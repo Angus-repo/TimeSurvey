@@ -51,6 +51,8 @@
   #resultArea .okr { border-right: 3px solid #28a745 !important; }
   .meetbox { margin: 10px 0 14px; font-size: 14px; color: #555; }
   .meetbox input { width: 70px; display: inline-block; padding: 4px 6px; }
+  #resultArea a { color: #2c7be5; font-size: 14px; text-decoration: none; }
+  #resultArea a:hover { text-decoration: underline; }
   /* 調查結論：共同有空時段的視覺化 */
   .concl { background: #f6fbf8; border: 1px solid #cde9db; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
   .concl .ctitle { font-size: 15px; font-weight: 700; color: #1d7a35; margin-bottom: 8px; }
@@ -323,9 +325,12 @@ function timeSlots(startTime, endTime) {
   return out;
 }
 
+let detailOpen = false;   // 調查明細表預設隱藏
+
 async function showResult(id) {
   const survey = surveys.find(x => x.id === id);
   const responses = await api('/api/surveys/' + id + '/responses');
+  if (!resultState || resultState.survey.id !== id) detailOpen = false;   // 換調查時收合明細
   resultState = { survey, responses };
   $('resultCard').style.display = '';
   $('resultTitle').textContent = '調查結果：' + survey.name;
@@ -421,6 +426,11 @@ function renderResult() {
 
   html += '<p class="muted">未填寫：' + (notAnswered.length ? esc(notAnswered.join('、')) : '（無，全部已填寫）') + '</p>';
 
+  // 明細表預設隱藏，點連結才展開
+  html += '<p><a href="javascript:void(0)" id="detailToggle" onclick="toggleDetail()">' +
+          (detailOpen ? '隱藏調查明細 ▲' : '顯示調查明細 ▼') + '</a></p>';
+  html += '<div id="detailWrap"' + (detailOpen ? '' : ' style="display:none"') + '>';
+
   html += '<table><thead><tr><th>日期</th><th>時間</th>';
   for (const p of ps) html += '<th>' + esc(p) + '</th>';
   html += '</tr></thead><tbody>';
@@ -453,7 +463,14 @@ function renderResult() {
   }
   html += '</tbody></table>';
   html += '<p class="muted">✓＝可出席；—＝尚未填寫；綠色大框＝每個人都有空、且可容納 ' + meetHours + ' 小時會議的連續時段區塊。</p>';
+  html += '</div>';
   $('resultArea').innerHTML = html;
+}
+
+function toggleDetail() {
+  detailOpen = !detailOpen;
+  $('detailWrap').style.display = detailOpen ? '' : 'none';
+  $('detailToggle').textContent = detailOpen ? '隱藏調查明細 ▲' : '顯示調查明細 ▼';
 }
 
 /* ---------- 完成通知（WebSocket 即時推播） ---------- */
@@ -503,6 +520,10 @@ function connectWs() {
 loadSurveys();
 updateNotifUi();
 connectWs();
+// 通知預設啟用：進入後台就自動向瀏覽器要求授權
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission().then(updateNotifUi);
+}
 </script>
 </body>
 </html>

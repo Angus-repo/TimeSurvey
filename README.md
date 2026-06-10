@@ -37,6 +37,16 @@ mvn package
 java -jar target/timesurvey-1.0.0.jar
 ```
 
+## Housekeeping 背景批次
+
+- 由 `application.properties` 的 `housekeeping.cron` 以 crontab 格式設定啟動時間（秒 分 時 日 月 週），預設每晚 20:00：
+
+  ```properties
+  housekeeping.cron=0 0 20 * * *
+  ```
+
+- 批次啟動時，以批次啟動日計算，**迄日已經過 7 日**的調查會連同填寫資料一併清除。
+
 ## 資料儲存
 
 所有設定與調查資料皆存於 H2 資料庫（`./data/timesurvey.mv.db`），重啟不會遺失。
