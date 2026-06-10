@@ -43,6 +43,9 @@ public class Survey {
 
     private LocalDateTime createdAt;
 
+    /** 結束調查時間，非 null 表示已結束、參與者不能再填寫 */
+    private LocalDateTime closedAt;
+
     /** 發起者識別碼（瀏覽器產生），只寫入不回傳，後台僅能看到自己發起的調查 */
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(length = 64)
@@ -71,6 +74,9 @@ public class Survey {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getClosedAt() { return closedAt; }
+    public void setClosedAt(LocalDateTime closedAt) { this.closedAt = closedAt; }
 
     public String getOwnerToken() { return ownerToken; }
     public void setOwnerToken(String ownerToken) { this.ownerToken = ownerToken; }

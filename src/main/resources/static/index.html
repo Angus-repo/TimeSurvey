@@ -25,6 +25,8 @@
   .btn-result { background: #6c5ce7; color: #fff; }
   .btn-edit { background: #f39c12; color: #fff; }
   .btn-del { background: #e74c3c; color: #fff; }
+  .btn-stop { background: #34495e; color: #fff; }
+  .closedtag { display: inline-block; padding: 2px 10px; border-radius: 12px; background: #95a5a6; color: #fff; font-size: 13px; }
   .btn-cancel { background: #95a5a6; color: #fff; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; vertical-align: top; }
@@ -182,9 +184,10 @@ async function loadSurveys() {
     const total = s.participants.length;
     const done = counts[i];
     const full = total > 0 && done >= total;
+    const closed = !!s.closedAt;
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${esc(s.name)}</td>
+      <td>${esc(s.name)}${closed ? ' <span class="closedtag">已結束</span>' : ''}</td>
       <td>${fmtYmd(s.startDate)} ~ ${fmtYmd(s.endDate)}</td>
       <td>${s.startTime.slice(0,5)} ~ ${s.endTime.slice(0,5)}</td>
       <td title="${esc(s.participants.join('、'))}">${total} 人</td>
@@ -192,6 +195,7 @@ async function loadSurveys() {
       <td>
         <button class="btn-sm btn-copy" onclick="copyLink('${s.id}')">複製調查連結</button>
         <button class="btn-sm btn-result" onclick="showResult('${s.id}')">查看結果</button>
+        ${closed ? '' : `<button class="btn-sm btn-stop" onclick="closeSurvey('${s.id}')">結束調查</button>`}
         <button class="btn-sm btn-edit" onclick="editSurvey('${s.id}')">編輯</button>
         <button class="btn-sm btn-del" onclick="deleteSurvey('${s.id}')">刪除</button>
       </td>`;
@@ -285,6 +289,18 @@ function resetForm() {
   $('cancelBtn').style.display = 'none';
 }
 
+async function closeSurvey(id) {
+  const s = surveys.find(x => x.id === id);
+  if (!confirm('確定結束調查「' + (s ? s.name : '') + '」？結束後參與者將無法再填寫時間。')) return;
+  try {
+    await api('/api/surveys/' + id + '/close', { method: 'POST' });
+    toast('調查已結束');
+    loadSurveys();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
 async function deleteSurvey(id) {
   const s = surveys.find(x => x.id === id);
   if (!confirm('確定刪除調查「' + (s ? s.name : '') + '」？已填寫的資料也會一併刪除。')) return;
@@ -333,7 +349,7 @@ async function showResult(id) {
   if (!resultState || resultState.survey.id !== id) detailOpen = false;   // 換調查時收合明細
   resultState = { survey, responses };
   $('resultCard').style.display = '';
-  $('resultTitle').textContent = '調查結果：' + survey.name;
+  $('resultTitle').textContent = '調查結果：' + survey.name + (survey.closedAt ? '（已結束）' : '');
   renderResult();
   $('resultCard').scrollIntoView({ behavior: 'smooth' });
 }

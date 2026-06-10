@@ -76,6 +76,18 @@ public class SurveyApiController {
         return surveyRepo.save(existing);
     }
 
+    /** 結束調查：之後參與者不能再填寫 */
+    @PostMapping("/{id}/close")
+    public Survey close(@PathVariable String id,
+                        @RequestHeader(value = "X-Owner-Token", required = false) String owner) {
+        Survey s = getOwned(id, owner);
+        if (s.getClosedAt() == null) {
+            s.setClosedAt(LocalDateTime.now());
+            s = surveyRepo.save(s);
+        }
+        return s;
+    }
+
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity<Void> delete(@PathVariable String id,
@@ -105,6 +117,9 @@ public class SurveyApiController {
     @PostMapping("/{id}/responses")
     public SurveyResponse saveResponse(@PathVariable String id, @RequestBody Map<String, String> body) {
         Survey survey = get(id);
+        if (survey.getClosedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "調查已結束，無法再填寫");
+        }
         String name = body.getOrDefault("participantName", "").trim();
         if (name.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "請選擇參與者姓名");

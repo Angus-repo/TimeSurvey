@@ -116,6 +116,11 @@ async function init() {
   $('subtitle').textContent = '調查期間：' + survey.startDate + ' ~ ' + survey.endDate +
       '，每日 ' + survey.startTime.slice(0,5) + ' ~ ' + survey.endTime.slice(0,5) + '（不含 12:00~13:00 午休）';
 
+  // 已結束的調查不開放填寫
+  if (survey.closedAt) {
+    return showErr('📋 本調查已結束，無法再填寫時間。如有疑問請聯絡調查發起人。');
+  }
+
   const who = $('who');
   for (const p of survey.participants) {
     const opt = document.createElement('option');
