@@ -30,6 +30,18 @@
                 stroke-linecap: round; stroke-linejoin: round; }
   .btn-ic:hover { background: var(--c); border-color: var(--c); color: #fff;
                   transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,.18); }
+  /* 自製提示框：滑上立即顯示（原生 title 要等 1~2 秒） */
+  .btn-ic { position: relative; }
+  .btn-ic::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%;
+                   transform: translateX(-50%); background: #2c3e50; color: #fff; font-size: 12px;
+                   padding: 6px 10px; border-radius: 6px; white-space: nowrap; opacity: 0; visibility: hidden;
+                   transition: opacity .08s; pointer-events: none; z-index: 30;
+                   box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  .btn-ic::before { content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%;
+                    transform: translateX(-50%); border: 5px solid transparent; border-top-color: #2c3e50;
+                    opacity: 0; visibility: hidden; transition: opacity .08s; pointer-events: none; z-index: 30; }
+  .btn-ic:hover::after, .btn-ic:hover::before { opacity: 1; visibility: visible; }
+  .ops .btn-ic:last-child::after { left: auto; right: 0; transform: none; }   /* 最右邊的提示靠右，避免超出畫面 */
   .btn-ic.copy   { --c: #00a884; }
   .btn-ic.result { --c: #6c5ce7; }
   .btn-ic.stop   { --c: #34495e; }
@@ -212,11 +224,11 @@ async function loadSurveys() {
       <td title="${esc(s.participants.join('、'))}">${total} 人</td>
       <td><span class="prog${full ? ' full' : ''}" title="${full ? '全部填寫完成' : '尚有 ' + (total - done) + ' 人未填'}">${done} / ${total}${full ? ' ✓' : ''}</span></td>
       <td><div class="ops">
-        <button class="btn-ic copy" onclick="copyLink('${s.id}')" title="複製調查連結" aria-label="複製調查連結">${ICONS.link}</button>
-        <button class="btn-ic result" onclick="showResult('${s.id}')" title="查看結果" aria-label="查看結果">${ICONS.chart}</button>
-        ${closed ? '' : `<button class="btn-ic stop" onclick="closeSurvey('${s.id}')" title="結束調查" aria-label="結束調查">${ICONS.stop}</button>`}
-        <button class="btn-ic edit" onclick="editSurvey('${s.id}')" title="編輯" aria-label="編輯">${ICONS.edit}</button>
-        <button class="btn-ic del" onclick="deleteSurvey('${s.id}')" title="刪除" aria-label="刪除">${ICONS.trash}</button>
+        <button class="btn-ic copy" onclick="copyLink('${s.id}')" data-tip="複製調查連結，傳給參與者即可填寫" aria-label="複製調查連結">${ICONS.link}</button>
+        <button class="btn-ic result" onclick="showResult('${s.id}')" data-tip="查看填寫狀況與共同有空的時段" aria-label="查看結果">${ICONS.chart}</button>
+        ${closed ? '' : `<button class="btn-ic stop" onclick="closeSurvey('${s.id}')" data-tip="結束調查，參與者將無法再填寫" aria-label="結束調查">${ICONS.stop}</button>`}
+        <button class="btn-ic edit" onclick="editSurvey('${s.id}')" data-tip="修改調查名稱、日期時間與人員名單" aria-label="編輯調查">${ICONS.edit}</button>
+        <button class="btn-ic del" onclick="deleteSurvey('${s.id}')" data-tip="刪除調查及所有已填寫的資料" aria-label="刪除調查">${ICONS.trash}</button>
       </div></td>`;
     tbody.appendChild(tr);
   });
