@@ -66,6 +66,9 @@ public class SurveyApiController {
     public Survey update(@PathVariable String id, @RequestBody Survey survey,
                          @RequestHeader(value = "X-Owner-Token", required = false) String owner) {
         Survey existing = getOwned(id, owner);
+        if (existing.getClosedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "調查已結束，無法編輯");
+        }
         validate(survey);
         existing.setName(survey.getName());
         existing.setStartDate(survey.getStartDate());
