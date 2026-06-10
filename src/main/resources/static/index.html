@@ -21,21 +21,27 @@
   .btn-primary { background: #2c7be5; color: #fff; }
   .btn-primary:hover { background: #1a68d1; }
   .btn-sm { padding: 4px 10px; font-size: 13px; margin-right: 4px; }
-  /* 清單操作的圖示按鈕 */
-  .btn-ic { width: 34px; height: 30px; padding: 0; margin-right: 4px; font-size: 16px; line-height: 1;
-            border-radius: 6px; }
-  .btn-ic:hover { filter: brightness(1.08); transform: translateY(-1px); }
-  .btn-copy { background: #00a884; color: #fff; }
-  .btn-result { background: #6c5ce7; color: #fff; }
-  .btn-edit { background: #f39c12; color: #fff; }
-  .btn-del { background: #e74c3c; color: #fff; }
-  .btn-stop { background: #34495e; color: #fff; }
+  /* 清單操作的圖示按鈕：平時淺底彩色線條圖示，滑過時填滿動作色 */
+  .ops { display: flex; gap: 6px; }
+  .btn-ic { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+            background: #f4f6f8; border: 1px solid #e4e8ec; border-radius: 8px; color: var(--c, #5a6470);
+            transition: background .15s, color .15s, box-shadow .15s, transform .15s; }
+  .btn-ic svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2;
+                stroke-linecap: round; stroke-linejoin: round; }
+  .btn-ic:hover { background: var(--c); border-color: var(--c); color: #fff;
+                  transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,.18); }
+  .btn-ic.copy   { --c: #00a884; }
+  .btn-ic.result { --c: #6c5ce7; }
+  .btn-ic.stop   { --c: #34495e; }
+  .btn-ic.edit   { --c: #f39c12; }
+  .btn-ic.del    { --c: #e74c3c; }
   .closedtag { display: inline-block; padding: 2px 10px; border-radius: 12px; background: #95a5a6; color: #fff; font-size: 13px; }
   .btn-cancel { background: #95a5a6; color: #fff; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; vertical-align: top; }
   th { background: #fafafa; color: #555; font-weight: 600; }
   .muted { color: #999; font-size: 13px; }
+  #surveyList td { vertical-align: middle; }
   .prog { display: inline-block; padding: 2px 10px; border-radius: 12px; background: #eee; color: #666; font-size: 13px; }
   .prog.full { background: #28a745; color: #fff; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: #fff;
@@ -157,6 +163,15 @@ async function api(url, opts) {
 let surveys = [];
 let resultState = null;   // { survey, responses }
 
+/* 操作鈕的線條風 SVG 圖示（Feather icons 風格） */
+const ICONS = {
+  link:  '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+  chart: '<svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>',
+  stop:  '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
+  edit:  '<svg viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>'
+};
+
 const WEEK = ['日','一','二','三','四','五','六'];
 
 /* "2026-06-10" -> "2026/6/10" */
@@ -196,13 +211,13 @@ async function loadSurveys() {
       <td>${s.startTime.slice(0,5)} ~ ${s.endTime.slice(0,5)}</td>
       <td title="${esc(s.participants.join('、'))}">${total} 人</td>
       <td><span class="prog${full ? ' full' : ''}" title="${full ? '全部填寫完成' : '尚有 ' + (total - done) + ' 人未填'}">${done} / ${total}${full ? ' ✓' : ''}</span></td>
-      <td>
-        <button class="btn-ic btn-copy" onclick="copyLink('${s.id}')" title="複製調查連結" aria-label="複製調查連結">🔗</button>
-        <button class="btn-ic btn-result" onclick="showResult('${s.id}')" title="查看結果" aria-label="查看結果">📊</button>
-        ${closed ? '' : `<button class="btn-ic btn-stop" onclick="closeSurvey('${s.id}')" title="結束調查" aria-label="結束調查">⏹</button>`}
-        <button class="btn-ic btn-edit" onclick="editSurvey('${s.id}')" title="編輯" aria-label="編輯">✏️</button>
-        <button class="btn-ic btn-del" onclick="deleteSurvey('${s.id}')" title="刪除" aria-label="刪除">🗑️</button>
-      </td>`;
+      <td><div class="ops">
+        <button class="btn-ic copy" onclick="copyLink('${s.id}')" title="複製調查連結" aria-label="複製調查連結">${ICONS.link}</button>
+        <button class="btn-ic result" onclick="showResult('${s.id}')" title="查看結果" aria-label="查看結果">${ICONS.chart}</button>
+        ${closed ? '' : `<button class="btn-ic stop" onclick="closeSurvey('${s.id}')" title="結束調查" aria-label="結束調查">${ICONS.stop}</button>`}
+        <button class="btn-ic edit" onclick="editSurvey('${s.id}')" title="編輯" aria-label="編輯">${ICONS.edit}</button>
+        <button class="btn-ic del" onclick="deleteSurvey('${s.id}')" title="刪除" aria-label="刪除">${ICONS.trash}</button>
+      </div></td>`;
     tbody.appendChild(tr);
   });
 }
