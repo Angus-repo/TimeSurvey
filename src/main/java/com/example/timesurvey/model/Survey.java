@@ -1,0 +1,68 @@
+package com.example.timesurvey.model;
+
+import jakarta.persistence.*;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Table(name = "survey")
+public class Survey {
+
+    /** 以 UUID 字串當主鍵，同時作為調查連結的識別碼 */
+    @Id
+    @Column(length = 36)
+    private String id;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false)
+    private LocalDate startDate;
+
+    @Column(nullable = false)
+    private LocalDate endDate;
+
+    /** 每日可調查的開始時間 */
+    @Column(nullable = false)
+    private LocalTime startTime;
+
+    /** 每日可調查的結束時間 */
+    @Column(nullable = false)
+    private LocalTime endTime;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "survey_participant", joinColumns = @JoinColumn(name = "survey_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "participant_name")
+    private List<String> participants = new ArrayList<>();
+
+    private LocalDateTime createdAt;
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public LocalDate getStartDate() { return startDate; }
+    public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
+
+    public LocalDate getEndDate() { return endDate; }
+    public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+
+    public LocalTime getStartTime() { return startTime; }
+    public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
+
+    public LocalTime getEndTime() { return endTime; }
+    public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
+
+    public List<String> getParticipants() { return participants; }
+    public void setParticipants(List<String> participants) { this.participants = participants; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+}

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>時間調查 - 後台維護</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; margin: 0; background: #f0f2f5; color: #333; }
+  header { background: #2c3e50; color: #fff; padding: 16px 24px; }
+  header h1 { margin: 0; font-size: 20px; }
+  .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); padding: 20px; margin-bottom: 24px; }
+  .card h2 { margin-top: 0; font-size: 17px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+  label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
+  input, textarea, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; font-family: inherit; }
+  textarea { resize: vertical; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  .row > div { flex: 1; min-width: 150px; }
+  button { cursor: pointer; border: none; border-radius: 4px; padding: 8px 16px; font-size: 14px; font-family: inherit; }
+  .btn-primary { background: #2c7be5; color: #fff; }
+  .btn-primary:hover { background: #1a68d1; }
+  .btn-sm { padding: 4px 10px; font-size: 13px; margin-right: 4px; }
+  .btn-copy { background: #00a884; color: #fff; }
+  .btn-result { background: #6c5ce7; color: #fff; }
+  .btn-edit { background: #f39c12; color: #fff; }
+  .btn-del { background: #e74c3c; color: #fff; }
+  .btn-cancel { background: #95a5a6; color: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; vertical-align: top; }
+  th { background: #fafafa; color: #555; font-weight: 600; }
+  .muted { color: #999; font-size: 13px; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: #fff;
+           padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  /* 結果表 */
+  #resultArea table { font-size: 12px; }
+  #resultArea th, #resultArea td { border: 1px solid #ddd; text-align: center; padding: 4px 6px; }
+  #resultArea td.c0 { background: #fff; color: #ccc; }
+  #resultArea td.heat { color: #1b4332; font-weight: 600; cursor: default; }
+</style>
+</head>
+<body>
+<header><h1>⏰ 時間調查 - 後台維護</h1></header>
+<div class="container">
+
+  <div class="card">
+    <h2 id="formTitle">建立新調查</h2>
+    <input type="hidden" id="editId">
+    <div class="row">
+      <div style="flex:2">
+        <label>調查名稱</label>
+        <input id="fName" placeholder="例如：六月份部門會議時間調查">
+      </div>
+    </div>
+    <div class="row">
+      <div><label>開始日期</label><input type="date" id="fStartDate"></div>
+      <div><label>結束日期</label><input type="date" id="fEndDate"></div>
+      <div><label>每日開始時間</label><input type="time" id="fStartTime" step="1800" value="09:00"></div>
+      <div><label>每日結束時間</label><input type="time" id="fEndTime" step="1800" value="18:00"></div>
+    </div>
+    <div class="row">
+      <div>
+        <label>受調查人員（每行一位）</label>
+        <textarea id="fParticipants" rows="4" placeholder="王小明&#10;李小華&#10;陳大文"></textarea>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="saveSurvey()" id="saveBtn">建立調查</button>
+    <button class="btn-cancel" onclick="resetForm()" id="cancelBtn" style="display:none">取消編輯</button>
+  </div>
+
+  <div class="card">
+    <h2>調查清單</h2>
+    <table>
+      <thead>
+        <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th style="width:330px">操作</th></tr>
+      </thead>
+      <tbody id="surveyList"></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <h2 id="resultTitle">調查結果</h2>
+    <div id="resultArea" style="overflow-x:auto"></div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+async function api(url, opts) {
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    let msg = '操作失敗';
+    try { msg = (await res.json()).message || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+let surveys = [];
+
+async function loadSurveys() {
+  surveys = await api('/api/surveys');
+  const tbody = $('surveyList');
+  tbody.innerHTML = '';
+  if (surveys.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="muted">尚無調查，請先建立。</td></tr>';
+    return;
+  }
+  for (const s of surveys) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${esc(s.name)}</td>
+      <td>${s.startDate} ~ ${s.endDate}</td>
+      <td>${s.startTime.slice(0,5)} ~ ${s.endTime.slice(0,5)}</td>
+      <td title="${esc(s.participants.join('、'))}">${s.participants.length} 人</td>
+      <td>
+        <button class="btn-sm btn-copy" onclick="copyLink('${s.id}')">複製調查連結</button>
+        <button class="btn-sm btn-result" onclick="showResult('${s.id}')">查看結果</button>
+        <button class="btn-sm btn-edit" onclick="editSurvey('${s.id}')">編輯</button>
+        <button class="btn-sm btn-del" onclick="deleteSurvey('${s.id}')">刪除</button>
+      </td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function surveyUrl(id) {
+  return location.origin + '/s/' + id;
+}
+
+function copyLink(id) {
+  const url = surveyUrl(id);
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(url).then(() => toast('已複製調查連結：' + url));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已複製調查連結：' + url);
+  }
+}
+
+function readForm() {
+  return {
+    name: $('fName').value.trim(),
+    startDate: $('fStartDate').value,
+    endDate: $('fEndDate').value,
+    startTime: $('fStartTime').value,
+    endTime: $('fEndTime').value,
+    participants: $('fParticipants').value.split('\n').map(s => s.trim()).filter(s => s)
+  };
+}
+
+async function saveSurvey() {
+  const body = readForm();
+  if (!body.name) return toast('請輸入調查名稱');
+  if (!body.startDate || !body.endDate) return toast('請選擇日期範圍');
+  if (body.endDate < body.startDate) return toast('結束日期不可早於開始日期');
+  if (!body.startTime || !body.endTime || body.endTime <= body.startTime) return toast('時間範圍不正確');
+  if (body.participants.length === 0) return toast('請至少輸入一位受調查人員');
+
+  const editId = $('editId').value;
+  try {
+    await api(editId ? '/api/surveys/' + editId : '/api/surveys', {
+      method: editId ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    toast(editId ? '已更新調查' : '已建立調查');
+    resetForm();
+    loadSurveys();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+function editSurvey(id) {
+  const s = surveys.find(x => x.id === id);
+  if (!s) return;
+  $('editId').value = s.id;
+  $('fName').value = s.name;
+  $('fStartDate').value = s.startDate;
+  $('fEndDate').value = s.endDate;
+  $('fStartTime').value = s.startTime.slice(0,5);
+  $('fEndTime').value = s.endTime.slice(0,5);
+  $('fParticipants').value = s.participants.join('\n');
+  $('formTitle').textContent = '編輯調查：' + s.name;
+  $('saveBtn').textContent = '儲存修改';
+  $('cancelBtn').style.display = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function resetForm() {
+  $('editId').value = '';
+  $('fName').value = '';
+  $('fStartDate').value = '';
+  $('fEndDate').value = '';
+  $('fStartTime').value = '09:00';
+  $('fEndTime').value = '18:00';
+  $('fParticipants').value = '';
+  $('formTitle').textContent = '建立新調查';
+  $('saveBtn').textContent = '建立調查';
+  $('cancelBtn').style.display = 'none';
+}
+
+async function deleteSurvey(id) {
+  const s = surveys.find(x => x.id === id);
+  if (!confirm('確定刪除調查「' + (s ? s.name : '') + '」？已填寫的資料也會一併刪除。')) return;
+  try {
+    await api('/api/surveys/' + id, { method: 'DELETE' });
+    toast('已刪除');
+    $('resultCard').style.display = 'none';
+    loadSurveys();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+/* ---------- 結果檢視 ---------- */
+function dateList(start, end) {
+  const out = [];
+  let d = new Date(start + 'T00:00:00');
+  const e = new Date(end + 'T00:00:00');
+  while (d <= e) {
+    out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+}
+
+function timeSlots(startTime, endTime) {
+  const out = [];
+  let [h, m] = startTime.slice(0,5).split(':').map(Number);
+  const [eh, em] = endTime.slice(0,5).split(':').map(Number);
+  while (h * 60 + m < eh * 60 + em) {
+    out.push(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'));
+    m += 30;
+    if (m >= 60) { m -= 60; h++; }
+  }
+  return out;
+}
+
+async function showResult(id) {
+  const s = surveys.find(x => x.id === id);
+  const responses = await api('/api/surveys/' + id + '/responses');
+  $('resultCard').style.display = '';
+  $('resultTitle').textContent = '調查結果：' + s.name;
+
+  const dates = dateList(s.startDate, s.endDate);
+  const times = timeSlots(s.startTime, s.endTime);
+
+  // slotKey -> [參與者名單]
+  const map = {};
+  for (const r of responses) {
+    for (const slot of (r.slots || '').split(',').filter(x => x)) {
+      (map[slot] = map[slot] || []).push(r.participantName);
+    }
+  }
+
+  const answered = responses.map(r => r.participantName);
+  const notAnswered = s.participants.filter(p => !answered.includes(p));
+  let html = '<p>已填寫：' + (answered.length ? esc(answered.join('、')) : '（無）') +
+             '　<span class="muted">未填寫：' + (notAnswered.length ? esc(notAnswered.join('、')) : '（無）') + '</span></p>';
+
+  html += '<table><thead><tr><th>時間</th>';
+  for (const d of dates) html += '<th>' + d.slice(5) + '</th>';
+  html += '</tr></thead><tbody>';
+  const max = Math.max(1, answered.length);
+  for (const t of times) {
+    html += '<tr><th>' + t + '</th>';
+    for (const d of dates) {
+      const names = map[d + 'T' + t] || [];
+      if (names.length === 0) {
+        html += '<td class="c0">0</td>';
+      } else {
+        const alpha = 0.15 + 0.65 * (names.length / max);
+        html += '<td class="heat" style="background:rgba(0,168,132,' + alpha.toFixed(2) + ')" title="' +
+                esc(names.join('、')) + '">' + names.length + '</td>';
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table><p class="muted">儲存格數字為可出席人數，滑鼠移上可看名單。</p>';
+  $('resultArea').innerHTML = html;
+  $('resultCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+loadSurveys();
+</script>
+</body>
+</html>
