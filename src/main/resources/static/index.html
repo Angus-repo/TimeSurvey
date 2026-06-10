@@ -57,7 +57,7 @@
       <div><label>開始日期</label><input type="date" id="fStartDate"></div>
       <div><label>結束日期</label><input type="date" id="fEndDate"></div>
       <div><label>每日開始時間</label><input type="time" id="fStartTime" step="1800" value="09:00"></div>
-      <div><label>每日結束時間</label><input type="time" id="fEndTime" step="1800" value="18:00"></div>
+      <div><label>每日結束時間</label><input type="time" id="fEndTime" step="1800" value="17:00"></div>
     </div>
     <div class="row">
       <div>
@@ -213,7 +213,7 @@ function resetForm() {
   $('fStartDate').value = '';
   $('fEndDate').value = '';
   $('fStartTime').value = '09:00';
-  $('fEndTime').value = '18:00';
+  $('fEndTime').value = '17:00';
   $('fParticipants').value = '';
   $('formTitle').textContent = '建立新調查';
   $('saveBtn').textContent = '建立調查';
@@ -250,7 +250,9 @@ function timeSlots(startTime, endTime) {
   let [h, m] = startTime.slice(0,5).split(':').map(Number);
   const [eh, em] = endTime.slice(0,5).split(':').map(Number);
   while (h * 60 + m < eh * 60 + em) {
-    out.push(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'));
+    const t = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+    // 12:00~13:00 為午休，不列入調查時段
+    if (t < '12:00' || t >= '13:00') out.push(t);
     m += 30;
     if (m >= 60) { m -= 60; h++; }
   }
@@ -279,25 +281,29 @@ async function showResult(id) {
   let html = '<p>已填寫：' + (answered.length ? esc(answered.join('、')) : '（無）') +
              '　<span class="muted">未填寫：' + (notAnswered.length ? esc(notAnswered.join('、')) : '（無）') + '</span></p>';
 
-  html += '<table><thead><tr><th>時間</th>';
-  for (const d of dates) html += '<th>' + d.slice(5) + '</th>';
+  const hours = [...new Set(times.map(t => t.slice(0, 2)))];
+  const WEEK = ['日','一','二','三','四','五','六'];
+  html += '<table><thead><tr><th>日期 \\ 時間</th>';
+  for (const h of hours) html += '<th>' + h + '時</th>';
   html += '</tr></thead><tbody>';
   const max = Math.max(1, answered.length);
-  for (const t of times) {
-    html += '<tr><th>' + t + '</th>';
-    for (const d of dates) {
-      const names = map[d + 'T' + t] || [];
-      if (names.length === 0) {
-        html += '<td class="c0">0</td>';
-      } else {
-        const alpha = 0.15 + 0.65 * (names.length / max);
-        html += '<td class="heat" style="background:rgba(0,168,132,' + alpha.toFixed(2) + ')" title="' +
-                esc(names.join('、')) + '">' + names.length + '</td>';
-      }
-    }
+  const cell = (d, t) => {
+    if (!times.includes(t)) return '<td class="c0"></td>';
+    const names = map[d + 'T' + t] || [];
+    if (names.length === 0) return '<td class="c0" title="' + d + ' ' + t + '">0</td>';
+    const alpha = 0.15 + 0.65 * (names.length / max);
+    return '<td class="heat" style="background:rgba(0,168,132,' + alpha.toFixed(2) + ')" title="' +
+           d + ' ' + t + '：' + esc(names.join('、')) + '">' + names.length + '</td>';
+  };
+  for (const d of dates) {
+    const w = WEEK[new Date(d + 'T00:00:00').getDay()];
+    html += '<tr><th rowspan="2">' + d.slice(5).replace('-', '/') + '（週' + w + '）</th>';
+    for (const h of hours) html += cell(d, h + ':00');
+    html += '</tr><tr>';
+    for (const h of hours) html += cell(d, h + ':30');
     html += '</tr>';
   }
-  html += '</tbody></table><p class="muted">儲存格數字為可出席人數，滑鼠移上可看名單。</p>';
+  html += '</tbody></table><p class="muted">每個日期占一列，同一小時的 :00 / :30 兩個時段上下排列；儲存格數字為可出席人數，滑鼠移上可看名單。</p>';
   $('resultArea').innerHTML = html;
   $('resultCard').scrollIntoView({ behavior: 'smooth' });
 }

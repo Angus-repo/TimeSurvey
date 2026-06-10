@@ -10,21 +10,28 @@
   header { background: #00a884; color: #fff; padding: 16px 24px; }
   header h1 { margin: 0; font-size: 20px; }
   header p { margin: 6px 0 0; font-size: 13px; opacity: .9; }
-  .container { max-width: 900px; margin: 24px auto; padding: 0 16px 60px; }
+  .container { max-width: 1100px; margin: 24px auto; padding: 0 16px 70px; }
   .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); padding: 16px 20px; margin-bottom: 16px; }
   label { font-size: 14px; color: #555; }
   select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; font-family: inherit; min-width: 200px; }
-  .day-card h3 { margin: 0 0 10px; font-size: 16px; color: #2c3e50; }
-  .quick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-  .quick label { display: inline-flex; align-items: center; gap: 5px; background: #eef6f3; border: 1px solid #bfe3d8;
-                 border-radius: 16px; padding: 5px 12px; cursor: pointer; font-size: 14px; user-select: none; }
+  .hint { font-size: 13px; color: #999; margin-left: 8px; }
+
+  /* 時段表格：每個日期一列，同一小時的 :00/:30 上下兩格 */
+  .gridwrap { overflow-x: auto; }
+  table.grid { border-collapse: separate; border-spacing: 3px; width: 100%; }
+  table.grid thead th { font-size: 13px; color: #777; font-weight: 600; padding: 4px 2px; }
+  .datecell { background: #f7f9f8; border: 1px solid #e2e8e5; border-radius: 6px; padding: 8px 10px;
+              text-align: left; vertical-align: top; min-width: 132px; }
+  .datecell .dname { font-size: 15px; color: #2c3e50; font-weight: 700; margin-bottom: 6px; white-space: nowrap; }
+  .quick { display: flex; gap: 4px; flex-wrap: wrap; }
+  .quick label { display: inline-flex; align-items: center; background: #eef6f3; border: 1px solid #bfe3d8;
+                 border-radius: 12px; padding: 2px 9px; cursor: pointer; font-size: 12px; user-select: none; white-space: nowrap; }
   .quick label.on { background: #00a884; border-color: #00a884; color: #fff; }
-  .quick input { display: none; }
-  .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 6px; }
-  .slot { display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; border-radius: 4px;
-          padding: 6px 2px; font-size: 13px; cursor: pointer; user-select: none; background: #fff; }
-  .slot.on { background: #00a884; border-color: #00a884; color: #fff; }
-  .slot input { display: none; }
+  td.slot { border: 1px solid #ccc; border-radius: 4px; padding: 7px 4px; font-size: 13px; text-align: center;
+            cursor: pointer; user-select: none; background: #fff; min-width: 58px; white-space: nowrap; }
+  td.slot.on { background: #00a884; border-color: #00a884; color: #fff; }
+  td.na { border: none; background: transparent; }
+
   .submit-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; box-shadow: 0 -2px 8px rgba(0,0,0,.1);
                 padding: 10px 16px; text-align: center; }
   .submit-bar button { background: #2c7be5; color: #fff; border: none; border-radius: 6px;
@@ -46,9 +53,9 @@
   <div class="card">
     <label>您的姓名：</label>
     <select id="who"><option value="">-- 請選擇 --</option></select>
-    <span style="font-size:13px;color:#999;margin-left:8px">選擇後請勾選您可以出席的時間（可勾選全天、上午、下午或個別 30 分鐘時段）</span>
+    <span class="hint">選擇後請勾選您可以出席的時間（可點全天、上午、下午快速鈕，或個別 30 分鐘時段）</span>
   </div>
-  <div id="days"></div>
+  <div class="card gridwrap" id="gridCard"></div>
 </div>
 <div class="err" id="err" style="display:none"></div>
 <div class="submit-bar" id="bar" style="display:none">
@@ -63,7 +70,7 @@ const surveyId = location.pathname.split('/')[2];
 
 let survey = null;
 let selected = new Set();   // "yyyy-MM-ddTHH:mm"
-let allResponses = [];
+let times = [], amTimes = [], pmTimes = [], hours = [];
 
 function toast(msg) {
   const t = $('toast');
@@ -88,7 +95,9 @@ function timeSlots(startTime, endTime) {
   let [h, m] = startTime.slice(0,5).split(':').map(Number);
   const [eh, em] = endTime.slice(0,5).split(':').map(Number);
   while (h * 60 + m < eh * 60 + em) {
-    out.push(String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0'));
+    const t = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+    // 12:00~13:00 為午休，不列入調查時段
+    if (t < '12:00' || t >= '13:00') out.push(t);
     m += 30;
     if (m >= 60) { m -= 60; h++; }
   }
@@ -105,7 +114,7 @@ async function init() {
 
   $('title').textContent = survey.name;
   $('subtitle').textContent = '調查期間：' + survey.startDate + ' ~ ' + survey.endDate +
-      '，每日 ' + survey.startTime.slice(0,5) + ' ~ ' + survey.endTime.slice(0,5);
+      '，每日 ' + survey.startTime.slice(0,5) + ' ~ ' + survey.endTime.slice(0,5) + '（不含 12:00~13:00 午休）';
 
   const who = $('who');
   for (const p of survey.participants) {
@@ -115,7 +124,12 @@ async function init() {
   }
   who.onchange = loadMyResponse;
 
-  renderDays();
+  times = timeSlots(survey.startTime, survey.endTime);
+  amTimes = times.filter(t => t < '12:00');
+  pmTimes = times.filter(t => t >= '13:00');   // 下午從 13:00 開始
+  hours = [...new Set(times.map(t => t.slice(0, 2)))];
+
+  renderGrid();
   $('main').style.display = '';
   $('bar').style.display = '';
 }
@@ -125,85 +139,70 @@ function showErr(msg) {
   $('err').style.display = '';
 }
 
-function renderDays() {
+function renderGrid() {
   const dates = dateList(survey.startDate, survey.endDate);
-  const times = timeSlots(survey.startTime, survey.endTime);
-  const container = $('days');
-  container.innerHTML = '';
+
+  let html = '<table class="grid"><thead><tr><th style="text-align:left">日期 \\ 時間</th>';
+  for (const h of hours) html += '<th>' + h + '時</th>';
+  html += '</tr></thead><tbody>';
+
+  const cell = (d, t) => {
+    if (!times.includes(t)) return '<td class="na"></td>';
+    return '<td class="slot" data-slot="' + d + 'T' + t + '">' + t + '</td>';
+  };
 
   for (const d of dates) {
     const w = WEEK[new Date(d + 'T00:00:00').getDay()];
-    const card = document.createElement('div');
-    card.className = 'card day-card';
-    card.dataset.date = d;
-
-    const amTimes = times.filter(t => t < '12:00');
-    const pmTimes = times.filter(t => t >= '12:00');
-
-    let quick = '<div class="quick">' +
-      '<label data-grp="all"><input type="checkbox">全天</label>';
-    if (amTimes.length) quick += '<label data-grp="am"><input type="checkbox">上午</label>';
-    if (pmTimes.length) quick += '<label data-grp="pm"><input type="checkbox">下午</label>';
-    quick += '</div>';
-
-    let slotsHtml = '<div class="slots">';
-    for (const t of times) {
-      slotsHtml += '<label class="slot" data-slot="' + d + 'T' + t + '"><input type="checkbox">' + t + '</label>';
-    }
-    slotsHtml += '</div>';
-
-    card.innerHTML = '<h3>' + d + '（週' + w + '）</h3>' + quick + slotsHtml;
-    container.appendChild(card);
-
-    // 個別時段點擊
-    card.querySelectorAll('.slot').forEach(el => {
-      el.addEventListener('click', e => {
-        e.preventDefault();
-        toggleSlot(el.dataset.slot);
-      });
-    });
-    // 全天 / 上午 / 下午
-    card.querySelectorAll('.quick label').forEach(el => {
-      el.addEventListener('click', e => {
-        e.preventDefault();
-        const grp = el.dataset.grp;
-        const list = (grp === 'all' ? times : grp === 'am' ? amTimes : pmTimes).map(t => d + 'T' + t);
-        const allOn = list.every(s => selected.has(s));
-        for (const s of list) allOn ? selected.delete(s) : selected.add(s);
-        refreshDay(card, times, amTimes, pmTimes);
-        updateCount();
-      });
-    });
+    const md = d.slice(5).replace('-', '/');
+    // 日期欄跨上下兩列（:00 / :30）
+    html += '<tr><th class="datecell" rowspan="2"><div class="dname">' + md + '（週' + w + '）</div>' +
+            '<div class="quick" data-date="' + d + '">' +
+            '<label data-grp="all">全天</label>' +
+            (amTimes.length ? '<label data-grp="am">上午</label>' : '') +
+            (pmTimes.length ? '<label data-grp="pm">下午</label>' : '') +
+            '</div></th>';
+    for (const h of hours) html += cell(d, h + ':00');
+    html += '</tr><tr>';
+    for (const h of hours) html += cell(d, h + ':30');
+    html += '</tr>';
   }
-  refreshAll();
-}
+  html += '</tbody></table>';
+  $('gridCard').innerHTML = html;
 
-function toggleSlot(slot) {
-  selected.has(slot) ? selected.delete(slot) : selected.add(slot);
+  // 個別 30 分鐘時段點擊
+  document.querySelectorAll('td.slot').forEach(el => {
+    el.addEventListener('click', () => {
+      const s = el.dataset.slot;
+      selected.has(s) ? selected.delete(s) : selected.add(s);
+      refreshAll();
+    });
+  });
+  // 全天 / 上午 / 下午 快速鈕
+  document.querySelectorAll('.quick label').forEach(el => {
+    el.addEventListener('click', () => {
+      const d = el.parentElement.dataset.date;
+      const grp = el.dataset.grp;
+      const list = (grp === 'all' ? times : grp === 'am' ? amTimes : pmTimes).map(t => d + 'T' + t);
+      const allOn = list.every(s => selected.has(s));
+      for (const s of list) allOn ? selected.delete(s) : selected.add(s);
+      refreshAll();
+    });
+  });
   refreshAll();
 }
 
 function refreshAll() {
-  const times = timeSlots(survey.startTime, survey.endTime);
-  const amTimes = times.filter(t => t < '12:00');
-  const pmTimes = times.filter(t => t >= '12:00');
-  document.querySelectorAll('.day-card').forEach(card => refreshDay(card, times, amTimes, pmTimes));
-  updateCount();
-}
-
-function refreshDay(card, times, amTimes, pmTimes) {
-  const d = card.dataset.date;
-  card.querySelectorAll('.slot').forEach(el => {
+  document.querySelectorAll('td.slot').forEach(el => {
     el.classList.toggle('on', selected.has(el.dataset.slot));
   });
-  const isOn = list => list.length > 0 && list.every(t => selected.has(d + 'T' + t));
-  card.querySelectorAll('.quick label').forEach(el => {
-    const grp = el.dataset.grp;
-    el.classList.toggle('on', isOn(grp === 'all' ? times : grp === 'am' ? amTimes : pmTimes));
+  document.querySelectorAll('.quick').forEach(q => {
+    const d = q.dataset.date;
+    const isOn = list => list.length > 0 && list.every(t => selected.has(d + 'T' + t));
+    q.querySelectorAll('label').forEach(el => {
+      const grp = el.dataset.grp;
+      el.classList.toggle('on', isOn(grp === 'all' ? times : grp === 'am' ? amTimes : pmTimes));
+    });
   });
-}
-
-function updateCount() {
   $('count').textContent = '已勾選 ' + selected.size + ' 個時段';
 }
 
