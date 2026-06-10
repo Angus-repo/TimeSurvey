@@ -51,6 +51,16 @@
   #resultArea .okr { border-right: 3px solid #28a745 !important; }
   .meetbox { margin: 10px 0 14px; font-size: 14px; color: #555; }
   .meetbox input { width: 70px; display: inline-block; padding: 4px 6px; }
+  /* 調查結論：共同有空時段的視覺化 */
+  .concl { background: #f6fbf8; border: 1px solid #cde9db; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; }
+  .concl .ctitle { font-size: 15px; font-weight: 700; color: #1d7a35; margin-bottom: 8px; }
+  .concl .cnote { font-size: 13px; color: #888; margin-top: 6px; }
+  .concl .cday { margin: 5px 0; font-size: 14px; }
+  .concl .dlabel { display: inline-block; min-width: 110px; font-weight: 600; color: #2c3e50; }
+  .concl .none { color: #c0c6c3; font-size: 13px; }
+  .chip { display: inline-block; margin: 2px 8px 2px 0; padding: 4px 14px; border-radius: 14px; font-size: 13px;
+          background: #e9ecef; color: #888; border: 1px solid #d4d8db; white-space: nowrap; }
+  .chip.fit { background: #28a745; color: #fff; border-color: #28a745; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -311,31 +321,34 @@ async function showResult(id) {
   $('resultCard').scrollIntoView({ behavior: 'smooth' });
 }
 
-/* 找出「所有人都有空」且長度足夠容納會議的連續區塊。
-   回傳 Map：slot -> { top, bottom }，top/bottom 表示該列是區塊的第一列/最後一列 */
-function computeOkFrames(survey, sets, dates, times, meetHours) {
-  const need = Math.max(1, Math.round(meetHours * 2));   // 30 分鐘為一格
+/* 找出每一天「每個人都有空」的最大連續區塊（午休 12:00~13:00 會中斷連續性）。
+   回傳 [{ date, slots: ['09:00', ...] }] */
+function computeCommonRuns(survey, sets, dates, times) {
   const ps = survey.participants;
   const everyoneFree = slot => ps.length > 0 && ps.every(p => sets[p] && sets[p].has(slot));
   const toMin = t => (+t.slice(0,2)) * 60 + (+t.slice(3,5));
-  const frames = new Map();
+  const runs = [];
   for (const d of dates) {
     let run = [];
     const flush = () => {
-      if (run.length >= need) {
-        run.forEach((slot, idx) => frames.set(slot, { top: idx === 0, bottom: idx === run.length - 1 }));
-      }
+      if (run.length > 0) runs.push({ date: d, slots: run });
       run = [];
     };
     times.forEach((t, i) => {
-      // 與前一格不連續（如午休 12:00~13:00）就先結算前一段
       if (run.length > 0 && toMin(t) !== toMin(times[i - 1]) + 30) flush();
-      if (everyoneFree(d + 'T' + t)) run.push(d + 'T' + t);
+      if (everyoneFree(d + 'T' + t)) run.push(t);
       else flush();
     });
     flush();
   }
-  return frames;
+  return runs;
+}
+
+/* "10:30" + 30分 -> "11:00" */
+function plus30(t) {
+  let h = +t.slice(0,2), m = +t.slice(3,5) + 30;
+  if (m >= 60) { m -= 60; h++; }
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
 }
 
 function renderResult() {
@@ -354,9 +367,47 @@ function renderResult() {
   const notAnswered = ps.filter(p => !respondedSet.has(p));
 
   const meetHours = parseFloat($('meetHours').value) || 1;
-  const okFrames = computeOkFrames(survey, sets, dates, times, meetHours);
+  const need = Math.max(1, Math.round(meetHours * 2));   // 30 分鐘為一格
+  const runs = computeCommonRuns(survey, sets, dates, times);
+  // 長度足以容納會議的區塊，在主表以綠色大框標示
+  const okFrames = new Map();
+  for (const r of runs) {
+    if (r.slots.length < need) continue;
+    r.slots.forEach((t, idx) => okFrames.set(r.date + 'T' + t,
+      { top: idx === 0, bottom: idx === r.slots.length - 1 }));
+  }
 
-  let html = '<p class="muted">未填寫：' + (notAnswered.length ? esc(notAnswered.join('、')) : '（無，全部已填寫）') + '</p>';
+  /* ---- 調查結論：視覺化顯示所有人共同有空的時段 ---- */
+  let html = '<div class="concl"><div class="ctitle">📊 調查結論：每個人都有空的時段</div>';
+  if (notAnswered.length) {
+    html += '<div class="cnote">⚠ ' + esc(notAnswered.join('、')) + ' 尚未填寫，目前無法得出共同時段。</div>';
+  } else if (runs.length === 0) {
+    html += '<div class="cnote">目前沒有所有人共同有空的時段。</div>';
+  } else {
+    for (const d of dates) {
+      const w = WEEK[new Date(d + 'T00:00:00').getDay()];
+      const dayRuns = runs.filter(r => r.date === d);
+      html += '<div class="cday"><span class="dlabel">' + fmtMd(d) + '（週' + w + '）</span>';
+      if (dayRuns.length === 0) {
+        html += '<span class="none">— 無共同時段 —</span>';
+      } else {
+        for (const r of dayRuns) {
+          const from = r.slots[0];
+          const to = plus30(r.slots[r.slots.length - 1]);
+          const hrs = parseFloat((r.slots.length * 0.5).toFixed(1));
+          const fit = r.slots.length >= need;
+          html += '<span class="chip' + (fit ? ' fit' : '') + '" title="' +
+                  (fit ? '可容納 ' + meetHours + ' 小時會議' : '長度不足 ' + meetHours + ' 小時') + '">' +
+                  from + ' ~ ' + to + '（' + hrs + ' 小時）' + (fit ? ' ✓' : '') + '</span>';
+        }
+      }
+      html += '</div>';
+    }
+    html += '<div class="cnote muted">綠色＝長度可容納 ' + meetHours + ' 小時會議的時段；灰色＝大家都有空但長度不足。</div>';
+  }
+  html += '</div>';
+
+  html += '<p class="muted">未填寫：' + (notAnswered.length ? esc(notAnswered.join('、')) : '（無，全部已填寫）') + '</p>';
 
   html += '<table><thead><tr><th>日期</th><th>時間</th>';
   for (const p of ps) html += '<th>' + esc(p) + '</th>';
