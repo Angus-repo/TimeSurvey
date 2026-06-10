@@ -1,22 +1,35 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "BDD 測試 (Cucumber)",
-      "detail": "執行 src/test/resources/features 下所有 Cucumber 場景",
-      "type": "shell",
-      "command": "mvn",
-      "args": ["test"],
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "clear": true
-      },
-      "problemMatcher": []
-    }
-  ]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "BDD 測試 (Cucumber)",
+            "detail": "執行 src/test/resources/features 下所有 Cucumber 情境測試",
+            "type": "shell",
+            "command": "mvn",
+            "args": ["test"],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "啟動 TimeSurvey",
+            "detail": "以 Spring Boot 啟動時間調查網站（http://localhost:8080）",
+            "type": "shell",
+            "command": "mvn",
+            "args": ["spring-boot:run"],
+            "isBackground": true,
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            },
+            "problemMatcher": []
+        }
+    ]
 }
