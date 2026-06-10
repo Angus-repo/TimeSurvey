@@ -84,7 +84,10 @@ function dateList(start, end) {
   let d = new Date(start + 'T00:00:00');
   const e = new Date(end + 'T00:00:00');
   while (d <= e) {
-    out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    // 跳過週六(6)、週日(0)
+    if (d.getDay() !== 0 && d.getDay() !== 6) {
+      out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    }
     d.setDate(d.getDate() + 1);
   }
   return out;
@@ -114,7 +117,7 @@ async function init() {
 
   $('title').textContent = survey.name;
   $('subtitle').textContent = '調查期間：' + survey.startDate + ' ~ ' + survey.endDate +
-      '，每日 ' + survey.startTime.slice(0,5) + ' ~ ' + survey.endTime.slice(0,5) + '（不含 12:00~13:00 午休）';
+      '，每日 ' + survey.startTime.slice(0,5) + ' ~ ' + survey.endTime.slice(0,5) + '（不含週六日及 12:00~13:00 午休）';
 
   // 已結束的調查不開放填寫
   if (survey.closedAt) {
@@ -146,6 +149,9 @@ function showErr(msg) {
 
 function renderGrid() {
   const dates = dateList(survey.startDate, survey.endDate);
+  if (dates.length === 0) {
+    return showErr('調查日期範圍內沒有工作日（週六日不列入調查），請聯絡調查發起人調整日期。');
+  }
 
   let html = '<table class="grid"><thead><tr><th style="text-align:left">日期 \\ 時間</th>';
   for (const h of hours) html += '<th>' + h + '時</th>';

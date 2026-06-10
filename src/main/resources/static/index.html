@@ -321,7 +321,10 @@ function dateList(start, end) {
   let d = new Date(start + 'T00:00:00');
   const e = new Date(end + 'T00:00:00');
   while (d <= e) {
-    out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    // 跳過週六(6)、週日(0)
+    if (d.getDay() !== 0 && d.getDay() !== 6) {
+      out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    }
     d.setDate(d.getDate() + 1);
   }
   return out;
