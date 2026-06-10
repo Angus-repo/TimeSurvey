@@ -44,8 +44,11 @@
   #resultArea td.no { color: #ddd; }
   #resultArea td.nr { background: #f5f5f5; color: #bbb; }
   #resultArea tr.hourtop th.tcell, #resultArea tr.hourtop td { border-top: 2px solid #bbb; }
-  #resultArea tr.okrow th.tcell { box-shadow: inset 0 0 0 2px #28a745; color: #1d7a35; font-weight: 700; }
-  #resultArea tr.okrow td { box-shadow: inset 0 0 0 2px #28a745; }
+  /* 符合會議時間的區塊：整塊一個綠色大框（用四邊框線拼出外框） */
+  #resultArea .okt { border-top: 3px solid #28a745 !important; }
+  #resultArea .okb { border-bottom: 3px solid #28a745 !important; }
+  #resultArea .okl { border-left: 3px solid #28a745 !important; }
+  #resultArea .okr { border-right: 3px solid #28a745 !important; }
   .meetbox { margin: 10px 0 14px; font-size: 14px; color: #555; }
   .meetbox input { width: 70px; display: inline-block; padding: 4px 6px; }
 </style>
@@ -92,7 +95,7 @@
   <div class="card" id="resultCard" style="display:none">
     <h2 id="resultTitle">調查結果</h2>
     <div class="meetbox">
-      會議時間：<input type="number" id="meetHours" min="0.5" step="0.5" value="1" onchange="renderResult()"> 小時
+      會議時間：<input type="number" id="meetHours" min="0.5" step="0.5" value="1" oninput="renderResult()" onchange="renderResult()"> 小時
       <span class="muted">　若有連續 n 小時「每個人都有空」的時段，會以綠框標示</span>
     </div>
     <div id="resultArea" style="overflow-x:auto"></div>
@@ -308,25 +311,31 @@ async function showResult(id) {
   $('resultCard').scrollIntoView({ behavior: 'smooth' });
 }
 
-/* 找出「連續 n 小時所有人都有空」的時段集合 */
-function computeOkSlots(survey, sets, dates, times, meetHours) {
+/* 找出「所有人都有空」且長度足夠容納會議的連續區塊。
+   回傳 Map：slot -> { top, bottom }，top/bottom 表示該列是區塊的第一列/最後一列 */
+function computeOkFrames(survey, sets, dates, times, meetHours) {
   const need = Math.max(1, Math.round(meetHours * 2));   // 30 分鐘為一格
   const ps = survey.participants;
   const everyoneFree = slot => ps.length > 0 && ps.every(p => sets[p] && sets[p].has(slot));
   const toMin = t => (+t.slice(0,2)) * 60 + (+t.slice(3,5));
-  const ok = new Set();
+  const frames = new Map();
   for (const d of dates) {
-    for (let i = 0; i + need <= times.length; i++) {
-      let good = true;
-      for (let j = 0; j < need; j++) {
-        // 必須是連續時間（午休 12:00~13:00 會中斷連續性）
-        if (j > 0 && toMin(times[i + j]) !== toMin(times[i + j - 1]) + 30) { good = false; break; }
-        if (!everyoneFree(d + 'T' + times[i + j])) { good = false; break; }
+    let run = [];
+    const flush = () => {
+      if (run.length >= need) {
+        run.forEach((slot, idx) => frames.set(slot, { top: idx === 0, bottom: idx === run.length - 1 }));
       }
-      if (good) for (let j = 0; j < need; j++) ok.add(d + 'T' + times[i + j]);
-    }
+      run = [];
+    };
+    times.forEach((t, i) => {
+      // 與前一格不連續（如午休 12:00~13:00）就先結算前一段
+      if (run.length > 0 && toMin(t) !== toMin(times[i - 1]) + 30) flush();
+      if (everyoneFree(d + 'T' + t)) run.push(d + 'T' + t);
+      else flush();
+    });
+    flush();
   }
-  return ok;
+  return frames;
 }
 
 function renderResult() {
@@ -345,7 +354,7 @@ function renderResult() {
   const notAnswered = ps.filter(p => !respondedSet.has(p));
 
   const meetHours = parseFloat($('meetHours').value) || 1;
-  const okSlots = computeOkSlots(survey, sets, dates, times, meetHours);
+  const okFrames = computeOkFrames(survey, sets, dates, times, meetHours);
 
   let html = '<p class="muted">未填寫：' + (notAnswered.length ? esc(notAnswered.join('、')) : '（無，全部已填寫）') + '</p>';
 
@@ -357,28 +366,30 @@ function renderResult() {
     const w = WEEK[new Date(d + 'T00:00:00').getDay()];
     times.forEach((t, i) => {
       const slot = d + 'T' + t;
-      const cls = [];
-      if (t.endsWith(':00')) cls.push('hourtop');          // 同一小時上下兩列，整點列加分隔線
-      if (okSlots.has(slot)) cls.push('okrow');
-      html += '<tr class="' + cls.join(' ') + '">';
+      const f = okFrames.get(slot);   // 在綠框區塊內時，f.top/f.bottom 標示區塊上下緣
+      const edge = f ? (f.top ? ' okt' : '') + (f.bottom ? ' okb' : '') : '';
+      html += '<tr class="' + (t.endsWith(':00') ? 'hourtop' : '') + '">';
       if (i === 0) {
         html += '<th class="dcell" rowspan="' + times.length + '">' + fmtMd(d) + '（週' + w + '）</th>';
       }
-      html += '<th class="tcell">' + t + '</th>';
-      for (const p of ps) {
+      html += '<th class="tcell' + (f ? ' okl' : '') + edge + '">' + t + '</th>';
+      ps.forEach((p, pi) => {
+        let cls;
+        if (!respondedSet.has(p)) cls = 'nr';
+        else if (sets[p].has(slot)) cls = 'yes';
+        else cls = 'no';
+        cls += edge + (f && pi === ps.length - 1 ? ' okr' : '');
         if (!respondedSet.has(p)) {
-          html += '<td class="nr" title="' + esc(p) + ' 尚未填寫">—</td>';
-        } else if (sets[p].has(slot)) {
-          html += '<td class="yes">✓</td>';
+          html += '<td class="' + cls + '" title="' + esc(p) + ' 尚未填寫">—</td>';
         } else {
-          html += '<td class="no"></td>';
+          html += '<td class="' + cls + '">' + (sets[p].has(slot) ? '✓' : '') + '</td>';
         }
-      }
+      });
       html += '</tr>';
     });
   }
   html += '</tbody></table>';
-  html += '<p class="muted">✓＝可出席；—＝尚未填寫；綠框＝連續 ' + meetHours + ' 小時每個人都有空的時段。</p>';
+  html += '<p class="muted">✓＝可出席；—＝尚未填寫；綠色大框＝每個人都有空、且可容納 ' + meetHours + ' 小時會議的連續時段區塊。</p>';
   $('resultArea').innerHTML = html;
 }
 
