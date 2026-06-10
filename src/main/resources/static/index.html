@@ -21,6 +21,10 @@
   .btn-primary { background: #2c7be5; color: #fff; }
   .btn-primary:hover { background: #1a68d1; }
   .btn-sm { padding: 4px 10px; font-size: 13px; margin-right: 4px; }
+  /* 清單操作的圖示按鈕 */
+  .btn-ic { width: 34px; height: 30px; padding: 0; margin-right: 4px; font-size: 16px; line-height: 1;
+            border-radius: 6px; }
+  .btn-ic:hover { filter: brightness(1.08); transform: translateY(-1px); }
   .btn-copy { background: #00a884; color: #fff; }
   .btn-result { background: #6c5ce7; color: #fff; }
   .btn-edit { background: #f39c12; color: #fff; }
@@ -100,7 +104,7 @@
     <h2>調查清單 <span id="notifUi" style="float:right;font-weight:400;font-size:13px"></span></h2>
     <table>
       <thead>
-        <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th>填寫狀況</th><th style="width:330px">操作</th></tr>
+        <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th>填寫狀況</th><th style="width:210px">操作</th></tr>
       </thead>
       <tbody id="surveyList"></tbody>
     </table>
@@ -193,11 +197,11 @@ async function loadSurveys() {
       <td title="${esc(s.participants.join('、'))}">${total} 人</td>
       <td><span class="prog${full ? ' full' : ''}" title="${full ? '全部填寫完成' : '尚有 ' + (total - done) + ' 人未填'}">${done} / ${total}${full ? ' ✓' : ''}</span></td>
       <td>
-        <button class="btn-sm btn-copy" onclick="copyLink('${s.id}')">複製調查連結</button>
-        <button class="btn-sm btn-result" onclick="showResult('${s.id}')">查看結果</button>
-        ${closed ? '' : `<button class="btn-sm btn-stop" onclick="closeSurvey('${s.id}')">結束調查</button>`}
-        <button class="btn-sm btn-edit" onclick="editSurvey('${s.id}')">編輯</button>
-        <button class="btn-sm btn-del" onclick="deleteSurvey('${s.id}')">刪除</button>
+        <button class="btn-ic btn-copy" onclick="copyLink('${s.id}')" title="複製調查連結" aria-label="複製調查連結">🔗</button>
+        <button class="btn-ic btn-result" onclick="showResult('${s.id}')" title="查看結果" aria-label="查看結果">📊</button>
+        ${closed ? '' : `<button class="btn-ic btn-stop" onclick="closeSurvey('${s.id}')" title="結束調查" aria-label="結束調查">⏹</button>`}
+        <button class="btn-ic btn-edit" onclick="editSurvey('${s.id}')" title="編輯" aria-label="編輯">✏️</button>
+        <button class="btn-ic btn-del" onclick="deleteSurvey('${s.id}')" title="刪除" aria-label="刪除">🗑️</button>
       </td>`;
     tbody.appendChild(tr);
   });
