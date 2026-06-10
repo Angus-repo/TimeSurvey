@@ -1,5 +1,6 @@
 package com.example.timesurvey.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
@@ -42,6 +43,11 @@ public class Survey {
 
     private LocalDateTime createdAt;
 
+    /** 發起者識別碼（瀏覽器產生），只寫入不回傳，後台僅能看到自己發起的調查 */
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @Column(length = 64)
+    private String ownerToken;
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 
@@ -65,4 +71,7 @@ public class Survey {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getOwnerToken() { return ownerToken; }
+    public void setOwnerToken(String ownerToken) { this.ownerToken = ownerToken; }
 }

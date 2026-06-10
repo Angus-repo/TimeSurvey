@@ -93,7 +93,7 @@
   </div>
 
   <div class="card">
-    <h2>調查清單</h2>
+    <h2>調查清單 <span id="notifUi" style="float:right;font-weight:400;font-size:13px"></span></h2>
     <table>
       <thead>
         <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th>填寫狀況</th><th style="width:330px">操作</th></tr>
@@ -117,6 +117,16 @@
 <script>
 const $ = id => document.getElementById(id);
 
+/* 發起者識別碼：存在瀏覽器 localStorage，後台只看得到自己發起的調查 */
+const OWNER = (() => {
+  let t = localStorage.getItem('ownerToken');
+  if (!t) {
+    t = (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2));
+    localStorage.setItem('ownerToken', t);
+  }
+  return t;
+})();
+
 function toast(msg) {
   const t = $('toast');
   t.textContent = msg;
@@ -125,6 +135,8 @@ function toast(msg) {
 }
 
 async function api(url, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({ 'X-Owner-Token': OWNER }, opts.headers || {});
   const res = await fetch(url, opts);
   if (!res.ok) {
     let msg = '操作失敗';
@@ -444,7 +456,53 @@ function renderResult() {
   $('resultArea').innerHTML = html;
 }
 
+/* ---------- 完成通知（WebSocket 即時推播） ---------- */
+function updateNotifUi() {
+  const el = $('notifUi');
+  if (!('Notification' in window)) { el.textContent = ''; return; }
+  if (Notification.permission === 'granted') {
+    el.innerHTML = '🔔 完成通知已開啟';
+  } else if (Notification.permission === 'denied') {
+    el.innerHTML = '🔕 瀏覽器已封鎖通知（請至網站設定開啟）';
+  } else {
+    el.innerHTML = '<button class="btn-sm btn-primary" onclick="askNotif()">開啟完成通知</button>';
+  }
+}
+function askNotif() {
+  Notification.requestPermission().then(() => {
+    updateNotifUi();
+    if (Notification.permission === 'granted') toast('完成通知已開啟');
+  });
+}
+
+function notifyDone(m) {
+  const msg = '調查「' + m.name + '」已全部填寫完成（' + m.total + '/' + m.total + '）！';
+  toast(msg);
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const n = new Notification('⏰ 時間調查完成', { body: msg });
+    n.onclick = () => { window.focus(); showResult(m.surveyId); n.close(); };
+  }
+}
+
+/* 與後端建立 WebSocket，最後一人填寫完成時由伺服器即時推播 */
+function connectWs() {
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const ws = new WebSocket(proto + location.host + '/ws/notify?owner=' + encodeURIComponent(OWNER));
+  ws.onmessage = e => {
+    try {
+      const m = JSON.parse(e.data);
+      if (m.type === 'surveyComplete') {
+        notifyDone(m);
+        loadSurveys();   // 重新整理清單，填寫狀況變綠
+      }
+    } catch (err) { /* 忽略非 JSON 訊息 */ }
+  };
+  ws.onclose = () => setTimeout(connectWs, 3000);   // 斷線自動重連
+}
+
 loadSurveys();
+updateNotifUi();
+connectWs();
 </script>
 </body>
 </html>
