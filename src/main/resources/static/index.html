@@ -30,14 +30,24 @@
   th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; vertical-align: top; }
   th { background: #fafafa; color: #555; font-weight: 600; }
   .muted { color: #999; font-size: 13px; }
+  .prog { display: inline-block; padding: 2px 10px; border-radius: 12px; background: #eee; color: #666; font-size: 13px; }
+  .prog.full { background: #28a745; color: #fff; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: #fff;
            padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
   .toast.show { opacity: 1; }
-  /* 結果表 */
-  #resultArea table { font-size: 12px; }
-  #resultArea th, #resultArea td { border: 1px solid #ddd; text-align: center; padding: 4px 6px; }
-  #resultArea td.c0 { background: #fff; color: #ccc; }
-  #resultArea td.heat { color: #1b4332; font-weight: 600; cursor: default; }
+  /* 結果表：欄=人名，列=日期+時間 */
+  #resultArea table { width: auto; min-width: 60%; font-size: 13px; }
+  #resultArea th, #resultArea td { border: 1px solid #ddd; text-align: center; padding: 4px 10px; vertical-align: middle; }
+  #resultArea th.dcell { background: #f7f9f8; white-space: nowrap; }
+  #resultArea th.tcell { font-weight: 400; color: #555; white-space: nowrap; }
+  #resultArea td.yes { background: #d2f4e8; color: #0a7d57; font-weight: 700; }
+  #resultArea td.no { color: #ddd; }
+  #resultArea td.nr { background: #f5f5f5; color: #bbb; }
+  #resultArea tr.hourtop th.tcell, #resultArea tr.hourtop td { border-top: 2px solid #bbb; }
+  #resultArea tr.okrow th.tcell { box-shadow: inset 0 0 0 2px #28a745; color: #1d7a35; font-weight: 700; }
+  #resultArea tr.okrow td { box-shadow: inset 0 0 0 2px #28a745; }
+  .meetbox { margin: 10px 0 14px; font-size: 14px; color: #555; }
+  .meetbox input { width: 70px; display: inline-block; padding: 4px 6px; }
 </style>
 </head>
 <body>
@@ -73,7 +83,7 @@
     <h2>調查清單</h2>
     <table>
       <thead>
-        <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th style="width:330px">操作</th></tr>
+        <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th>填寫狀況</th><th style="width:330px">操作</th></tr>
       </thead>
       <tbody id="surveyList"></tbody>
     </table>
@@ -81,6 +91,10 @@
 
   <div class="card" id="resultCard" style="display:none">
     <h2 id="resultTitle">調查結果</h2>
+    <div class="meetbox">
+      會議時間：<input type="number" id="meetHours" min="0.5" step="0.5" value="1" onchange="renderResult()"> 小時
+      <span class="muted">　若有連續 n 小時「每個人都有空」的時段，會以綠框標示</span>
+    </div>
     <div id="resultArea" style="overflow-x:auto"></div>
   </div>
 
@@ -108,22 +122,46 @@ async function api(url, opts) {
 }
 
 let surveys = [];
+let resultState = null;   // { survey, responses }
+
+const WEEK = ['日','一','二','三','四','五','六'];
+
+/* "2026-06-10" -> "2026/6/10" */
+function fmtYmd(d) {
+  const [y, m, dd] = d.split('-');
+  return y + '/' + (+m) + '/' + (+dd);
+}
+/* "2026-06-10" -> "6/10" */
+function fmtMd(d) {
+  const [, m, dd] = d.split('-');
+  return (+m) + '/' + (+dd);
+}
 
 async function loadSurveys() {
   surveys = await api('/api/surveys');
+  // 取得各調查的已填寫人數
+  const counts = await Promise.all(
+    surveys.map(s => api('/api/surveys/' + s.id + '/responses')
+      .then(rs => rs.filter(r => s.participants.includes(r.participantName)).length)
+      .catch(() => 0))
+  );
   const tbody = $('surveyList');
   tbody.innerHTML = '';
   if (surveys.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="muted">尚無調查，請先建立。</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="muted">尚無調查，請先建立。</td></tr>';
     return;
   }
-  for (const s of surveys) {
+  surveys.forEach((s, i) => {
+    const total = s.participants.length;
+    const done = counts[i];
+    const full = total > 0 && done >= total;
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${esc(s.name)}</td>
-      <td>${s.startDate} ~ ${s.endDate}</td>
+      <td>${fmtYmd(s.startDate)} ~ ${fmtYmd(s.endDate)}</td>
       <td>${s.startTime.slice(0,5)} ~ ${s.endTime.slice(0,5)}</td>
-      <td title="${esc(s.participants.join('、'))}">${s.participants.length} 人</td>
+      <td title="${esc(s.participants.join('、'))}">${total} 人</td>
+      <td><span class="prog${full ? ' full' : ''}" title="${full ? '全部填寫完成' : '尚有 ' + (total - done) + ' 人未填'}">${done} / ${total}${full ? ' ✓' : ''}</span></td>
       <td>
         <button class="btn-sm btn-copy" onclick="copyLink('${s.id}')">複製調查連結</button>
         <button class="btn-sm btn-result" onclick="showResult('${s.id}')">查看結果</button>
@@ -131,7 +169,7 @@ async function loadSurveys() {
         <button class="btn-sm btn-del" onclick="deleteSurvey('${s.id}')">刪除</button>
       </td>`;
     tbody.appendChild(tr);
-  }
+  });
 }
 
 function esc(s) {
@@ -227,6 +265,7 @@ async function deleteSurvey(id) {
     await api('/api/surveys/' + id, { method: 'DELETE' });
     toast('已刪除');
     $('resultCard').style.display = 'none';
+    resultState = null;
     loadSurveys();
   } catch (e) {
     toast(e.message);
@@ -260,52 +299,87 @@ function timeSlots(startTime, endTime) {
 }
 
 async function showResult(id) {
-  const s = surveys.find(x => x.id === id);
+  const survey = surveys.find(x => x.id === id);
   const responses = await api('/api/surveys/' + id + '/responses');
+  resultState = { survey, responses };
   $('resultCard').style.display = '';
-  $('resultTitle').textContent = '調查結果：' + s.name;
+  $('resultTitle').textContent = '調查結果：' + survey.name;
+  renderResult();
+  $('resultCard').scrollIntoView({ behavior: 'smooth' });
+}
 
-  const dates = dateList(s.startDate, s.endDate);
-  const times = timeSlots(s.startTime, s.endTime);
-
-  // slotKey -> [參與者名單]
-  const map = {};
-  for (const r of responses) {
-    for (const slot of (r.slots || '').split(',').filter(x => x)) {
-      (map[slot] = map[slot] || []).push(r.participantName);
+/* 找出「連續 n 小時所有人都有空」的時段集合 */
+function computeOkSlots(survey, sets, dates, times, meetHours) {
+  const need = Math.max(1, Math.round(meetHours * 2));   // 30 分鐘為一格
+  const ps = survey.participants;
+  const everyoneFree = slot => ps.length > 0 && ps.every(p => sets[p] && sets[p].has(slot));
+  const toMin = t => (+t.slice(0,2)) * 60 + (+t.slice(3,5));
+  const ok = new Set();
+  for (const d of dates) {
+    for (let i = 0; i + need <= times.length; i++) {
+      let good = true;
+      for (let j = 0; j < need; j++) {
+        // 必須是連續時間（午休 12:00~13:00 會中斷連續性）
+        if (j > 0 && toMin(times[i + j]) !== toMin(times[i + j - 1]) + 30) { good = false; break; }
+        if (!everyoneFree(d + 'T' + times[i + j])) { good = false; break; }
+      }
+      if (good) for (let j = 0; j < need; j++) ok.add(d + 'T' + times[i + j]);
     }
   }
+  return ok;
+}
 
-  const answered = responses.map(r => r.participantName);
-  const notAnswered = s.participants.filter(p => !answered.includes(p));
-  let html = '<p>已填寫：' + (answered.length ? esc(answered.join('、')) : '（無）') +
-             '　<span class="muted">未填寫：' + (notAnswered.length ? esc(notAnswered.join('、')) : '（無）') + '</span></p>';
+function renderResult() {
+  if (!resultState) return;
+  const { survey, responses } = resultState;
+  const dates = dateList(survey.startDate, survey.endDate);
+  const times = timeSlots(survey.startTime, survey.endTime);
+  const ps = survey.participants;
 
-  const hours = [...new Set(times.map(t => t.slice(0, 2)))];
-  const WEEK = ['日','一','二','三','四','五','六'];
-  html += '<table><thead><tr><th>日期 \\ 時間</th>';
-  for (const h of hours) html += '<th>' + h + '時</th>';
+  // 每人勾選的時段集合
+  const sets = {};
+  for (const r of responses) {
+    sets[r.participantName] = new Set((r.slots || '').split(',').filter(x => x));
+  }
+  const respondedSet = new Set(responses.map(r => r.participantName));
+  const notAnswered = ps.filter(p => !respondedSet.has(p));
+
+  const meetHours = parseFloat($('meetHours').value) || 1;
+  const okSlots = computeOkSlots(survey, sets, dates, times, meetHours);
+
+  let html = '<p class="muted">未填寫：' + (notAnswered.length ? esc(notAnswered.join('、')) : '（無，全部已填寫）') + '</p>';
+
+  html += '<table><thead><tr><th>日期</th><th>時間</th>';
+  for (const p of ps) html += '<th>' + esc(p) + '</th>';
   html += '</tr></thead><tbody>';
-  const max = Math.max(1, answered.length);
-  const cell = (d, t) => {
-    if (!times.includes(t)) return '<td class="c0"></td>';
-    const names = map[d + 'T' + t] || [];
-    if (names.length === 0) return '<td class="c0" title="' + d + ' ' + t + '">0</td>';
-    const alpha = 0.15 + 0.65 * (names.length / max);
-    return '<td class="heat" style="background:rgba(0,168,132,' + alpha.toFixed(2) + ')" title="' +
-           d + ' ' + t + '：' + esc(names.join('、')) + '">' + names.length + '</td>';
-  };
+
   for (const d of dates) {
     const w = WEEK[new Date(d + 'T00:00:00').getDay()];
-    html += '<tr><th rowspan="2">' + d.slice(5).replace('-', '/') + '（週' + w + '）</th>';
-    for (const h of hours) html += cell(d, h + ':00');
-    html += '</tr><tr>';
-    for (const h of hours) html += cell(d, h + ':30');
-    html += '</tr>';
+    times.forEach((t, i) => {
+      const slot = d + 'T' + t;
+      const cls = [];
+      if (t.endsWith(':00')) cls.push('hourtop');          // 同一小時上下兩列，整點列加分隔線
+      if (okSlots.has(slot)) cls.push('okrow');
+      html += '<tr class="' + cls.join(' ') + '">';
+      if (i === 0) {
+        html += '<th class="dcell" rowspan="' + times.length + '">' + fmtMd(d) + '（週' + w + '）</th>';
+      }
+      html += '<th class="tcell">' + t + '</th>';
+      for (const p of ps) {
+        if (!respondedSet.has(p)) {
+          html += '<td class="nr" title="' + esc(p) + ' 尚未填寫">—</td>';
+        } else if (sets[p].has(slot)) {
+          html += '<td class="yes">✓</td>';
+        } else {
+          html += '<td class="no"></td>';
+        }
+      }
+      html += '</tr>';
+    });
   }
-  html += '</tbody></table><p class="muted">每個日期占一列，同一小時的 :00 / :30 兩個時段上下排列；儲存格數字為可出席人數，滑鼠移上可看名單。</p>';
+  html += '</tbody></table>';
+  html += '<p class="muted">✓＝可出席；—＝尚未填寫；綠框＝連續 ' + meetHours + ' 小時每個人都有空的時段。</p>';
   $('resultArea').innerHTML = html;
-  $('resultCard').scrollIntoView({ behavior: 'smooth' });
 }
 
 loadSurveys();
