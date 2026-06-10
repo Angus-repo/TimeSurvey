@@ -17,19 +17,6 @@
                 "clear": true
             },
             "problemMatcher": []
-        },
-        {
-            "label": "啟動 TimeSurvey",
-            "detail": "以 Spring Boot 啟動時間調查網站（http://localhost:8080）",
-            "type": "shell",
-            "command": "mvn",
-            "args": ["spring-boot:run"],
-            "isBackground": true,
-            "presentation": {
-                "reveal": "always",
-                "panel": "dedicated"
-            },
-            "problemMatcher": []
         }
     ]
 }

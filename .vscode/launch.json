@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "啟動 TimeSurvey",
+            "request": "launch",
+            "mainClass": "com.example.timesurvey.TimeSurveyApplication",
+            "projectName": "timesurvey"
+        }
+    ]
+}
