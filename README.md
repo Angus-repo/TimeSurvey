@@ -37,6 +37,19 @@ mvn package
 java -jar target/timesurvey-1.0.0.jar
 ```
 
+## 測試（Cucumber BDD）
+
+行為測試位於 `src/test/resources/features`（中文 Gherkin），涵蓋：調查建立與驗證、
+發起者隔離、參與者填寫與覆寫、結束調查、WebSocket 完成通知、housekeeping 清理。
+
+```bash
+mvn test
+```
+
+測試使用 in-memory H2，不會動到 `./data` 的正式資料。
+VS Code 使用者可直接執行內建 task「BDD 測試 (Cucumber)」（終端機 → 執行工作，
+或 Ctrl/Cmd+Shift+P → Tasks: Run Test Task）。
+
 ## Housekeeping 背景批次
 
 - 由 `application.properties` 的 `housekeeping.cron` 以 crontab 格式設定啟動時間（秒 分 時 日 月 週），預設每晚 20:00：

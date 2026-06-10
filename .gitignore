@@ -4,4 +4,5 @@ data/
 *.trace.db
 .idea/
 *.iml
-.vscode/
+.vscode/*
+!.vscode/tasks.json
