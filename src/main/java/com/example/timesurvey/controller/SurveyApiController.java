@@ -142,22 +142,28 @@ public class SurveyApiController {
         resp.setUpdatedAt(LocalDateTime.now());
         SurveyResponse saved = responseRepo.save(resp);
 
-        // 第一次填寫且全員到齊時，透過 WebSocket 即時通知發起者
-        if (isNew && survey.getOwnerToken() != null) {
+        // 每次填寫（含覆寫）都推播進度，讓後台清單即時更新；全員首次到齊時另發完成通知
+        if (survey.getOwnerToken() != null) {
             long done = responseRepo.findBySurveyId(id).stream()
                     .map(SurveyResponse::getParticipantName)
                     .filter(survey.getParticipants()::contains)
                     .distinct().count();
-            if (done >= survey.getParticipants().size()) {
-                try {
-                    String json = objectMapper.writeValueAsString(Map.of(
+            try {
+                notifier.notifyOwner(survey.getOwnerToken(), objectMapper.writeValueAsString(Map.of(
+                        "type", "responseUpdated",
+                        "surveyId", survey.getId(),
+                        "name", survey.getName(),
+                        "participantName", name,
+                        "done", done,
+                        "total", survey.getParticipants().size())));
+                if (isNew && done >= survey.getParticipants().size()) {
+                    notifier.notifyOwner(survey.getOwnerToken(), objectMapper.writeValueAsString(Map.of(
                             "type", "surveyComplete",
                             "surveyId", survey.getId(),
                             "name", survey.getName(),
-                            "total", survey.getParticipants().size()));
-                    notifier.notifyOwner(survey.getOwnerToken(), json);
-                } catch (Exception ignored) {
+                            "total", survey.getParticipants().size())));
                 }
+            } catch (Exception ignored) {
             }
         }
         return saved;

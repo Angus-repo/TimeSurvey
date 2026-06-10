@@ -553,6 +553,15 @@ function connectWs() {
       if (m.type === 'surveyComplete') {
         notifyDone(m);
         loadSurveys();   // 重新整理清單，填寫狀況變綠
+      } else if (m.type === 'responseUpdated') {
+        loadSurveys();   // 任一人填寫即更新清單的填寫狀況
+        // 若正開著該調查的結果視圖，重抓回覆並重繪（不捲動頁面）
+        if (resultState && resultState.survey.id === m.surveyId) {
+          api('/api/surveys/' + m.surveyId + '/responses').then(rs => {
+            resultState.responses = rs;
+            renderResult();
+          }).catch(() => {});
+        }
       }
     } catch (err) { /* 忽略非 JSON 訊息 */ }
   };

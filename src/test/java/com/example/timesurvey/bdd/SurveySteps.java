@@ -247,8 +247,24 @@ public class SurveySteps {
     @Then("{string} 不應收到完成通知")
     public void noNotification(String owner) {
         waitFor(() -> false, 600);   // 留時間讓誤發的訊息有機會到達
+        List<String> completes = wsMessages.getOrDefault(owner, List.<String>of()).stream()
+                .filter(m -> m.contains("surveyComplete")).toList();
+        assertEquals(0, completes.size(), "不應收到完成通知，實際收到：" + completes);
+    }
+
+    @Then("{string} 不應收到任何通知")
+    public void noMessagesAtAll(String owner) {
+        waitFor(() -> false, 600);   // 留時間讓誤發的訊息有機會到達
         assertEquals(0, wsMessages.getOrDefault(owner, List.of()).size(),
-                "不應收到通知，實際收到：" + wsMessages.get(owner));
+                "不應收到任何通知，實際收到：" + wsMessages.get(owner));
+    }
+
+    @Then("{string} 應收到調查 {string} 的填寫進度更新，進度 {int} \\/ {int}")
+    public void gotProgress(String owner, String surveyName, int done, int total) {
+        boolean ok = waitFor(() -> wsMessages.getOrDefault(owner, List.<String>of()).stream()
+                .anyMatch(m -> m.contains("responseUpdated") && m.contains(surveyName)
+                        && m.contains("\"done\":" + done) && m.contains("\"total\":" + total)), 3000);
+        assertTrue(ok, "未收到進度 " + done + "/" + total + " 的更新，收到的訊息：" + wsMessages.get(owner));
     }
 
     @Then("{string} 應收到調查 {string} 的完成通知")
@@ -261,8 +277,9 @@ public class SurveySteps {
     @Then("{string} 收到的完成通知總數應為 {int}")
     public void notificationCount(String owner, int expected) {
         waitFor(() -> false, 600);   // 留時間讓重複通知有機會到達
-        assertEquals(expected, wsMessages.getOrDefault(owner, List.of()).size(),
-                "通知內容：" + wsMessages.get(owner));
+        List<String> completes = wsMessages.getOrDefault(owner, List.<String>of()).stream()
+                .filter(m -> m.contains("surveyComplete")).toList();
+        assertEquals(expected, completes.size(), "完成通知內容：" + completes);
     }
 
     /* ---------- Housekeeping 批次 ---------- */
