@@ -451,7 +451,11 @@ function downloadIcs(el) {
   const { date, from, end } = meetingRange(el);
   const fmt = t => date.replace(/-/g, '') + 'T' + t.replace(':', '') + '00';
   const desc = '與會人員：' + survey.participants.join('、') +
-               '\n（由時間調查產生；開啟後請按「邀請出席者」加入收件者再傳送）';
+               '\n（由時間調查產生；收件者已帶入姓名，請按 Alt+K「檢查名稱」解析為通訊錄 email 後再傳送）';
+  // 出席者只有姓名沒有 email：mailto 直接放姓名（不含 @），Outlook 會視為未解析名稱，
+  // 開啟後按 Alt+K（檢查名稱）即可由公司通訊錄解析成正式收件者
+  const attendees = survey.participants.map(p =>
+      'ATTENDEE;ROLE=REQ-PARTICIPANT;RSVP=TRUE;CN=' + icsEscape(p) + ':mailto:' + p);
   const ics = [
     'BEGIN:VCALENDAR',
     'PRODID:-//TimeSurvey//ZH-TW',
@@ -464,6 +468,7 @@ function downloadIcs(el) {
     'DTEND:' + fmt(end),
     'SUMMARY:' + icsEscape(survey.name),
     'DESCRIPTION:' + icsEscape(desc),
+    ...attendees,
     'END:VEVENT',
     'END:VCALENDAR'
   ].join('\r\n');
@@ -485,6 +490,7 @@ function openOutlookWeb(el) {
       '&subject=' + encodeURIComponent(survey.name) +
       '&startdt=' + date + 'T' + from + ':00' +
       '&enddt=' + date + 'T' + end + ':00' +
+      '&to=' + encodeURIComponent(survey.participants.join(';')) +
       '&body=' + encodeURIComponent('與會人員：' + survey.participants.join('、') + '（由時間調查產生）');
   window.open(url, '_blank');
 }
