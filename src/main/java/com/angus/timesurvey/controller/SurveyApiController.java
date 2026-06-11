@@ -1,10 +1,10 @@
-package com.example.timesurvey.controller;
+package com.angus.timesurvey.controller;
 
-import com.example.timesurvey.model.Survey;
-import com.example.timesurvey.model.SurveyResponse;
-import com.example.timesurvey.repo.SurveyRepository;
-import com.example.timesurvey.repo.SurveyResponseRepository;
-import com.example.timesurvey.ws.NotifyWebSocketHandler;
+import com.angus.timesurvey.model.Survey;
+import com.angus.timesurvey.model.SurveyResponse;
+import com.angus.timesurvey.repo.SurveyRepository;
+import com.angus.timesurvey.repo.SurveyResponseRepository;
+import com.angus.timesurvey.ws.NotifyWebSocketHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
 import org.springframework.http.HttpStatus;

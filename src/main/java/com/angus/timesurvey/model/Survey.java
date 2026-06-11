@@ -1,4 +1,4 @@
-package com.example.timesurvey.model;
+package com.angus.timesurvey.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;

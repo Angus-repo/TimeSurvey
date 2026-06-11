@@ -1,4 +1,4 @@
-package com.example.timesurvey.ws;
+package com.angus.timesurvey.ws;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;

@@ -11,7 +11,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.example</groupId>
+    <groupId>com.angus</groupId>
     <artifactId>timesurvey</artifactId>
     <version>1.0.0</version>
     <name>TimeSurvey</name>
@@ -89,9 +89,20 @@
 
     <build>
         <plugins>
+            <!-- 將專案打包為可直接 java -jar 執行的 jar（mvn package 後產生 target/timesurvey-1.0.0.jar） -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.angus.timesurvey.TimeSurveyApplication</mainClass>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

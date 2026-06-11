@@ -1,10 +1,10 @@
-package com.example.timesurvey.bdd;
+package com.angus.timesurvey.bdd;
 
-import com.example.timesurvey.job.HousekeepingJob;
-import com.example.timesurvey.model.Survey;
-import com.example.timesurvey.model.SurveyResponse;
-import com.example.timesurvey.repo.SurveyRepository;
-import com.example.timesurvey.repo.SurveyResponseRepository;
+import com.angus.timesurvey.job.HousekeepingJob;
+import com.angus.timesurvey.model.Survey;
+import com.angus.timesurvey.model.SurveyResponse;
+import com.angus.timesurvey.repo.SurveyRepository;
+import com.angus.timesurvey.repo.SurveyResponseRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.java.After;

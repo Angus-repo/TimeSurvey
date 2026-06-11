@@ -1,6 +1,6 @@
-package com.example.timesurvey.repo;
+package com.angus.timesurvey.repo;
 
-import com.example.timesurvey.model.Survey;
+import com.angus.timesurvey.model.Survey;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;

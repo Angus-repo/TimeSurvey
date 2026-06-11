@@ -1,4 +1,4 @@
-package com.example.timesurvey.model;
+package com.angus.timesurvey.model;
 
 import jakarta.persistence.*;
 

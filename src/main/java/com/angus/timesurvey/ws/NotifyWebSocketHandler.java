@@ -1,4 +1,4 @@
-package com.example.timesurvey.ws;
+package com.angus.timesurvey.ws;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;

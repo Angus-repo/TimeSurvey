@@ -1,6 +1,6 @@
-package com.example.timesurvey.repo;
+package com.angus.timesurvey.repo;
 
-import com.example.timesurvey.model.SurveyResponse;
+import com.angus.timesurvey.model.SurveyResponse;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

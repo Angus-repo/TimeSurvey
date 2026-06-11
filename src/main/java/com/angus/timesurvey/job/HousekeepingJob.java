@@ -1,8 +1,8 @@
-package com.example.timesurvey.job;
+package com.angus.timesurvey.job;
 
-import com.example.timesurvey.model.Survey;
-import com.example.timesurvey.repo.SurveyRepository;
-import com.example.timesurvey.repo.SurveyResponseRepository;
+import com.angus.timesurvey.model.Survey;
+import com.angus.timesurvey.repo.SurveyRepository;
+import com.angus.timesurvey.repo.SurveyResponseRepository;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -1,4 +1,4 @@
-package com.example.timesurvey.bdd;
+package com.angus.timesurvey.bdd;
 
 import org.junit.platform.suite.api.IncludeEngines;
 import org.junit.platform.suite.api.SelectClasspathResource;

@@ -5,7 +5,7 @@
             "type": "java",
             "name": "啟動 TimeSurvey",
             "request": "launch",
-            "mainClass": "com.example.timesurvey.TimeSurveyApplication",
+            "mainClass": "com.angus.timesurvey.TimeSurveyApplication",
             "projectName": "timesurvey"
         }
     ]
