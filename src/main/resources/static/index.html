@@ -288,6 +288,21 @@ function copyLink(id) {
   }
 }
 
+/* Date -> "yyyy-MM-dd" */
+function ymd(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+/* 日期預設：明天開始、共五天 */
+function setDefaultDates() {
+  const s = new Date();
+  s.setDate(s.getDate() + 1);
+  const e = new Date(s);
+  e.setDate(e.getDate() + 4);
+  $('fStartDate').value = ymd(s);
+  $('fEndDate').value = ymd(e);
+}
+
 function readForm() {
   return {
     name: $('fName').value.trim(),
@@ -341,8 +356,7 @@ function editSurvey(id) {
 function resetForm() {
   $('editId').value = '';
   $('fName').value = '';
-  $('fStartDate').value = '';
-  $('fEndDate').value = '';
+  setDefaultDates();
   $('fStartTime').value = '09:00';
   $('fEndTime').value = '17:30';
   $('fParticipants').value = '';
@@ -673,6 +687,7 @@ function connectWs() {
   ws.onclose = () => setTimeout(connectWs, 3000);   // 斷線自動重連
 }
 
+setDefaultDates();
 loadSurveys();
 updateNotifUi();
 connectWs();
