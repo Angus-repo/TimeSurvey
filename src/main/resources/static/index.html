@@ -200,6 +200,16 @@ function fmtMd(d) {
   return (+m) + '/' + (+dd);
 }
 
+/* 自動刪除倒數提示：housekeeping 批次會在「迄日經過 7 天」後刪除調查 */
+function deleteHint(s) {
+  const del = new Date(s.endDate + 'T00:00:00');
+  del.setDate(del.getDate() + 7);   // 迄日+7 當晚的批次（預設 20:00）就會刪除
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((del - today) / 86400000);
+  return days > 0 ? '🗑 約 ' + days + ' 天後自動刪除' : '🗑 今晚批次將自動刪除';
+}
+
 async function loadSurveys() {
   surveys = await api('/api/surveys');
   // 取得各調查的已填寫人數
@@ -226,7 +236,9 @@ async function loadSurveys() {
       <td>${s.startTime.slice(0,5)} ~ ${s.endTime.slice(0,5)}</td>
       <td title="${esc(s.participants.join('、'))}">${total} 人</td>
       <td><span class="prog${full ? ' full' : ''}" title="${full ? '全部填寫完成' : '尚有 ' + (total - done) + ' 人未填'}">${done} / ${total}${full ? ' ✓' : ''}</span></td>
-      <td><span class="st ${closed ? 'st-closed' : 'st-open'}">${closed ? '已結束' : '進行中'}</span></td>
+      <td><span class="st ${closed ? 'st-closed' : 'st-open'}">${closed ? '已結束' : '進行中'}</span>
+        <div class="muted" style="font-size:12px;margin-top:4px"
+             title="調查迄日經過 7 天後，系統批次（每晚 20:00）會自動刪除調查與填寫資料">${deleteHint(s)}</div></td>
       <td><div class="ops">
         <button class="btn-ic copy" onclick="copyLink('${s.id}')" ${closed ? 'disabled' : ''}
           data-tip="${closed ? '調查已結束，連結已停用' : '複製調查連結，傳給參與者即可填寫'}" aria-label="複製調查連結">${ICONS.link}</button>

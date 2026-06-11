@@ -42,6 +42,25 @@
            padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 10; }
   .toast.show { opacity: 1; }
   .err { text-align: center; color: #e74c3c; margin-top: 60px; font-size: 16px; }
+  .muted { color: #999; font-size: 13px; }
+
+  /* 送出後的完成畫面 */
+  #done .card { padding: 24px 28px; }
+  #done h2 { margin: 0 0 12px; font-size: 19px; color: #0a7d57; }
+  .dday { margin: 6px 0; font-size: 14px; }
+  .dday .dlabel { display: inline-block; min-width: 110px; font-weight: 600; color: #2c3e50; }
+  .chip { display: inline-block; margin: 2px 8px 2px 0; padding: 4px 14px; border-radius: 14px; font-size: 13px;
+          background: #d2f4e8; color: #0a7d57; border: 1px solid #9fdec6; white-space: nowrap; }
+  .btn-edit { margin-top: 14px; background: #f39c12; color: #fff; border: none; border-radius: 6px;
+              padding: 9px 24px; font-size: 14px; cursor: pointer; font-family: inherit; }
+  .btn-edit:hover { background: #d9890e; }
+  #done hr { border: none; border-top: 1px solid #eee; margin: 20px 0 14px; }
+  .btn-new { display: inline-block; background: #2c7be5; color: #fff; border-radius: 6px;
+             padding: 9px 24px; font-size: 14px; text-decoration: none; }
+  .btn-new:hover { background: #1a68d1; }
+  .ownlink { text-align: center; margin-top: 4px; }
+  .ownlink a { color: #2c7be5; font-size: 13px; text-decoration: none; }
+  .ownlink a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -56,6 +75,18 @@
     <span class="hint">選擇後請勾選您可以出席的時間（可點全天、上午、下午快速鈕，或個別 30 分鐘時段）</span>
   </div>
   <div class="card gridwrap" id="gridCard"></div>
+  <div class="ownlink">想調查大家的時間嗎？<a href="/" target="_blank">您也可以發起自己的會議時間調查 →</a></div>
+</div>
+<div class="container" id="done" style="display:none">
+  <div class="card">
+    <h2>✅ 已送出！感謝您的填寫</h2>
+    <p><b id="doneName"></b>，以下是您勾選的可出席時間：</p>
+    <div id="doneList"></div>
+    <button class="btn-edit" onclick="backToEdit()">修改填寫內容</button>
+    <hr>
+    <p class="muted">想調查大家的時間嗎？您也可以發起自己的會議時間調查：</p>
+    <a class="btn-new" href="/" target="_blank">➕ 建立我自己的時間調查</a>
+  </div>
 </div>
 <div class="err" id="err" style="display:none"></div>
 <div class="submit-bar" id="bar" style="display:none">
@@ -243,12 +274,64 @@ async function submitResponse() {
     body: JSON.stringify({ participantName: name, slots: [...selected].sort().join(',') })
   });
   if (res.ok) {
-    toast('已送出！感謝您的填寫 🎉');
+    showDone(name);
   } else {
     let msg = '送出失敗，請稍後再試';
     try { msg = (await res.json()).message || msg; } catch (e) {}
     toast(msg);
   }
+}
+
+/* ---------- 送出後的完成畫面 ---------- */
+const toMin = t => (+t.slice(0,2)) * 60 + (+t.slice(3,5));
+
+/* "10:30" + 30分 -> "11:00" */
+function plus30(t) {
+  let h = +t.slice(0,2), m = +t.slice(3,5) + 30;
+  if (m >= 60) { m -= 60; h++; }
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+
+/* 隱藏填寫表單，改顯示這次送出的內容摘要（連續時段合併為區間） */
+function showDone(name) {
+  const byDate = {};
+  for (const s of [...selected].sort()) {
+    const [d, t] = s.split('T');
+    (byDate[d] = byDate[d] || []).push(t);
+  }
+  const dates = Object.keys(byDate).sort();
+  let html = '';
+  if (dates.length === 0) {
+    html = '<p class="muted">您沒有勾選任何時段（表示這段期間都無法出席）。</p>';
+  } else {
+    for (const d of dates) {
+      const w = WEEK[new Date(d + 'T00:00:00').getDay()];
+      const ts = byDate[d];
+      const ranges = [];
+      let start = ts[0], prev = ts[0];
+      for (let i = 1; i <= ts.length; i++) {
+        const cur = ts[i];
+        if (cur && toMin(cur) === toMin(prev) + 30) { prev = cur; continue; }
+        ranges.push(start + ' ~ ' + plus30(prev));
+        start = prev = cur;
+      }
+      html += '<div class="dday"><span class="dlabel">' + d.slice(5).replace('-', '/') + '（週' + w + '）</span>' +
+              ranges.map(r => '<span class="chip">' + r + '</span>').join('') + '</div>';
+    }
+  }
+  $('doneName').textContent = name;
+  $('doneList').innerHTML = html;
+  $('main').style.display = 'none';
+  $('bar').style.display = 'none';
+  $('done').style.display = '';
+  window.scrollTo({ top: 0 });
+}
+
+/* 回到表單繼續修改（重新進入網址也同樣可重新填寫） */
+function backToEdit() {
+  $('done').style.display = 'none';
+  $('main').style.display = '';
+  $('bar').style.display = '';
 }
 
 init();
