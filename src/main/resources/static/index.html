@@ -46,6 +46,7 @@
   .btn-ic.result { --c: #6c5ce7; }
   .btn-ic.stop   { --c: #34495e; }
   .btn-ic.edit   { --c: #f39c12; }
+  .btn-ic.dup    { --c: #2c7be5; }
   .st { display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 13px; white-space: nowrap; }
   .st-open { background: #e6f7ef; color: #0a7d57; border: 1px solid #b3e6cf; }
   .st-closed { background: #eceff1; color: #78838c; border: 1px solid #d5dbdf; }
@@ -139,7 +140,7 @@
     <h2>調查清單 <span id="notifUi" style="float:right;font-weight:400;font-size:13px"></span></h2>
     <table>
       <thead>
-        <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th>填寫狀況</th><th>目前狀態</th><th style="width:180px">操作</th></tr>
+        <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th>填寫狀況</th><th>目前狀態</th><th style="width:210px">操作</th></tr>
       </thead>
       <tbody id="surveyList"></tbody>
     </table>
@@ -197,7 +198,8 @@ const ICONS = {
   link:  '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
   chart: '<svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>',
   stop:  '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
-  edit:  '<svg viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>'
+  edit:  '<svg viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
+  dup:   '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
 };
 
 const WEEK = ['日','一','二','三','四','五','六'];
@@ -260,6 +262,8 @@ async function loadSurveys() {
           data-tip="${closed ? '調查已結束' : '結束調查，參與者將無法再填寫'}" aria-label="結束調查">${ICONS.stop}</button>
         <button class="btn-ic edit" onclick="editSurvey('${s.id}')" ${closed ? 'disabled' : ''}
           data-tip="${closed ? '調查已結束，無法編輯' : '修改調查名稱、日期時間與人員名單'}" aria-label="編輯調查">${ICONS.edit}</button>
+        <button class="btn-ic dup" onclick="duplicateSurvey('${s.id}')"
+          data-tip="複製主旨與人員，開啟新的會議調查" aria-label="複製調查">${ICONS.dup}</button>
       </div></td>`;
     tbody.appendChild(tr);
   });
@@ -351,6 +355,18 @@ function editSurvey(id) {
   $('saveBtn').textContent = '儲存修改';
   $('cancelBtn').style.display = '';
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* 複製調查：帶入主旨與人員到「建立新調查」表單（日期回到預設的明天起五天） */
+function duplicateSurvey(id) {
+  const s = surveys.find(x => x.id === id);
+  if (!s) return;
+  resetForm();
+  $('fName').value = s.name;
+  $('fParticipants').value = s.participants.join('\n');
+  $('formTitle').textContent = '建立新調查(複製自:' + s.name + ')';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast('已帶入「' + s.name + '」的主旨與人員，確認日期後即可建立');
 }
 
 function resetForm() {
