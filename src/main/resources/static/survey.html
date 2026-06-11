@@ -18,6 +18,7 @@
 
   /* 時段表格：每個日期一列，同一小時的 :00/:30 上下兩格 */
   .gridwrap { overflow-x: auto; }
+  .gridwrap.locked { opacity: .5; }   /* 未選姓名前格線半透明，提示先選姓名 */
   table.grid { border-collapse: separate; border-spacing: 3px; width: 100%; }
   table.grid thead th { font-size: 13px; color: #777; font-weight: 600; padding: 4px 2px; }
   .datecell { background: #f7f9f8; border: 1px solid #e2e8e5; border-radius: 6px; padding: 8px 10px;
@@ -183,6 +184,7 @@ async function init() {
   hours = [...new Set(times.map(t => t.slice(0, 2)))];
 
   renderGrid();
+  $('gridCard').classList.add('locked');   // 進頁面尚未選姓名，先鎖定格線
   $('main').style.display = '';
   $('bar').style.display = '';
 }
@@ -195,6 +197,15 @@ function showErr(msg) {
 /* 某日某小時的全部時段鍵值（例如 "2026-06-15"×"09" -> 09:00、09:30） */
 function dayHourSlots(d, h) {
   return times.filter(t => t.slice(0, 2) === h).map(t => d + 'T' + t);
+}
+
+/* 還沒選姓名前不可勾時段：切換姓名會重載該人內容，先勾的會被清掉造成誤會 */
+function requireName() {
+  if (!$('who').value) {
+    toast('請先選擇您的姓名，再勾選時段');
+    return false;
+  }
+  return true;
 }
 
 function renderGrid() {
@@ -235,6 +246,7 @@ function renderGrid() {
   // 個別 30 分鐘時段點擊
   document.querySelectorAll('.slot').forEach(el => {
     el.addEventListener('click', () => {
+      if (!requireName()) return;
       const s = el.dataset.slot;
       selected.has(s) ? selected.delete(s) : selected.add(s);
       refreshAll();
@@ -243,6 +255,7 @@ function renderGrid() {
   // 右上角勾勾：一次選取/取消該日該小時的兩格
   document.querySelectorAll('.chk').forEach(el => {
     el.addEventListener('click', () => {
+      if (!requireName()) return;
       const list = dayHourSlots(el.dataset.date, el.dataset.hour);
       const allOn = list.length > 0 && list.every(s => selected.has(s));
       for (const s of list) allOn ? selected.delete(s) : selected.add(s);
@@ -252,6 +265,7 @@ function renderGrid() {
   // 全天 / 上午 / 下午 快速鈕
   document.querySelectorAll('.quick label').forEach(el => {
     el.addEventListener('click', () => {
+      if (!requireName()) return;
       const d = el.parentElement.dataset.date;
       const grp = el.dataset.grp;
       const list = (grp === 'all' ? times : grp === 'am' ? amTimes : pmTimes).map(t => d + 'T' + t);
@@ -287,6 +301,7 @@ function refreshAll() {
 
 async function loadMyResponse() {
   const name = $('who').value;
+  $('gridCard').classList.toggle('locked', !name);
   selected = new Set();
   if (name) {
     const res = await fetch('/api/surveys/' + surveyId + '/responses');
