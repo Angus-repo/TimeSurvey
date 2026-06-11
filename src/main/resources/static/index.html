@@ -90,7 +90,10 @@
   .concl .none { color: #c0c6c3; font-size: 13px; }
   .chip { display: inline-block; margin: 2px 8px 2px 0; padding: 4px 14px; border-radius: 14px; font-size: 13px;
           background: #e9ecef; color: #888; border: 1px solid #d4d8db; white-space: nowrap; }
-  .chip.fit { background: #28a745; color: #fff; border-color: #28a745; font-weight: 600; }
+  .chip.fit { background: #28a745; color: #fff; border-color: #28a745; font-weight: 600; cursor: pointer;
+              transition: background .15s, box-shadow .15s, transform .15s; }
+  .chip.fit:hover { background: #1d8c38; text-decoration: underline;
+                    transform: translateY(-1px); box-shadow: 0 3px 8px rgba(40,167,69,.35); }
 </style>
 </head>
 <body>
@@ -422,6 +425,50 @@ function plus30(t) {
   return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
 }
 
+/* ---------- 會議邀請 .ics 下載 ---------- */
+/* iCalendar 文字欄位的跳脫規則（RFC 5545） */
+function icsEscape(s) {
+  return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+/* 點擊綠色時段：產生會議邀請 .ics 並下載。
+   主旨＝調查名稱；時間＝該區塊開頭起算「會議時間」長度；與會人員寫入說明
+   （名單只有姓名沒有 email，無法自動帶入收件者欄位）。
+   用 METHOD:PUBLISH 讓 Outlook 以「可編輯的約會」開啟，按「邀請出席者」即可寄送會通 */
+function downloadIcs(el) {
+  if (!resultState) return;
+  const survey = resultState.survey;
+  const date = el.dataset.date, from = el.dataset.from;
+  const meetHours = parseFloat($('meetHours').value) || 1;
+  let end = from;
+  for (let i = 0; i < Math.max(1, Math.round(meetHours * 2)); i++) end = plus30(end);
+  const fmt = t => date.replace(/-/g, '') + 'T' + t.replace(':', '') + '00';
+  const desc = '與會人員：' + survey.participants.join('、') +
+               '\n（由時間調查產生；開啟後請按「邀請出席者」加入收件者再傳送）';
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'PRODID:-//TimeSurvey//ZH-TW',
+    'VERSION:2.0',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    'UID:' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2)) + '@timesurvey',
+    'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z',
+    'DTSTART:' + fmt(from),
+    'DTEND:' + fmt(end),
+    'SUMMARY:' + icsEscape(survey.name),
+    'DESCRIPTION:' + icsEscape(desc),
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+  a.download = '會議邀請-' + survey.name + '-' + fmtMd(date).replace('/', '') + '-' + from.replace(':', '') + '.ics';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('已下載會議邀請（' + fmtMd(date) + ' ' + from + ' ~ ' + end + '），以 Outlook 開啟即可寄送');
+}
+
 function renderResult() {
   if (!resultState) return;
   const { survey, responses } = resultState;
@@ -467,14 +514,19 @@ function renderResult() {
           const to = plus30(r.slots[r.slots.length - 1]);
           const hrs = parseFloat((r.slots.length * 0.5).toFixed(1));
           const fit = r.slots.length >= need;
-          html += '<span class="chip' + (fit ? ' fit' : '') + '" title="' +
-                  (fit ? '可容納 ' + meetHours + ' 小時會議' : '長度不足 ' + meetHours + ' 小時') + '">' +
-                  from + ' ~ ' + to + '（' + hrs + ' 小時）' + (fit ? ' ✓' : '') + '</span>';
+          if (fit) {
+            html += '<span class="chip fit" data-date="' + d + '" data-from="' + from + '" onclick="downloadIcs(this)"' +
+                    ' title="點擊下載「會議邀請.ics」（' + meetHours + ' 小時，自 ' + from + ' 起），以 Outlook 開啟即可寄送會通">📅 ' +
+                    from + ' ~ ' + to + '（' + hrs + ' 小時）✓</span>';
+          } else {
+            html += '<span class="chip" title="長度不足 ' + meetHours + ' 小時">' +
+                    from + ' ~ ' + to + '（' + hrs + ' 小時）</span>';
+          }
         }
       }
       html += '</div>';
     }
-    html += '<div class="cnote muted">綠色＝長度可容納 ' + meetHours + ' 小時會議的時段；灰色＝大家都有空但長度不足。</div>';
+    html += '<div class="cnote muted">綠色＝長度可容納 ' + meetHours + ' 小時會議的時段，點擊即可下載「會議邀請.ics」（主旨、時間、與會人員已帶入）；灰色＝大家都有空但長度不足。</div>';
   }
   html += '</div>';
 
