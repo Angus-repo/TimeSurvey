@@ -90,10 +90,12 @@
   .concl .none { color: #c0c6c3; font-size: 13px; }
   .chip { display: inline-block; margin: 2px 8px 2px 0; padding: 4px 14px; border-radius: 14px; font-size: 13px;
           background: #e9ecef; color: #888; border: 1px solid #d4d8db; white-space: nowrap; }
-  .chip.fit { background: #28a745; color: #fff; border-color: #28a745; font-weight: 600; cursor: pointer;
-              transition: background .15s, box-shadow .15s, transform .15s; }
-  .chip.fit:hover { background: #1d8c38; text-decoration: underline;
-                    transform: translateY(-1px); box-shadow: 0 3px 8px rgba(40,167,69,.35); }
+  .chip.fit { background: #28a745; color: #fff; border-color: #28a745; font-weight: 600; }
+  /* 綠色時段旁的「產生會通」小按鈕 */
+  .calbtn { display: inline-block; margin: 2px 6px 2px 0; padding: 3px 11px; border-radius: 12px; font-size: 12px;
+            cursor: pointer; border: 1px solid #1d8c38; background: #fff; color: #1d8c38; white-space: nowrap;
+            user-select: none; transition: background .15s, color .15s; }
+  .calbtn:hover { background: #1d8c38; color: #fff; }
 </style>
 </head>
 <body>
@@ -431,17 +433,22 @@ function icsEscape(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
 
-/* 點擊綠色時段：產生會議邀請 .ics 並下載。
-   主旨＝調查名稱；時間＝該區塊開頭起算「會議時間」長度；與會人員寫入說明
-   （名單只有姓名沒有 email，無法自動帶入收件者欄位）。
-   用 METHOD:PUBLISH 讓 Outlook 以「可編輯的約會」開啟，按「邀請出席者」即可寄送會通 */
-function downloadIcs(el) {
-  if (!resultState) return;
-  const survey = resultState.survey;
+/* 由按鈕的 data-date / data-from 取得會議起迄：自區塊開頭起算「會議時間」長度 */
+function meetingRange(el) {
   const date = el.dataset.date, from = el.dataset.from;
   const meetHours = parseFloat($('meetHours').value) || 1;
   let end = from;
   for (let i = 0; i < Math.max(1, Math.round(meetHours * 2)); i++) end = plus30(end);
+  return { date, from, end };
+}
+
+/* 「📅 .ics」按鈕：產生會議邀請 .ics 並下載。
+   主旨＝調查名稱；與會人員寫入說明（名單只有姓名沒有 email，無法自動帶入收件者欄位）。
+   用 METHOD:PUBLISH 讓 Outlook 以「可編輯的約會」開啟，按「邀請出席者」即可寄送會通 */
+function downloadIcs(el) {
+  if (!resultState) return;
+  const survey = resultState.survey;
+  const { date, from, end } = meetingRange(el);
   const fmt = t => date.replace(/-/g, '') + 'T' + t.replace(':', '') + '00';
   const desc = '與會人員：' + survey.participants.join('、') +
                '\n（由時間調查產生；開啟後請按「邀請出席者」加入收件者再傳送）';
@@ -467,6 +474,19 @@ function downloadIcs(el) {
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   toast('已下載會議邀請（' + fmtMd(date) + ' ' + from + ' ~ ' + end + '），以 Outlook 開啟即可寄送');
+}
+
+/* 「🌐 網頁版」按鈕：在 Outlook 網頁版開啟預填好的新會議（需登入 Microsoft 帳號） */
+function openOutlookWeb(el) {
+  if (!resultState) return;
+  const survey = resultState.survey;
+  const { date, from, end } = meetingRange(el);
+  const url = 'https://outlook.office.com/calendar/deeplink/compose?path=/calendar/action/compose&rru=addevent' +
+      '&subject=' + encodeURIComponent(survey.name) +
+      '&startdt=' + date + 'T' + from + ':00' +
+      '&enddt=' + date + 'T' + end + ':00' +
+      '&body=' + encodeURIComponent('與會人員：' + survey.participants.join('、') + '（由時間調查產生）');
+  window.open(url, '_blank');
 }
 
 function renderResult() {
@@ -515,9 +535,13 @@ function renderResult() {
           const hrs = parseFloat((r.slots.length * 0.5).toFixed(1));
           const fit = r.slots.length >= need;
           if (fit) {
-            html += '<span class="chip fit" data-date="' + d + '" data-from="' + from + '" onclick="downloadIcs(this)"' +
-                    ' title="點擊下載「會議邀請.ics」（' + meetHours + ' 小時，自 ' + from + ' 起），以 Outlook 開啟即可寄送會通">📅 ' +
-                    from + ' ~ ' + to + '（' + hrs + ' 小時）✓</span>';
+            const attrs = ' data-date="' + d + '" data-from="' + from + '"';
+            html += '<span class="chip fit" title="可容納 ' + meetHours + ' 小時會議">' +
+                    from + ' ~ ' + to + '（' + hrs + ' 小時）✓</span>' +
+                    '<span class="calbtn"' + attrs + ' onclick="downloadIcs(this)"' +
+                    ' title="下載「會議邀請.ics」（' + meetHours + ' 小時，自 ' + from + ' 起），以桌面版 Outlook 開啟即可寄送會通">📅 .ics</span>' +
+                    '<span class="calbtn"' + attrs + ' onclick="openOutlookWeb(this)"' +
+                    ' title="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + from + ' 起），主旨與時間已帶入">🌐 網頁版</span>';
           } else {
             html += '<span class="chip" title="長度不足 ' + meetHours + ' 小時">' +
                     from + ' ~ ' + to + '（' + hrs + ' 小時）</span>';
@@ -526,7 +550,7 @@ function renderResult() {
       }
       html += '</div>';
     }
-    html += '<div class="cnote muted">綠色＝長度可容納 ' + meetHours + ' 小時會議的時段，點擊即可下載「會議邀請.ics」（主旨、時間、與會人員已帶入）；灰色＝大家都有空但長度不足。</div>';
+    html += '<div class="cnote muted">綠色＝長度可容納 ' + meetHours + ' 小時會議的時段，旁邊的「📅 .ics」可下載會議邀請檔（桌面版 Outlook）、「🌐 網頁版」可在 Outlook 網頁版開啟新會議；灰色＝大家都有空但長度不足。</div>';
   }
   html += '</div>';
 
