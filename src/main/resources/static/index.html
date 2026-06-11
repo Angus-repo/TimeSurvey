@@ -93,7 +93,7 @@
           background: #e9ecef; color: #888; border: 1px solid #d4d8db; white-space: nowrap; }
   .chip.fit { background: #28a745; color: #fff; border-color: #28a745; font-weight: 600; }
   /* 綠色時段內的「產生會通」小按鈕：白底膠囊，滑上立即顯示自製提示（不用原生 title） */
-  .cbtn { position: relative; display: inline-block; margin-left: 6px; padding: 1px 9px; border-radius: 10px;
+  .cbtn { position: relative; display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px;
           font-size: 12px; font-weight: 400; cursor: pointer; background: #fff; color: #1d8c38;
           border: 1px solid #bfe3c9; user-select: none; transition: background .15s, transform .15s; }
   .cbtn:hover { background: #eafff1; transform: translateY(-1px); }
@@ -582,9 +582,9 @@ function renderResult() {
             const attrs = ' data-date="' + d + '" data-from="' + from + '"';
             html += '<span class="chip fit">' + from + ' ~ ' + to + '（' + hrs + ' 小時）✓' +
                     '<span class="cbtn"' + attrs + ' onclick="downloadIcs(this)"' +
-                    ' data-tip="下載「會議邀請.ics」（' + meetHours + ' 小時，自 ' + from + ' 起），以桌面版 Outlook 開啟寄送會通">📅 .ics</span>' +
+                    ' data-tip="下載「會議邀請.ics」（' + meetHours + ' 小時，自 ' + from + ' 起），以桌面版 Outlook 開啟寄送會通">📅</span>' +
                     '<span class="cbtn"' + attrs + ' onclick="openOutlookWeb(this)"' +
-                    ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + from + ' 起），主旨、時間、與會人員已帶入">🌐 網頁版</span>' +
+                    ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + from + ' 起），主旨、時間、與會人員已帶入">🌐</span>' +
                     '</span>';
           } else {
             html += '<span class="chip" title="長度不足 ' + meetHours + ' 小時">' +
@@ -596,8 +596,8 @@ function renderResult() {
     }
     html += '<div class="cnote muted">綠色＝長度可容納 ' + meetHours + ' 小時會議的時段<br>' +
             '灰色＝大家都有空但長度不足<br>' +
-            '「📅 .ics」可下載會議邀請檔（桌面版 Outlook）<br>' +
-            '「🌐 網頁版」可在 Outlook 網頁版開啟新會議</div>';
+            '「📅」可下載會議邀請檔（桌面版 Outlook）<br>' +
+            '「🌐」可在 Outlook 網頁版開啟新會議</div>';
   }
   html += '</div>';
 
