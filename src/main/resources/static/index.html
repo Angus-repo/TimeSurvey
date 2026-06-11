@@ -91,11 +91,19 @@
   .chip { display: inline-block; margin: 2px 8px 2px 0; padding: 4px 14px; border-radius: 14px; font-size: 13px;
           background: #e9ecef; color: #888; border: 1px solid #d4d8db; white-space: nowrap; }
   .chip.fit { background: #28a745; color: #fff; border-color: #28a745; font-weight: 600; }
-  /* 綠色時段旁的「產生會通」小按鈕 */
-  .calbtn { display: inline-block; margin: 2px 6px 2px 0; padding: 3px 11px; border-radius: 12px; font-size: 12px;
-            cursor: pointer; border: 1px solid #1d8c38; background: #fff; color: #1d8c38; white-space: nowrap;
-            user-select: none; transition: background .15s, color .15s; }
-  .calbtn:hover { background: #1d8c38; color: #fff; }
+  /* 綠色時段內的「產生會通」小按鈕：白底膠囊，滑上立即顯示自製提示（不用原生 title） */
+  .cbtn { position: relative; display: inline-block; margin-left: 6px; padding: 1px 9px; border-radius: 10px;
+          font-size: 12px; font-weight: 400; cursor: pointer; background: #fff; color: #1d8c38;
+          border: 1px solid #bfe3c9; user-select: none; transition: background .15s, transform .15s; }
+  .cbtn:hover { background: #eafff1; transform: translateY(-1px); }
+  .cbtn::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%;
+                 transform: translateX(-50%); background: #2c3e50; color: #fff; font-size: 12px; font-weight: 400;
+                 padding: 6px 10px; border-radius: 6px; white-space: nowrap; opacity: 0; visibility: hidden;
+                 transition: opacity .08s; pointer-events: none; z-index: 30; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  .cbtn::before { content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%;
+                  transform: translateX(-50%); border: 5px solid transparent; border-top-color: #2c3e50;
+                  opacity: 0; visibility: hidden; transition: opacity .08s; pointer-events: none; z-index: 30; }
+  .cbtn:hover::after, .cbtn:hover::before { opacity: 1; visibility: visible; }
 </style>
 </head>
 <body>
@@ -542,12 +550,12 @@ function renderResult() {
           const fit = r.slots.length >= need;
           if (fit) {
             const attrs = ' data-date="' + d + '" data-from="' + from + '"';
-            html += '<span class="chip fit" title="可容納 ' + meetHours + ' 小時會議">' +
-                    from + ' ~ ' + to + '（' + hrs + ' 小時）✓</span>' +
-                    '<span class="calbtn"' + attrs + ' onclick="downloadIcs(this)"' +
-                    ' title="下載「會議邀請.ics」（' + meetHours + ' 小時，自 ' + from + ' 起），以桌面版 Outlook 開啟即可寄送會通">📅 .ics</span>' +
-                    '<span class="calbtn"' + attrs + ' onclick="openOutlookWeb(this)"' +
-                    ' title="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + from + ' 起），主旨與時間已帶入">🌐 網頁版</span>';
+            html += '<span class="chip fit">' + from + ' ~ ' + to + '（' + hrs + ' 小時）✓' +
+                    '<span class="cbtn"' + attrs + ' onclick="downloadIcs(this)"' +
+                    ' data-tip="下載「會議邀請.ics」（' + meetHours + ' 小時，自 ' + from + ' 起），以桌面版 Outlook 開啟寄送會通">📅 .ics</span>' +
+                    '<span class="cbtn"' + attrs + ' onclick="openOutlookWeb(this)"' +
+                    ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + from + ' 起），主旨、時間、與會人員已帶入">🌐 網頁版</span>' +
+                    '</span>';
           } else {
             html += '<span class="chip" title="長度不足 ' + meetHours + ' 小時">' +
                     from + ' ~ ' + to + '（' + hrs + ' 小時）</span>';
