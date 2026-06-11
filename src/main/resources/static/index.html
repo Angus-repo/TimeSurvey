@@ -550,7 +550,10 @@ function renderResult() {
       }
       html += '</div>';
     }
-    html += '<div class="cnote muted">綠色＝長度可容納 ' + meetHours + ' 小時會議的時段，旁邊的「📅 .ics」可下載會議邀請檔（桌面版 Outlook）、「🌐 網頁版」可在 Outlook 網頁版開啟新會議；灰色＝大家都有空但長度不足。</div>';
+    html += '<div class="cnote muted">綠色＝長度可容納 ' + meetHours + ' 小時會議的時段<br>' +
+            '灰色＝大家都有空但長度不足<br>' +
+            '「📅 .ics」可下載會議邀請檔（桌面版 Outlook）<br>' +
+            '「🌐 網頁版」可在 Outlook 網頁版開啟新會議</div>';
   }
   html += '</div>';
 
