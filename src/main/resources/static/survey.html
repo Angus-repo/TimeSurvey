@@ -20,6 +20,11 @@
   .gridwrap { overflow-x: auto; }
   table.grid { border-collapse: separate; border-spacing: 3px; width: 100%; }
   table.grid thead th { font-size: 13px; color: #777; font-weight: 600; padding: 4px 2px; }
+  /* 小時欄標題：可點擊整欄選取/取消 */
+  th.hcol { cursor: pointer; color: #00a884; text-decoration: underline; user-select: none;
+            border-radius: 4px; transition: background .15s, color .15s; }
+  th.hcol:hover { background: #eef6f3; }
+  th.hcol.on { background: #00a884; color: #fff; text-decoration: none; }
   .datecell { background: #f7f9f8; border: 1px solid #e2e8e5; border-radius: 6px; padding: 8px 10px;
               text-align: left; vertical-align: top; min-width: 132px; }
   .datecell .dname { font-size: 15px; color: #2c3e50; font-weight: 700; margin-bottom: 6px; white-space: nowrap; }
@@ -72,7 +77,7 @@
   <div class="card">
     <label>您的姓名：</label>
     <select id="who"><option value="">-- 請選擇 --</option></select>
-    <span class="hint">選擇後請勾選您可以出席的時間（可點全天、上午、下午快速鈕，或個別 30 分鐘時段）</span>
+    <span class="hint">選擇後請勾選您可以出席的時間（可點全天、上午、下午快速鈕、上方「09時」等整欄選取，或個別 30 分鐘時段）</span>
   </div>
   <div class="card gridwrap" id="gridCard"></div>
   <div class="ownlink">想調查大家的時間嗎？<a href="/" target="_blank">您也可以發起自己的會議時間調查 →</a></div>
@@ -178,14 +183,17 @@ function showErr(msg) {
   $('err').style.display = '';
 }
 
+let gridDates = [];   // 表格目前顯示的日期，供整欄選取與標題狀態使用
+
 function renderGrid() {
   const dates = dateList(survey.startDate, survey.endDate);
   if (dates.length === 0) {
     return showErr('調查日期範圍內沒有工作日（週六日不列入調查），請聯絡調查發起人調整日期。');
   }
+  gridDates = dates;
 
   let html = '<table class="grid"><thead><tr><th style="text-align:left">日期 \\ 時間</th>';
-  for (const h of hours) html += '<th>' + h + '時</th>';
+  for (const h of hours) html += '<th class="hcol" data-hour="' + h + '" title="點擊選取/取消所有日期的 ' + h + ' 時整欄">' + h + '時</th>';
   html += '</tr></thead><tbody>';
 
   const cell = (d, t) => {
@@ -219,6 +227,15 @@ function renderGrid() {
       refreshAll();
     });
   });
+  // 小時欄標題：點擊選取/取消「所有日期」的該小時時段
+  document.querySelectorAll('th.hcol').forEach(el => {
+    el.addEventListener('click', () => {
+      const list = hourSlots(el.dataset.hour);
+      const allOn = list.length > 0 && list.every(s => selected.has(s));
+      for (const s of list) allOn ? selected.delete(s) : selected.add(s);
+      refreshAll();
+    });
+  });
   // 全天 / 上午 / 下午 快速鈕
   document.querySelectorAll('.quick label').forEach(el => {
     el.addEventListener('click', () => {
@@ -233,9 +250,25 @@ function renderGrid() {
   refreshAll();
 }
 
+/* 某小時在所有日期下的全部時段鍵值（例如 "09" -> 每天的 09:00、09:30） */
+function hourSlots(h) {
+  const list = [];
+  for (const d of gridDates) {
+    for (const t of times) {
+      if (t.slice(0, 2) === h) list.push(d + 'T' + t);
+    }
+  }
+  return list;
+}
+
 function refreshAll() {
   document.querySelectorAll('td.slot').forEach(el => {
     el.classList.toggle('on', selected.has(el.dataset.slot));
+  });
+  // 小時欄標題：整欄都選取時反白
+  document.querySelectorAll('th.hcol').forEach(el => {
+    const list = hourSlots(el.dataset.hour);
+    el.classList.toggle('on', list.length > 0 && list.every(s => selected.has(s)));
   });
   document.querySelectorAll('.quick').forEach(q => {
     const d = q.dataset.date;
