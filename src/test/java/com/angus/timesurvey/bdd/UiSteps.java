@@ -318,4 +318,28 @@ public class UiSteps {
         assertThat(page.locator("#resultArea")).containsText("📅");
         assertThat(page.locator("#resultArea")).containsText("🌐");
     }
+
+    @When("設定會議時間為 {string} 小時")
+    public void setMeetingHours(String hours) {
+        page.fill("#meetHours", hours);   // oninput 會即時重算結論區
+    }
+
+    @Then("結論區應顯示可開會時段 {string}")
+    public void fitChipShown(String range) {
+        assertThat(page.locator("#resultArea .chip.fit")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(range))
+                .first()).isVisible();
+    }
+
+    @Then("結論區應顯示長度不足時段 {string}")
+    public void unfitChipShown(String range) {
+        assertThat(page.locator("#resultArea .chip:not(.fit)")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(range))
+                .first()).isVisible();
+    }
+
+    @Then("結論區不應顯示可開會時段")
+    public void noFitChip() {
+        assertThat(page.locator("#resultArea .chip.fit")).hasCount(0);
+    }
 }
