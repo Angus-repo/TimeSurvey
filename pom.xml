@@ -58,6 +58,12 @@
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
+        <!-- 設定檔屬性加密：application.properties 中以 ENC(密文) 存放，啟動時用主金鑰在記憶體解密 -->
+        <dependency>
+            <groupId>com.github.ulisesbocchio</groupId>
+            <artifactId>jasypt-spring-boot-starter</artifactId>
+            <version>3.0.5</version>
+        </dependency>
 
         <!-- 測試：Cucumber BDD -->
         <dependency>
@@ -115,6 +121,13 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- 產生/驗證 Jasypt 密文的指令列工具：
+                 mvn jasypt:encrypt-value -Djasypt.encryptor.password=主金鑰 -Djasypt.plugin.value=明文 -->
+            <plugin>
+                <groupId>com.github.ulisesbocchio</groupId>
+                <artifactId>jasypt-maven-plugin</artifactId>
+                <version>3.0.5</version>
             </plugin>
         </plugins>
     </build>

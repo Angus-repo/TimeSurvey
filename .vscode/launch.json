@@ -6,7 +6,12 @@
             "name": "啟動 TimeSurvey",
             "request": "launch",
             "mainClass": "com.angus.timesurvey.TimeSurveyApplication",
-            "projectName": "timesurvey"
+            "projectName": "timesurvey",
+            // Jasypt 主金鑰：解開 application.properties 中 ENC(...) 密文用。
+            // 這裡只是開發機的預設值，正式環境請改設作業系統的環境變數，不要把真正的金鑰提交進 git。
+            "env": {
+                "JASYPT_ENCRYPTOR_PASSWORD": "ts-master-key-change-me"
+            }
         }
     ]
 }
