@@ -83,13 +83,18 @@ public class UiSteps {
     public void captureAndClose(io.cucumber.java.Scenario scenario) {
         try {
             if (page != null) {
-                String banner = "UI 測試場景：" + scenario.getName() +
-                        "　［" + (scenario.isFailed() ? "✘ 失敗" : "✔ 通過") + "］　" +
-                        LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                String title = "UI 測試場景：" + scenario.getName() +
+                        "　［" + (scenario.isFailed() ? "✘ 失敗" : "✔ 通過") + "］";
+                String time = "截圖時間:" + LocalDateTime.now()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
                 String color = scenario.isFailed() ? "#c0392b" : "#1d7a35";
-                page.evaluate("t => { const b = document.createElement('div');" +
-                        "b.style.cssText = 'background:" + color + ";color:#fff;font:bold 15px sans-serif;padding:10px 16px;';" +
-                        "b.textContent = t; document.body.prepend(b); }", banner);
+                page.evaluate("([title, time]) => { const b = document.createElement('div');" +
+                        "b.style.cssText = 'display:flex;justify-content:space-between;align-items:center;" +
+                        "background:" + color + ";color:#fff;font:bold 15px sans-serif;padding:10px 16px;';" +
+                        "const l = document.createElement('span'); l.textContent = title;" +
+                        "const r = document.createElement('span'); r.textContent = time; r.style.fontWeight = '400';" +
+                        "b.append(l, r); document.body.prepend(b); }",
+                        Arrays.asList(title, time));
                 byte[] png = page.screenshot(new Page.ScreenshotOptions().setFullPage(true));
                 shots.add(new Shot(scenario.getName(), scenario.isFailed(), png));
                 scenario.attach(png, "image/png", scenario.getName());   // 同步嵌入 Cucumber HTML 報告
