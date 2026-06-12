@@ -345,4 +345,17 @@ public class UiSteps {
     public void noFitChip() {
         assertThat(page.locator("#resultArea .chip.fit")).hasCount(0);
     }
+
+    @When("展開調查明細")
+    public void expandDetail() {
+        page.click("#detailToggle");
+        assertThat(page.locator("#detailWrap")).isVisible();
+    }
+
+    @Then("調查明細應顯示人員 {string}")
+    public void detailShowsParticipants(String people) {
+        for (String p : people.split(",")) {
+            assertThat(page.locator("#detailWrap table thead")).containsText(p);
+        }
+    }
 }
