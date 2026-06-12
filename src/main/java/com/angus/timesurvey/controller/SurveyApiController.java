@@ -4,6 +4,7 @@ import com.angus.timesurvey.model.Survey;
 import com.angus.timesurvey.model.SurveyResponse;
 import com.angus.timesurvey.repo.SurveyRepository;
 import com.angus.timesurvey.repo.SurveyResponseRepository;
+import com.angus.timesurvey.repo.SurveyVisitRepository;
 import com.angus.timesurvey.ws.NotifyWebSocketHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
@@ -23,13 +24,16 @@ public class SurveyApiController {
 
     private final SurveyRepository surveyRepo;
     private final SurveyResponseRepository responseRepo;
+    private final SurveyVisitRepository visitRepo;
     private final NotifyWebSocketHandler notifier;
     private final ObjectMapper objectMapper;
 
     public SurveyApiController(SurveyRepository surveyRepo, SurveyResponseRepository responseRepo,
+                               SurveyVisitRepository visitRepo,
                                NotifyWebSocketHandler notifier, ObjectMapper objectMapper) {
         this.surveyRepo = surveyRepo;
         this.responseRepo = responseRepo;
+        this.visitRepo = visitRepo;
         this.notifier = notifier;
         this.objectMapper = objectMapper;
     }
@@ -97,8 +101,25 @@ public class SurveyApiController {
                                        @RequestHeader(value = "X-Owner-Token", required = false) String owner) {
         getOwned(id, owner);
         responseRepo.deleteBySurveyId(id);
+        visitRepo.deleteBySurveyId(id);
         surveyRepo.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** 使用統計：開啟次數、使用人數（不重複 IP）、回覆狀況，僅發起者可查 */
+    @GetMapping("/{id}/stats")
+    public Map<String, Object> stats(@PathVariable String id,
+                                     @RequestHeader(value = "X-Owner-Token", required = false) String owner) {
+        Survey s = getOwned(id, owner);
+        long responded = responseRepo.findBySurveyId(id).stream()
+                .map(SurveyResponse::getParticipantName)
+                .filter(s.getParticipants()::contains)
+                .distinct().count();
+        return Map.of(
+                "visits", visitRepo.countBySurveyId(id),
+                "uniqueIps", visitRepo.countDistinctIpBySurveyId(id),
+                "responded", responded,
+                "total", s.getParticipants().size());
     }
 
     /** 取得調查並確認是本人發起，否則 403 */

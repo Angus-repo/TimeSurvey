@@ -2,8 +2,10 @@ package com.angus.timesurvey.bdd;
 
 import com.angus.timesurvey.model.Survey;
 import com.angus.timesurvey.model.SurveyResponse;
+import com.angus.timesurvey.model.SurveyVisit;
 import com.angus.timesurvey.repo.SurveyRepository;
 import com.angus.timesurvey.repo.SurveyResponseRepository;
+import com.angus.timesurvey.repo.SurveyVisitRepository;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
@@ -38,6 +40,7 @@ public class UiSteps {
 
     @Autowired private SurveyRepository surveyRepo;
     @Autowired private SurveyResponseRepository responseRepo;
+    @Autowired private SurveyVisitRepository visitRepo;
     @Value("${local.server.port}") private int port;
 
     /** 整個測試 JVM 共用一個瀏覽器（啟動成本高），每個場景開獨立的無痕分頁環境 */
@@ -230,6 +233,17 @@ public class UiSteps {
         responseRepo.save(r);
     }
 
+    @Given("調查 {string} 已被開啟 {int} 次，來自 {int} 個不同 IP")
+    public void visitsExist(String surveyName, int visits, int ips) {
+        for (int i = 0; i < visits; i++) {
+            SurveyVisit v = new SurveyVisit();
+            v.setSurveyId(surveyIds.get(surveyName));
+            v.setIp("10.0.0." + (i % ips + 1));
+            v.setVisitedAt(LocalDateTime.now());
+            visitRepo.save(v);
+        }
+    }
+
     /* ---------- 調查填寫頁 ---------- */
 
     @When("開啟調查 {string} 的填寫頁")
@@ -333,6 +347,20 @@ public class UiSteps {
     @When("點擊第一筆調查的查看結果")
     public void clickFirstResult() {
         page.click("#surveyList .btn-ic.result");
+    }
+
+    @When("點擊第一筆調查的使用統計")
+    public void clickFirstStats() {
+        page.click("#surveyList .btn-ic.stat");
+    }
+
+    @Then("統計卡應顯示 開啟 {int} 次、使用者 {int} 人、回覆 {string}")
+    public void statCardShows(int visits, int users, String responded) {
+        assertThat(page.locator("#statCard")).isVisible();
+        var nums = page.locator("#statArea .stat .num");
+        assertThat(nums.nth(0)).hasText(String.valueOf(visits));
+        assertThat(nums.nth(1)).hasText(String.valueOf(users));
+        assertThat(nums.nth(2)).hasText(responded);
     }
 
     @Then("調查清單應包含 {string}")

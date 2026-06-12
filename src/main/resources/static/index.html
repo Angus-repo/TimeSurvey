@@ -47,6 +47,13 @@
   .btn-ic.stop   { --c: #34495e; }
   .btn-ic.edit   { --c: #f39c12; }
   .btn-ic.dup    { --c: #2c7be5; }
+  .btn-ic.stat   { --c: #16a085; }
+  /* 使用統計卡片：數字方塊 */
+  .stats { display: flex; gap: 16px; flex-wrap: wrap; }
+  .stat { flex: 1; min-width: 150px; background: #f7f9fc; border: 1px solid #e3e9f1; border-radius: 10px;
+          padding: 18px 16px; text-align: center; }
+  .stat .num { font-size: 32px; font-weight: 700; color: #2c3e50; line-height: 1.2; }
+  .stat .lbl { font-size: 13px; color: #888; margin-top: 6px; }
   .st { display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 13px; white-space: nowrap; }
   .st-open { background: #e6f7ef; color: #0a7d57; border: 1px solid #b3e6cf; }
   .st-closed { background: #eceff1; color: #78838c; border: 1px solid #d5dbdf; }
@@ -160,10 +167,15 @@
     <h2>調查清單 <span id="notifUi" style="float:right;font-weight:400;font-size:13px"></span></h2>
     <table>
       <thead>
-        <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th>填寫狀況</th><th>目前狀態</th><th style="width:210px">操作</th></tr>
+        <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th>填寫狀況</th><th>目前狀態</th><th style="width:250px">操作</th></tr>
       </thead>
       <tbody id="surveyList"></tbody>
     </table>
+  </div>
+
+  <div class="card" id="statCard" style="display:none">
+    <h2 id="statTitle">使用統計</h2>
+    <div class="stats" id="statArea"></div>
   </div>
 
   <div class="card" id="resultCard" style="display:none">
@@ -219,7 +231,8 @@ const ICONS = {
   chart: '<svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>',
   stop:  '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
   edit:  '<svg viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
-  dup:   '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+  dup:   '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  stat:  '<svg viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>'
 };
 
 const WEEK = ['日','一','二','三','四','五','六'];
@@ -284,6 +297,8 @@ async function loadSurveys() {
           data-tip="${closed ? '調查已結束，無法編輯' : '修改調查名稱、日期時間與人員名單'}" aria-label="編輯調查">${ICONS.edit}</button>
         <button class="btn-ic dup" onclick="duplicateSurvey('${s.id}')"
           data-tip="複製主旨與人員，開啟新的會議調查" aria-label="複製調查">${ICONS.dup}</button>
+        <button class="btn-ic stat" onclick="showStats('${s.id}')"
+          data-tip="使用統計：開啟次數、使用人數、回覆狀況" aria-label="使用統計">${ICONS.stat}</button>
       </div></td>`;
     tbody.appendChild(tr);
   });
@@ -494,6 +509,25 @@ async function closeSurvey(id) {
     await api('/api/surveys/' + id + '/close', { method: 'POST' });
     toast('調查已結束');
     loadSurveys();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+/* ---------- 使用統計 ---------- */
+async function showStats(id) {
+  const s = surveys.find(x => x.id === id);
+  try {
+    const st = await api('/api/surveys/' + id + '/stats');
+    const rate = st.total > 0 ? Math.round(st.responded * 100 / st.total) : 0;
+    $('statTitle').textContent = '使用統計：' + (s ? s.name : '');
+    $('statArea').innerHTML =
+        '<div class="stat"><div class="num">' + st.visits + '</div><div class="lbl">調查頁開啟次數</div></div>' +
+        '<div class="stat"><div class="num">' + st.uniqueIps + '</div><div class="lbl">使用人數（不重複 IP）</div></div>' +
+        '<div class="stat"><div class="num">' + st.responded + ' / ' + st.total + '</div><div class="lbl">已回覆 / 應回覆人數</div></div>' +
+        '<div class="stat"><div class="num">' + rate + '%</div><div class="lbl">回覆率</div></div>';
+    $('statCard').style.display = '';
+    $('statCard').scrollIntoView({ behavior: 'smooth' });
   } catch (e) {
     toast(e.message);
   }

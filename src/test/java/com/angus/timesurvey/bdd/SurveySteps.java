@@ -5,6 +5,7 @@ import com.angus.timesurvey.model.Survey;
 import com.angus.timesurvey.model.SurveyResponse;
 import com.angus.timesurvey.repo.SurveyRepository;
 import com.angus.timesurvey.repo.SurveyResponseRepository;
+import com.angus.timesurvey.repo.SurveyVisitRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.java.After;
@@ -47,6 +48,7 @@ public class SurveySteps {
     @Autowired private SurveyRepository surveyRepo;
     @Autowired private SurveyResponseRepository responseRepo;
     @Autowired private HousekeepingJob housekeepingJob;
+    @Autowired private SurveyVisitRepository visitRepo;
     @Autowired private ObjectMapper om;
     @Value("${local.server.port}") private int port;
 
@@ -60,6 +62,7 @@ public class SurveySteps {
     @Before
     public void cleanDb() {
         responseRepo.deleteAll();
+        visitRepo.deleteAll();
         surveyRepo.deleteAll();
     }
 
@@ -280,6 +283,32 @@ public class SurveySteps {
         List<String> completes = wsMessages.getOrDefault(owner, List.<String>of()).stream()
                 .filter(m -> m.contains("surveyComplete")).toList();
         assertEquals(expected, completes.size(), "完成通知內容：" + completes);
+    }
+
+    /* ---------- 使用統計 ---------- */
+
+    @When("有人從 IP {string} 開啟調查 {string} 的填寫頁")
+    public void visitSurveyPage(String ip, String surveyName) {
+        HttpHeaders h = new HttpHeaders();
+        h.set("X-Forwarded-For", ip);
+        rest.exchange("/s/" + surveyId(surveyName), HttpMethod.GET, new HttpEntity<>(h), String.class);
+    }
+
+    @When("{string} 查詢調查 {string} 的統計")
+    public void queryStats(String owner, String surveyName) {
+        last = rest.exchange("/api/surveys/" + surveyId(surveyName) + "/stats",
+                HttpMethod.GET, new HttpEntity<>(headers(owner)), String.class);
+    }
+
+    @Then("{string} 查詢調查 {string} 的統計應為 開啟 {int} 次、使用者 {int} 人、回覆 {int} \\/ {int}")
+    public void statsShouldBe(String owner, String surveyName, int visits, int users, int responded, int total) {
+        queryStats(owner, surveyName);
+        assertEquals(200, last.getStatusCode().value(), "回應：" + last.getBody());
+        JsonNode n = json(last.getBody());
+        assertEquals(visits, n.get("visits").asInt(), "開啟次數不符：" + last.getBody());
+        assertEquals(users, n.get("uniqueIps").asInt(), "不重複 IP 數不符：" + last.getBody());
+        assertEquals(responded, n.get("responded").asInt(), "回覆人數不符：" + last.getBody());
+        assertEquals(total, n.get("total").asInt(), "應回覆人數不符：" + last.getBody());
     }
 
     /* ---------- Housekeeping 批次 ---------- */
