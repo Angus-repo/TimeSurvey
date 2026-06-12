@@ -294,7 +294,10 @@ public class UiSteps {
     @When("在後台輸入調查名稱 {string} 與人員 {string}")
     public void fillAdminForm(String name, String people) {
         page.fill("#fName", name);
-        page.fill("#fParticipants", String.join("\n", people.split(",")));
+        for (String p : people.split(",")) {
+            page.fill("#pInput", p);
+            page.keyboard().press("Enter");   // 名牌式輸入：每位按 Enter 成為一顆名牌
+        }
     }
 
     @When("按下建立調查")

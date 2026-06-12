@@ -54,6 +54,21 @@
   .btn-ic:disabled:hover { background: #f4f6f8; border-color: #e4e8ec; color: var(--c, #5a6470);
                            transform: none; box-shadow: none; }
   .btn-cancel { background: #95a5a6; color: #fff; }
+  /* 受調查人員：名牌式輸入 */
+  .ptags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px; min-height: 46px;
+           border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: text; }
+  .ptags:focus-within { border-color: #2c7be5; }
+  .ptag { display: inline-flex; align-items: center; gap: 7px; background: #eef6f3; border: 1px solid #bfe3d8;
+          border-radius: 14px; padding: 4px 11px; font-size: 13px; cursor: pointer; user-select: none;
+          transition: background .15s, border-color .15s; }
+  .ptag:hover { border-color: #00a884; }
+  .ptag.host { background: #e8f1fd; border-color: #9cc3f5; font-weight: 600; }
+  .ptag .x { color: #999; font-weight: 700; line-height: 1; }
+  .ptag .x:hover { color: #e74c3c; }
+  .ptags input { border: none; outline: none; flex: 1; min-width: 240px; font-size: 14px; padding: 4px; width: auto; }
+  .pbar { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 13px; }
+  .pbar a { color: #2c7be5; text-decoration: none; }
+  .pbar a:hover { text-decoration: underline; }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; vertical-align: top; }
   th { background: #fafafa; color: #555; font-weight: 600; }
@@ -128,8 +143,14 @@
     </div>
     <div class="row">
       <div>
-        <label>受調查人員（每行一位，請將<b>會議主持人</b>放在第一位）</label>
-        <textarea id="fParticipants" rows="4" placeholder="王小明（第一位請填會議主持人）&#10;李小華&#10;陳大文"></textarea>
+        <label>受調查人員（輸入姓名按 Enter，或直接貼上整串名單；👑 第一位為<b>會議主持人</b>，點名牌可改設）</label>
+        <div class="ptags" id="pTags">
+          <input id="pInput" placeholder="輸入姓名後按 Enter，或貼上「王大明;陳小明;李中明」這類名單">
+        </div>
+        <div class="pbar">
+          <span class="muted" id="pCount">共 0 人</span>
+          <a href="javascript:void(0)" onclick="copyParticipants()">📋 複製全部人名</a>
+        </div>
       </div>
     </div>
     <button class="btn-primary" onclick="saveSurvey()" id="saveBtn">建立調查</button>
@@ -307,14 +328,104 @@ function setDefaultDates() {
   $('fEndDate').value = ymd(e);
 }
 
+/* ---------- 受調查人員：名牌式輸入 ---------- */
+let plist = [];   // 人員名單，第 0 位為會議主持人
+
+function renderTags() {
+  const box = $('pTags');
+  const input = $('pInput');
+  box.querySelectorAll('.ptag').forEach(el => el.remove());
+  plist.forEach((name, i) => {
+    const tag = document.createElement('span');
+    tag.className = 'ptag' + (i === 0 ? ' host' : '');
+    tag.title = i === 0 ? '會議主持人' : '點擊設為會議主持人（移到第一位）';
+    const label = document.createElement('span');
+    label.textContent = (i === 0 ? '👑 ' : '') + name;
+    const x = document.createElement('span');
+    x.className = 'x';
+    x.textContent = '×';
+    x.title = '移除 ' + name;
+    x.onclick = e => {
+      e.stopPropagation();
+      plist.splice(i, 1);
+      renderTags();
+    };
+    tag.onclick = () => {
+      if (i === 0) return;
+      plist.splice(i, 1);
+      plist.unshift(name);
+      renderTags();
+      toast('已將「' + name + '」設為會議主持人');
+    };
+    tag.append(label, x);
+    box.insertBefore(tag, input);
+  });
+  $('pCount').textContent = '共 ' + plist.length + ' 人' + (plist.length ? '（👑 ' + plist[0] + ' 為主持人）' : '');
+}
+
+/* 把整串文字拆成多位人名：支援換行、逗號、分號、頓號、全形標點與空白 */
+function addNames(text) {
+  let dup = 0;
+  for (const n of String(text).split(/[\n\r,;，；、\s]+/)) {
+    const name = n.trim();
+    if (!name) continue;
+    if (plist.includes(name)) { dup++; continue; }
+    plist.push(name);
+  }
+  if (dup > 0) toast('已略過 ' + dup + ' 個重複姓名');
+  renderTags();
+}
+
+function commitPInput() {
+  const v = $('pInput').value.trim();
+  if (v) addNames(v);
+  $('pInput').value = '';
+}
+
+function copyParticipants() {
+  if (plist.length === 0) return toast('名單是空的');
+  const text = plist.join(';');
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => toast('已複製 ' + plist.length + ' 位人名'));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已複製 ' + plist.length + ' 位人名');
+  }
+}
+
+$('pInput').addEventListener('keydown', e => {
+  if (e.isComposing) return;   // 中文輸入法選字中的 Enter 不處理
+  if (e.key === 'Enter' || [',', ';', '、', '，', '；'].includes(e.key)) {
+    e.preventDefault();
+    commitPInput();
+  } else if (e.key === 'Backspace' && !$('pInput').value && plist.length) {
+    plist.pop();
+    renderTags();
+  }
+});
+$('pInput').addEventListener('blur', commitPInput);
+$('pInput').addEventListener('paste', e => {
+  e.preventDefault();
+  addNames((e.clipboardData || window.clipboardData).getData('text'));
+});
+$('pTags').addEventListener('click', e => {
+  if (e.target === $('pTags')) $('pInput').focus();
+});
+
 function readForm() {
+  commitPInput();   // 輸入框還有沒按 Enter 的姓名，先收進名單
   return {
     name: $('fName').value.trim(),
     startDate: $('fStartDate').value,
     endDate: $('fEndDate').value,
     startTime: $('fStartTime').value,
     endTime: $('fEndTime').value,
-    participants: $('fParticipants').value.split('\n').map(s => s.trim()).filter(s => s)
+    participants: [...plist]
   };
 }
 
@@ -350,7 +461,8 @@ function editSurvey(id) {
   $('fEndDate').value = s.endDate;
   $('fStartTime').value = s.startTime.slice(0,5);
   $('fEndTime').value = s.endTime.slice(0,5);
-  $('fParticipants').value = s.participants.join('\n');
+  plist = [...s.participants];
+  renderTags();
   $('formTitle').textContent = '編輯調查：' + s.name;
   $('saveBtn').textContent = '儲存修改';
   $('cancelBtn').style.display = '';
@@ -363,7 +475,8 @@ function duplicateSurvey(id) {
   if (!s) return;
   resetForm();
   $('fName').value = s.name;
-  $('fParticipants').value = s.participants.join('\n');
+  plist = [...s.participants];
+  renderTags();
   $('formTitle').textContent = '建立新調查(複製自:' + s.name + ')';
   window.scrollTo({ top: 0, behavior: 'smooth' });
   toast('已帶入「' + s.name + '」的主旨與人員，確認日期後即可建立');
@@ -375,7 +488,9 @@ function resetForm() {
   setDefaultDates();
   $('fStartTime').value = '09:00';
   $('fEndTime').value = '17:30';
-  $('fParticipants').value = '';
+  plist = [];
+  $('pInput').value = '';
+  renderTags();
   $('formTitle').textContent = '建立新調查';
   $('saveBtn').textContent = '建立調查';
   $('cancelBtn').style.display = 'none';
