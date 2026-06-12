@@ -24,18 +24,57 @@
 
 ## 執行方式
 
+啟動前需先設定 Jasypt 主金鑰環境變數（見下方「設定檔加密」一節）：
+
 ```bash
+export JASYPT_ENCRYPTOR_PASSWORD=你的主金鑰
 mvn spring-boot:run
 ```
 
 啟動後開啟 <http://localhost:8080> 進入後台維護頁。
+（VS Code 使用者按 F5 即可，`.vscode/launch.json` 已帶入開發用主金鑰。）
 
 打包執行：
 
 ```bash
 mvn package
-java -jar target/timesurvey-1.0.0.jar
+JASYPT_ENCRYPTOR_PASSWORD=你的主金鑰 java -jar target/timesurvey-1.0.0.jar
 ```
+
+## 設定檔加密（Jasypt）
+
+`application.properties` 中的資料庫密碼以 Jasypt 加密成 `ENC(密文)` 存放，
+啟動時才用主金鑰在記憶體中解密，設定檔裡不會出現明文密碼。
+主金鑰由環境變數 `JASYPT_ENCRYPTOR_PASSWORD` 提供；未設定時應用程式會拒絕啟動。
+
+### 設定主金鑰環境變數
+
+| 環境 | 指令 |
+| --- | --- |
+| Linux / macOS（當前終端機） | `export JASYPT_ENCRYPTOR_PASSWORD=你的主金鑰` |
+| Windows cmd（當前視窗） | `set JASYPT_ENCRYPTOR_PASSWORD=你的主金鑰` |
+| Windows PowerShell（當前視窗） | `$env:JASYPT_ENCRYPTOR_PASSWORD="你的主金鑰"` |
+| Windows（永久，使用者層級） | `setx JASYPT_ENCRYPTOR_PASSWORD 你的主金鑰`（開新視窗才生效） |
+
+也可改用 JVM 參數：`java -Djasypt.encryptor.password=你的主金鑰 -jar target/timesurvey-1.0.0.jar`。
+
+開發機上 VS Code 的 `.vscode/launch.json` 已內建一組開發用主金鑰，按 F5 即可啟動；
+**正式環境請換成自己的主金鑰**，只設在伺服器的環境變數，不要提交進 git。
+
+### 換主金鑰（或換資料庫密碼）
+
+1. 用新的主金鑰重新產生密文：
+
+   ```bash
+   mvn jasypt:encrypt-value -Djasypt.encryptor.password=新主金鑰 -Djasypt.plugin.value='資料庫密碼'
+   ```
+
+2. 將輸出的 `ENC(...)` 整段貼回 `application.properties` 的 `spring.datasource.password=`。
+3. 之後啟動時改用新主金鑰設定 `JASYPT_ENCRYPTOR_PASSWORD`。
+
+注意：H2 的 `sa` 密碼是在「第一次建立資料庫檔案」時定下來的。
+若要更換的是**資料庫密碼本身**（而非只換主金鑰），需先刪除舊的
+`./data/timesurvey.mv.db` 再啟動，否則會連不上。
 
 ## 測試（Cucumber BDD）
 
@@ -63,4 +102,4 @@ VS Code 使用者可直接執行內建 task「BDD 測試 (Cucumber)」（終端�
 ## 資料儲存
 
 所有設定與調查資料皆存於 H2 資料庫（`./data/timesurvey.mv.db`），重啟不會遺失。
-偵錯用 H2 console：<http://localhost:8080/h2-console>（JDBC URL：`jdbc:h2:file:./data/timesurvey`，帳號 `sa`，密碼空白）。
+偵錯用 H2 console：<http://localhost:8080/h2-console>（JDBC URL：`jdbc:h2:file:./data/timesurvey`，帳號 `sa`，密碼為建立資料庫時設定的密碼）。
