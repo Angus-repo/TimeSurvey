@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>時間調查 - 全站使用統計</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; margin: 0; background: #f0f2f5; color: #333; }
+  header { background: #34495e; color: #fff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { margin: 0; font-size: 20px; }
+  header a { color: #cfd8e3; font-size: 13px; text-decoration: none; }
+  header a:hover { color: #fff; text-decoration: underline; }
+  .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+  .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); padding: 20px; margin-bottom: 24px; }
+  .card h2 { margin-top: 0; font-size: 17px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+  .muted { color: #999; font-size: 13px; }
+  /* 總覽數字方塊 */
+  .stats { display: flex; gap: 16px; flex-wrap: wrap; }
+  .stat { flex: 1; min-width: 150px; background: #f7f9fc; border: 1px solid #e3e9f1; border-radius: 10px;
+          padding: 18px 16px; text-align: center; }
+  .stat .num { font-size: 32px; font-weight: 700; color: #2c3e50; line-height: 1.2; }
+  .stat .lbl { font-size: 13px; color: #888; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { border-bottom: 1px solid #eee; padding: 10px 8px; text-align: left; vertical-align: middle; }
+  th { background: #fafafa; color: #555; font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  th.num { text-align: right; }
+  .st { display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 13px; white-space: nowrap; }
+  .st-open { background: #e6f7ef; color: #0a7d57; border: 1px solid #b3e6cf; }
+  .st-closed { background: #eceff1; color: #78838c; border: 1px solid #d5dbdf; }
+  /* 回覆率長條 */
+  .ratebar { display: inline-block; width: 90px; height: 10px; background: #eceff1; border-radius: 5px;
+             overflow: hidden; margin-right: 8px; vertical-align: middle; }
+  .ratebar i { display: block; height: 100%; background: #28a745; border-radius: 5px; }
+  button { cursor: pointer; border: none; border-radius: 4px; padding: 5px 14px; font-size: 13px;
+           font-family: inherit; background: #2c7be5; color: #fff; float: right; }
+  button:hover { background: #1a68d1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📊 時間調查 - 全站使用統計</h1>
+  <a href="/">← 回後台維護</a>
+</header>
+<div class="container">
+
+  <div class="card">
+    <h2>總覽 <span class="muted" id="genAt" style="float:right;font-weight:400"></span></h2>
+    <div class="stats" id="totArea"></div>
+  </div>
+
+  <div class="card">
+    <h2>各調查統計 <button onclick="load()">重新整理</button></h2>
+    <table id="statTable">
+      <thead>
+        <tr><th>調查名稱</th><th>調查期間</th><th>狀態</th><th class="num">開啟次數</th>
+            <th class="num">使用人數（不重複 IP）</th><th class="num">已回覆 / 應回覆</th><th>回覆率</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="muted">使用人數以不重複來源 IP 估算：同一網路出口（NAT）的多位使用者會被算成一人，同一人切換網路則會被算成多人。</p>
+  </div>
+
+</div>
+<script>
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* "2026-06-10" -> "2026/6/10" */
+function fmtYmd(d) {
+  const [y, m, dd] = String(d).split('-');
+  return y + '/' + (+m) + '/' + (+dd);
+}
+
+function tile(num, label) {
+  return '<div class="stat"><div class="num">' + num + '</div><div class="lbl">' + label + '</div></div>';
+}
+
+async function load() {
+  const res = await fetch('/api/stats');
+  if (!res.ok) return;
+  const d = await res.json();
+
+  $('totArea').innerHTML =
+      tile(d.totalSurveys, '調查總數') +
+      tile(d.totalVisits, '調查頁開啟總次數') +
+      tile(d.totalUniqueIps, '全站使用人數（不重複 IP）') +
+      tile(d.totalResponded, '已回覆總人次');
+  $('genAt').textContent = '統計時間：' + String(d.generatedAt).replace('T', ' ').slice(0, 19);
+
+  const tbody = $('statTable').querySelector('tbody');
+  tbody.innerHTML = '';
+  if (d.surveys.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">尚無調查。</td></tr>';
+    return;
+  }
+  for (const s of d.surveys) {
+    const rate = s.total > 0 ? Math.round(s.responded * 100 / s.total) : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+        '<td>' + esc(s.name) + '</td>' +
+        '<td>' + fmtYmd(s.startDate) + ' ~ ' + fmtYmd(s.endDate) + '</td>' +
+        '<td><span class="st ' + (s.closed ? 'st-closed' : 'st-open') + '">' + (s.closed ? '已結束' : '進行中') + '</span></td>' +
+        '<td class="num">' + s.visits + '</td>' +
+        '<td class="num">' + s.uniqueIps + '</td>' +
+        '<td class="num">' + s.responded + ' / ' + s.total + '</td>' +
+        '<td><span class="ratebar"><i style="width:' + rate + '%"></i></span>' + rate + '%</td>';
+    tbody.appendChild(tr);
+  }
+}
+
+load();
+</script>
+</body>
+</html>

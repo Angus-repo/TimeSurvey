@@ -106,22 +106,6 @@ public class SurveyApiController {
         return ResponseEntity.noContent().build();
     }
 
-    /** 使用統計：開啟次數、使用人數（不重複 IP）、回覆狀況，僅發起者可查 */
-    @GetMapping("/{id}/stats")
-    public Map<String, Object> stats(@PathVariable String id,
-                                     @RequestHeader(value = "X-Owner-Token", required = false) String owner) {
-        Survey s = getOwned(id, owner);
-        long responded = responseRepo.findBySurveyId(id).stream()
-                .map(SurveyResponse::getParticipantName)
-                .filter(s.getParticipants()::contains)
-                .distinct().count();
-        return Map.of(
-                "visits", visitRepo.countBySurveyId(id),
-                "uniqueIps", visitRepo.countDistinctIpBySurveyId(id),
-                "responded", responded,
-                "total", s.getParticipants().size());
-    }
-
     /** 取得調查並確認是本人發起，否則 403 */
     private Survey getOwned(String id, String owner) {
         Survey s = get(id);

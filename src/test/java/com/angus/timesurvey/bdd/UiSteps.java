@@ -349,18 +349,23 @@ public class UiSteps {
         page.click("#surveyList .btn-ic.result");
     }
 
-    @When("點擊第一筆調查的使用統計")
-    public void clickFirstStats() {
-        page.click("#surveyList .btn-ic.stat");
+    /* ---------- 全站統計頁 ---------- */
+
+    @When("開啟全站統計頁")
+    public void openStatsPage() {
+        page.navigate(base() + "/stats");
+        page.locator("#statTable tbody tr").first().waitFor();
     }
 
-    @Then("統計卡應顯示 開啟 {int} 次、使用者 {int} 人、回覆 {string}")
-    public void statCardShows(int visits, int users, String responded) {
-        assertThat(page.locator("#statCard")).isVisible();
-        var nums = page.locator("#statArea .stat .num");
-        assertThat(nums.nth(0)).hasText(String.valueOf(visits));
-        assertThat(nums.nth(1)).hasText(String.valueOf(users));
-        assertThat(nums.nth(2)).hasText(responded);
+    @Then("統計頁應列出調查 {string}：開啟 {int} 次、使用者 {int} 人、回覆 {string}")
+    public void statsPageRow(String name, int visits, int users, String responded) {
+        var row = page.locator("#statTable tbody tr")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(name));
+        assertThat(row).isVisible();
+        var cells = row.locator("td");
+        assertThat(cells.nth(3)).hasText(String.valueOf(visits));
+        assertThat(cells.nth(4)).hasText(String.valueOf(users));
+        assertThat(cells.nth(5)).hasText(responded);
     }
 
     @Then("調查清單應包含 {string}")

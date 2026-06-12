@@ -34,6 +34,12 @@ public class PageController {
         return "forward:/survey.html";
     }
 
+    /** 全站使用統計頁（管理者自行進入查看） */
+    @GetMapping("/stats")
+    public String statsPage() {
+        return "forward:/stats.html";
+    }
+
     /** 來源 IP：經過反向代理時取 X-Forwarded-For 的第一段，否則取連線位址 */
     private String clientIp(HttpServletRequest request) {
         String xff = request.getHeader("X-Forwarded-For");

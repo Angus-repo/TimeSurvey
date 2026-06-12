@@ -11,5 +11,8 @@ public interface SurveyVisitRepository extends JpaRepository<SurveyVisit, Long> 
     @Query("select count(distinct v.ip) from SurveyVisit v where v.surveyId = ?1")
     long countDistinctIpBySurveyId(String surveyId);
 
+    @Query("select count(distinct v.ip) from SurveyVisit v")
+    long countDistinctIpAll();
+
     void deleteBySurveyId(String surveyId);
 }

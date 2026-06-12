@@ -294,21 +294,30 @@ public class SurveySteps {
         rest.exchange("/s/" + surveyId(surveyName), HttpMethod.GET, new HttpEntity<>(h), String.class);
     }
 
-    @When("{string} 查詢調查 {string} 的統計")
-    public void queryStats(String owner, String surveyName) {
-        last = rest.exchange("/api/surveys/" + surveyId(surveyName) + "/stats",
-                HttpMethod.GET, new HttpEntity<>(headers(owner)), String.class);
+    @Then("全站統計應包含調查 {string}：開啟 {int} 次、使用者 {int} 人、回覆 {int} \\/ {int}")
+    public void siteStatsRow(String surveyName, int visits, int users, int responded, int total) {
+        ResponseEntity<String> res = rest.getForEntity("/api/stats", String.class);
+        assertEquals(200, res.getStatusCode().value(), "回應：" + res.getBody());
+        JsonNode row = null;
+        for (JsonNode n : json(res.getBody()).get("surveys")) {
+            if (surveyName.equals(n.get("name").asText())) { row = n; break; }
+        }
+        assertNotNull(row, "統計中找不到調查「" + surveyName + "」：" + res.getBody());
+        assertEquals(visits, row.get("visits").asInt(), "開啟次數不符：" + row);
+        assertEquals(users, row.get("uniqueIps").asInt(), "不重複 IP 數不符：" + row);
+        assertEquals(responded, row.get("responded").asInt(), "回覆人數不符：" + row);
+        assertEquals(total, row.get("total").asInt(), "應回覆人數不符：" + row);
     }
 
-    @Then("{string} 查詢調查 {string} 的統計應為 開啟 {int} 次、使用者 {int} 人、回覆 {int} \\/ {int}")
-    public void statsShouldBe(String owner, String surveyName, int visits, int users, int responded, int total) {
-        queryStats(owner, surveyName);
-        assertEquals(200, last.getStatusCode().value(), "回應：" + last.getBody());
-        JsonNode n = json(last.getBody());
-        assertEquals(visits, n.get("visits").asInt(), "開啟次數不符：" + last.getBody());
-        assertEquals(users, n.get("uniqueIps").asInt(), "不重複 IP 數不符：" + last.getBody());
-        assertEquals(responded, n.get("responded").asInt(), "回覆人數不符：" + last.getBody());
-        assertEquals(total, n.get("total").asInt(), "應回覆人數不符：" + last.getBody());
+    @Then("全站統計總計應為：調查 {int} 筆、開啟 {int} 次、使用者 {int} 人、回覆 {int} 人次")
+    public void siteStatsTotals(int surveys, int visits, int users, int responded) {
+        ResponseEntity<String> res = rest.getForEntity("/api/stats", String.class);
+        assertEquals(200, res.getStatusCode().value(), "回應：" + res.getBody());
+        JsonNode n = json(res.getBody());
+        assertEquals(surveys, n.get("totalSurveys").asInt(), "調查總數不符：" + res.getBody());
+        assertEquals(visits, n.get("totalVisits").asInt(), "開啟總次數不符：" + res.getBody());
+        assertEquals(users, n.get("totalUniqueIps").asInt(), "全站不重複 IP 數不符：" + res.getBody());
+        assertEquals(responded, n.get("totalResponded").asInt(), "回覆總人次不符：" + res.getBody());
     }
 
     /* ---------- Housekeeping 批次 ---------- */
