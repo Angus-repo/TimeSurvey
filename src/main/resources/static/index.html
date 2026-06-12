@@ -114,6 +114,8 @@
   /* 首次建立調查的新手引導：打亮清單上的「複製連結」按鈕，提示把超連結傳給受調查人員 */
   .btn-ic.onb-spot { z-index: 1001; background: #fff; animation: onbpulse 1.6s ease-in-out infinite; }
   #linkOnbPop { position: fixed; top: auto; left: auto; }   /* 位置由 JS 依按鈕座標決定 */
+  #linkOnbPop::before { left: var(--arrow-left, 36px); }    /* 箭頭由 JS 對準按鈕中心 */
+  #linkOnbPop.above::before { bottom: auto; top: 100%; border-bottom-color: transparent; border-top-color: #fff; }
   #resultArea a { color: #2c7be5; font-size: 14px; text-decoration: none; }
   #resultArea a:hover { text-decoration: underline; }
   /* 調查結論：共同有空時段的視覺化 */
@@ -131,14 +133,19 @@
           font-size: 12px; font-weight: 400; cursor: pointer; background: #fff; color: #1d8c38;
           border: 1px solid #bfe3c9; user-select: none; transition: background .15s, transform .15s; }
   .cbtn:hover { background: #eafff1; transform: translateY(-1px); }
-  .cbtn::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%;
+  /* 綠色時段的文字本身也是超連結：點了與 📅 相同，開啟 Outlook 網頁版會議 */
+  .clnk { position: relative; cursor: pointer; text-decoration: underline;
+          text-underline-offset: 3px; text-decoration-color: rgba(255,255,255,.65); }
+  .clnk:hover { text-decoration-color: #fff; }
+  .cbtn::after, .clnk::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%;
                  transform: translateX(-50%); background: #2c3e50; color: #fff; font-size: 12px; font-weight: 400;
                  padding: 6px 10px; border-radius: 6px; white-space: nowrap; opacity: 0; visibility: hidden;
                  transition: opacity .08s; pointer-events: none; z-index: 30; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
-  .cbtn::before { content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%;
+  .cbtn::before, .clnk::before { content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%;
                   transform: translateX(-50%); border: 5px solid transparent; border-top-color: #2c3e50;
                   opacity: 0; visibility: hidden; transition: opacity .08s; pointer-events: none; z-index: 30; }
-  .cbtn:hover::after, .cbtn:hover::before { opacity: 1; visibility: visible; }
+  .cbtn:hover::after, .cbtn:hover::before,
+  .clnk:hover::after, .clnk:hover::before { opacity: 1; visibility: visible; }
 </style>
 </head>
 <body>
@@ -584,18 +591,32 @@ async function showResult(id) {
 /* ---------- 首次建立調查的新手引導：提示複製超連結給受調查人員 ---------- */
 let linkOnbSid = null;   // 引導打亮中的調查 id（清單重繪時用來重新套上效果）
 
-/* 打亮該調查的「複製連結」按鈕，並把說明泡泡定位在按鈕下方 */
+/* 打亮該調查的「複製連結」按鈕，並把說明泡泡定位在按鈕旁、箭頭對準按鈕中心。
+   按鈕在表格最右邊的「操作」欄，泡泡置中對齊按鈕後夾在視窗內；下方放不下就改放上方。 */
 function spotLinkBtn() {
   const btn = document.querySelector('.btn-ic.copy[data-sid="' + linkOnbSid + '"]');
   if (!btn) return false;
   btn.classList.add('onb-spot');
   const r = btn.getBoundingClientRect();
   const pop = $('linkOnbPop');
-  pop.style.display = '';
-  pop.style.top = (r.bottom + 14) + 'px';
-  pop.style.left = Math.max(12, Math.min(r.left - 24, window.innerWidth - 420)) + 'px';
+  pop.style.display = '';   // 先顯示才量得到泡泡的實際寬高
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  const left = Math.max(12, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 12));
+  pop.style.left = left + 'px';
+  pop.style.setProperty('--arrow-left', (r.left + r.width / 2 - left - 9) + 'px');   // 9 = 箭頭半寬
+  if (r.bottom + 14 + ph <= window.innerHeight - 8) {
+    pop.classList.remove('above');
+    pop.style.top = (r.bottom + 14) + 'px';
+  } else {
+    pop.classList.add('above');
+    pop.style.top = Math.max(8, r.top - 14 - ph) + 'px';
+  }
   return true;
 }
+
+// 引導進行中若捲動或縮放視窗，按鈕位置會變，泡泡跟著重新定位
+['resize', 'scroll'].forEach(ev =>
+  window.addEventListener(ev, () => { if (linkOnbSid) spotLinkBtn(); }, true));
 
 function startLinkOnb(surveyId) {
   linkOnbSid = surveyId;
@@ -737,10 +758,13 @@ function renderResult() {
             for (let k = 0; k < winCount; k++) {
               const wFrom = r.slots[k * need];
               const wTo = plus30(r.slots[k * need + need - 1]);
-              const attrs = ' data-date="' + d + '" data-from="' + wFrom + '"';
-              html += '<span class="chip fit">' + wFrom + ' ~ ' + wTo + '（' + meetHours + ' 小時）✓' +
-                      '<span class="cbtn"' + attrs + ' onclick="openOutlookWeb(this)"' +
-                      ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + wFrom + ' 起），主旨、時間、與會人員已帶入，並開啟 Teams 線上會議">📅</span>' +
+              const attrs = ' data-date="' + d + '" data-from="' + wFrom + '"' +
+                            ' onclick="openOutlookWeb(this)"' +
+                            ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + wFrom + ' 起），主旨、時間、與會人員已帶入，並開啟 Teams 線上會議"';
+              // 時段文字與 📅 都是超連結，點了行為相同（開啟 Outlook 網頁版會議）
+              html += '<span class="chip fit">' +
+                      '<span class="clnk"' + attrs + '>' + wFrom + ' ~ ' + wTo + '（' + meetHours + ' 小時）✓</span>' +
+                      '<span class="cbtn"' + attrs + '>📅</span>' +
                       '</span>';
             }
           } else {
@@ -753,7 +777,7 @@ function renderResult() {
     }
     html += '<div class="cnote muted">綠色＝可挑選的 ' + meetHours + ' 小時會議時段（共同有空的時間較長時，會切成多段供選擇）<br>' +
             '灰色＝大家都有空但長度不足<br>' +
-            '「📅」可在 Outlook 網頁版開啟新會議（主旨、時間、與會人員已帶入，含 Teams 線上會議）</div>';
+            '點綠色時段的文字或「📅」可在 Outlook 網頁版開啟新會議（主旨、時間、與會人員已帶入，含 Teams 線上會議）</div>';
   }
   html += '</div>';
 

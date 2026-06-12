@@ -362,6 +362,17 @@ public class UiSteps {
         assertThat(page.locator(".btn-ic.copy.onb-spot")).isVisible();
     }
 
+    @Then("複製連結引導泡泡應對準被打亮的按鈕")
+    public void linkOnboardingPopAligned() {
+        var btnBox = page.locator(".btn-ic.copy.onb-spot").boundingBox();
+        var popBox = page.locator("#linkOnbPop").boundingBox();
+        double btnCx = btnBox.x + btnBox.width / 2;
+        // 泡泡的水平範圍必須涵蓋按鈕中心（箭頭才指得到按鈕），否則就是定位歪掉
+        org.junit.jupiter.api.Assertions.assertTrue(
+                btnCx >= popBox.x && btnCx <= popBox.x + popBox.width,
+                "泡泡應對準按鈕：按鈕中心 x=" + btnCx + "，泡泡範圍 " + popBox.x + " ~ " + (popBox.x + popBox.width));
+    }
+
     @Then("複製連結的新手引導應消失")
     public void linkOnboardingGone() {
         assertThat(page.locator("#linkOnbPop")).isHidden();
@@ -439,6 +450,17 @@ public class UiSteps {
         assertThat(page.locator("#resultArea .chip:not(.fit)")
                 .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(range))
                 .first()).isVisible();
+    }
+
+    @Then("綠色時段的文字應為可開啟會議的超連結")
+    public void fitChipTextIsLink() {
+        var links = page.locator("#resultArea .chip.fit .clnk[onclick]");
+        assertThat(links.first()).isVisible();
+        // 每個綠色時段的文字都要是超連結，且提示說明與 📅 相同（開啟 Outlook 會議）
+        org.junit.jupiter.api.Assertions.assertEquals(
+                page.locator("#resultArea .chip.fit").count(), links.count(),
+                "每個綠色時段的文字都應是超連結");
+        assertThat(links.first()).hasAttribute("data-tip", java.util.regex.Pattern.compile(".*Outlook.*"));
     }
 
     @Then("結論區應顯示 {int} 個可開會時段")
