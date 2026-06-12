@@ -111,6 +111,9 @@
   .onb-pop button { margin-top: 10px; background: #2c7be5; color: #fff; border: none; border-radius: 6px;
                     padding: 7px 22px; font-size: 14px; cursor: pointer; font-family: inherit; }
   .onb-pop button:hover { background: #1a68d1; }
+  /* 首次建立調查的新手引導：打亮清單上的「複製連結」按鈕，提示把超連結傳給受調查人員 */
+  .btn-ic.onb-spot { z-index: 1001; background: #fff; animation: onbpulse 1.6s ease-in-out infinite; }
+  #linkOnbPop { position: fixed; top: auto; left: auto; }   /* 位置由 JS 依按鈕座標決定 */
   #resultArea a { color: #2c7be5; font-size: 14px; text-decoration: none; }
   #resultArea a:hover { text-decoration: underline; }
   /* 調查結論：共同有空時段的視覺化 */
@@ -200,6 +203,13 @@
 
 </div>
 <div class="onb-mask" id="meetOnbMask" style="display:none" onclick="endMeetOnb()"></div>
+<div class="onb-mask" id="linkOnbMask" style="display:none" onclick="endLinkOnb()"></div>
+<div class="onb-pop" id="linkOnbPop" style="display:none">
+  🔗 <b>調查建立完成，接著把連結傳給受調查人員</b><br>
+  點這顆打亮的「複製連結」按鈕，即可複製此調查的填寫超連結，
+  貼到 Email 或聊天工具傳給大家，收到的人點開就能填寫。
+  <div><button onclick="endLinkOnb()">知道了</button></div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -299,7 +309,7 @@ async function loadSurveys() {
         <div class="muted" style="font-size:12px;margin-top:4px"
              title="調查迄日經過 7 天後，系統批次（每晚 20:00）會自動刪除調查與填寫資料">${deleteHint(s)}</div></td>
       <td><div class="ops">
-        <button class="btn-ic copy" onclick="copyLink('${s.id}')" ${closed ? 'disabled' : ''}
+        <button class="btn-ic copy" data-sid="${s.id}" onclick="copyLink('${s.id}')" ${closed ? 'disabled' : ''}
           data-tip="${closed ? '調查已結束，連結已停用' : '複製調查連結，傳給參與者即可填寫'}" aria-label="複製調查連結">${ICONS.link}</button>
         <button class="btn-ic result" onclick="showResult('${s.id}')" data-tip="查看填寫狀況與共同有空的時段" aria-label="查看結果">${ICONS.chart}</button>
         <button class="btn-ic stop" onclick="closeSurvey('${s.id}')" ${closed ? 'disabled' : ''}
@@ -311,6 +321,7 @@ async function loadSurveys() {
       </div></td>`;
     tbody.appendChild(tr);
   });
+  if (linkOnbSid) spotLinkBtn();   // 清單重繪會洗掉打亮效果，引導進行中就重新套上
 }
 
 function esc(s) {
@@ -322,6 +333,7 @@ function surveyUrl(id) {
 }
 
 function copyLink(id) {
+  if (linkOnbSid) endLinkOnb();   // 照著引導按下複製，代表已學會，結束引導
   const url = surveyUrl(id);
   if (navigator.clipboard && window.isSecureContext) {
     navigator.clipboard.writeText(url).then(() => toast('已複製調查連結：' + url));
@@ -454,14 +466,16 @@ async function saveSurvey() {
 
   const editId = $('editId').value;
   try {
-    await api(editId ? '/api/surveys/' + editId : '/api/surveys', {
+    const saved = await api(editId ? '/api/surveys/' + editId : '/api/surveys', {
       method: editId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     toast(editId ? '已更新調查' : '已建立調查');
     resetForm();
-    loadSurveys();
+    await loadSurveys();
+    // 首次建立調查：以新手引導提示複製超連結傳給受調查人員（看過一次就不再出現）
+    if (!editId && !localStorage.getItem('copyLinkOnboarded')) startLinkOnb(saved.id);
   } catch (e) {
     toast(e.message);
   }
@@ -565,6 +579,36 @@ async function showResult(id) {
   $('resultCard').scrollIntoView({ behavior: 'smooth' });
   // 首次查看結果：以新手引導提示「會議時間」的用途（看過一次就不再出現）
   if (!localStorage.getItem('meetHoursOnboarded')) startMeetOnb();
+}
+
+/* ---------- 首次建立調查的新手引導：提示複製超連結給受調查人員 ---------- */
+let linkOnbSid = null;   // 引導打亮中的調查 id（清單重繪時用來重新套上效果）
+
+/* 打亮該調查的「複製連結」按鈕，並把說明泡泡定位在按鈕下方 */
+function spotLinkBtn() {
+  const btn = document.querySelector('.btn-ic.copy[data-sid="' + linkOnbSid + '"]');
+  if (!btn) return false;
+  btn.classList.add('onb-spot');
+  const r = btn.getBoundingClientRect();
+  const pop = $('linkOnbPop');
+  pop.style.display = '';
+  pop.style.top = (r.bottom + 14) + 'px';
+  pop.style.left = Math.max(12, Math.min(r.left - 24, window.innerWidth - 420)) + 'px';
+  return true;
+}
+
+function startLinkOnb(surveyId) {
+  linkOnbSid = surveyId;
+  if (!spotLinkBtn()) { linkOnbSid = null; return; }
+  $('linkOnbMask').style.display = '';
+}
+
+function endLinkOnb() {
+  localStorage.setItem('copyLinkOnboarded', '1');
+  linkOnbSid = null;
+  document.querySelectorAll('.btn-ic.copy.onb-spot').forEach(b => b.classList.remove('onb-spot'));
+  $('linkOnbMask').style.display = 'none';
+  $('linkOnbPop').style.display = 'none';
 }
 
 /* ---------- 會議時間的新手引導 ---------- */
@@ -688,11 +732,17 @@ function renderResult() {
           const hrs = parseFloat((r.slots.length * 0.5).toFixed(1));
           const fit = r.slots.length >= need;
           if (fit) {
-            const attrs = ' data-date="' + d + '" data-from="' + from + '"';
-            html += '<span class="chip fit">' + from + ' ~ ' + to + '（' + hrs + ' 小時）✓' +
-                    '<span class="cbtn"' + attrs + ' onclick="openOutlookWeb(this)"' +
-                    ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + from + ' 起），主旨、時間、與會人員已帶入，並開啟 Teams 線上會議">📅</span>' +
-                    '</span>';
+            // 共同有空的時間比會議長時，切成多個剛好等於會議長度的時段，讓管理者挑選要開哪一段
+            const winCount = Math.floor(r.slots.length / need);
+            for (let k = 0; k < winCount; k++) {
+              const wFrom = r.slots[k * need];
+              const wTo = plus30(r.slots[k * need + need - 1]);
+              const attrs = ' data-date="' + d + '" data-from="' + wFrom + '"';
+              html += '<span class="chip fit">' + wFrom + ' ~ ' + wTo + '（' + meetHours + ' 小時）✓' +
+                      '<span class="cbtn"' + attrs + ' onclick="openOutlookWeb(this)"' +
+                      ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + wFrom + ' 起），主旨、時間、與會人員已帶入，並開啟 Teams 線上會議">📅</span>' +
+                      '</span>';
+            }
           } else {
             html += '<span class="chip" title="長度不足 ' + meetHours + ' 小時">' +
                     from + ' ~ ' + to + '（' + hrs + ' 小時）</span>';
@@ -701,7 +751,7 @@ function renderResult() {
       }
       html += '</div>';
     }
-    html += '<div class="cnote muted">綠色＝長度可容納 ' + meetHours + ' 小時會議的時段<br>' +
+    html += '<div class="cnote muted">綠色＝可挑選的 ' + meetHours + ' 小時會議時段（共同有空的時間較長時，會切成多段供選擇）<br>' +
             '灰色＝大家都有空但長度不足<br>' +
             '「📅」可在 Outlook 網頁版開啟新會議（主旨、時間、與會人員已帶入，含 Teams 線上會議）</div>';
   }

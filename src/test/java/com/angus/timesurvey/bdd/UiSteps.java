@@ -75,7 +75,8 @@ public class UiSteps {
         // 預設視為已看過新手引導，避免遮罩擋住一般場景；引導本身由專屬場景測試
         ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
                 "localStorage.setItem('surveyOnboarded', '1');" +
-                "localStorage.setItem('meetHoursOnboarded', '1');");
+                "localStorage.setItem('meetHoursOnboarded', '1');" +
+                "localStorage.setItem('copyLinkOnboarded', '1');");
         page = ctx.newPage();
     }
 
@@ -354,6 +355,24 @@ public class UiSteps {
         assertThat(page.locator("#meetOnbMask")).isHidden();
     }
 
+    @Then("應顯示複製連結的新手引導")
+    public void linkOnboardingShown() {
+        assertThat(page.locator("#linkOnbPop")).isVisible();
+        assertThat(page.locator("#linkOnbMask")).isVisible();
+        assertThat(page.locator(".btn-ic.copy.onb-spot")).isVisible();
+    }
+
+    @Then("複製連結的新手引導應消失")
+    public void linkOnboardingGone() {
+        assertThat(page.locator("#linkOnbPop")).isHidden();
+        assertThat(page.locator("#linkOnbMask")).isHidden();
+    }
+
+    @When("點擊被打亮的複製連結按鈕")
+    public void clickSpotCopyButton() {
+        page.click(".btn-ic.copy.onb-spot");
+    }
+
     @When("在後台輸入調查名稱 {string} 與人員 {string}")
     public void fillAdminForm(String name, String people) {
         page.fill("#fName", name);
@@ -420,6 +439,11 @@ public class UiSteps {
         assertThat(page.locator("#resultArea .chip:not(.fit)")
                 .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(range))
                 .first()).isVisible();
+    }
+
+    @Then("結論區應顯示 {int} 個可開會時段")
+    public void fitChipCount(int n) {
+        assertThat(page.locator("#resultArea .chip.fit")).hasCount(n);
     }
 
     @Then("結論區不應顯示可開會時段")
