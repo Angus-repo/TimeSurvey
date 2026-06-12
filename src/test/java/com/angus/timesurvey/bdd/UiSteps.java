@@ -78,23 +78,47 @@ public class UiSteps {
     private record Shot(String title, boolean failed, byte[] png) {}
     private static final List<Shot> shots = java.util.Collections.synchronizedList(new ArrayList<>());
 
-    /** 每個 @ui 場景結束：在頁面頂端壓上場景名稱與結果的橫幅後截圖（瀏覽器渲染中文，PDF 端不需字型） */
+    /** 每個 test case 一個專屬顏色：頁面標題橫幅與 PDF 頂端色條同色，跨頁時靠顏色快速辨識同一案例 */
+    private static final java.awt.Color[] CASE_COLORS = {
+            new java.awt.Color(0x1d7a35), new java.awt.Color(0x2c7be5), new java.awt.Color(0x6c5ce7),
+            new java.awt.Color(0xe67e22), new java.awt.Color(0x16a085), new java.awt.Color(0xc2185b),
+            new java.awt.Color(0x34495e), new java.awt.Color(0x795548)
+    };
+    private static final java.awt.Color FAIL_COLOR = new java.awt.Color(0xc0392b);
+
+    private static java.awt.Color caseColor(int caseNo, boolean failed) {
+        return failed ? FAIL_COLOR : CASE_COLORS[(caseNo - 1) % CASE_COLORS.length];
+    }
+
+    private static String hex(java.awt.Color c) {
+        return String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
+    }
+
+    /** 每個 @ui 場景結束：在頁面頂端壓上場景標題橫幅後截圖（瀏覽器渲染中文，PDF 端不需字型） */
     @After("@ui")
     public void captureAndClose(io.cucumber.java.Scenario scenario) {
         try {
             if (page != null) {
-                String title = "UI 測試場景：" + scenario.getName() +
-                        "　［" + (scenario.isFailed() ? "✘ 失敗" : "✔ 通過") + "］";
+                int caseNo = shots.size() + 1;
                 String time = "截圖時間:" + LocalDateTime.now()
                         .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                String color = scenario.isFailed() ? "#c0392b" : "#1d7a35";
-                page.evaluate("([title, time]) => { const b = document.createElement('div');" +
-                        "b.style.cssText = 'display:flex;justify-content:space-between;align-items:center;" +
-                        "background:" + color + ";color:#fff;font:bold 15px sans-serif;padding:10px 16px;';" +
-                        "const l = document.createElement('span'); l.textContent = title;" +
-                        "const r = document.createElement('span'); r.textContent = time; r.style.fontWeight = '400';" +
-                        "b.append(l, r); document.body.prepend(b); }",
-                        Arrays.asList(title, time));
+                page.evaluate("([no, title, status, time, color]) => {" +
+                        "const b = document.createElement('div');" +
+                        "b.style.cssText = 'display:flex;align-items:center;gap:14px;background:' + color + ';" +
+                        "color:#fff;padding:14px 20px;font-family:sans-serif;';" +
+                        "const n = document.createElement('span'); n.textContent = '場景 ' + no;" +
+                        "n.style.cssText = 'background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.6);" +
+                        "border-radius:16px;padding:4px 16px;font-size:16px;font-weight:700;white-space:nowrap;';" +
+                        "const t = document.createElement('span'); t.textContent = title;" +
+                        "t.style.cssText = 'font-size:22px;font-weight:700;flex:1;';" +
+                        "const s = document.createElement('span'); s.textContent = status;" +
+                        "s.style.cssText = 'font-size:16px;font-weight:700;white-space:nowrap;';" +
+                        "const c = document.createElement('span'); c.textContent = time;" +
+                        "c.style.cssText = 'font-size:13px;opacity:.9;white-space:nowrap;';" +
+                        "b.append(n, t, s, c); document.body.prepend(b); }",
+                        Arrays.asList(String.valueOf(caseNo), scenario.getName(),
+                                scenario.isFailed() ? "✘ 失敗" : "✔ 通過", time,
+                                hex(caseColor(caseNo, scenario.isFailed()))));
                 byte[] png = page.screenshot(new Page.ScreenshotOptions().setFullPage(true));
                 shots.add(new Shot(scenario.getName(), scenario.isFailed(), png));
                 scenario.attach(png, "image/png", scenario.getName());   // 同步嵌入 Cucumber HTML 報告
@@ -112,24 +136,59 @@ public class UiSteps {
         writePdfReport();
     }
 
-    /** 將本次所有 UI 截圖彙整成 target/ui-test-report.pdf，一張截圖一頁 */
+    /**
+     * 將本次所有 UI 截圖彙整成 target/ui-test-report.pdf（A4）。
+     * 截圖過長時切成多頁；每頁頂端畫該 test case 專屬顏色的色條與「Case N (頁次/總頁數)」，
+     * 與頁面內的標題橫幅同色，方便快速辨識同一案例的連續頁。
+     */
     private static void writePdfReport() {
         if (shots.isEmpty()) return;
+        final float pageW = org.apache.pdfbox.pdmodel.common.PDRectangle.A4.getWidth();
+        final float pageH = org.apache.pdfbox.pdmodel.common.PDRectangle.A4.getHeight();
+        final float barH = 26f;
+        final float imgAreaH = pageH - barH;
+        var font = new org.apache.pdfbox.pdmodel.font.PDType1Font(
+                org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD);
         try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument()) {
-            for (Shot s : shots) {
-                var img = org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject
-                        .createFromByteArray(doc, s.png(), s.title());
-                float pageW = 595f;   // A4 寬，高度依截圖比例
-                float pageH = pageW * img.getHeight() / img.getWidth();
-                var pg = new org.apache.pdfbox.pdmodel.PDPage(
-                        new org.apache.pdfbox.pdmodel.common.PDRectangle(pageW, pageH));
-                doc.addPage(pg);
-                try (var cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, pg)) {
-                    cs.drawImage(img, 0, 0, pageW, pageH);
+            int pdfPages = 0;
+            for (int i = 0; i < shots.size(); i++) {
+                Shot s = shots.get(i);
+                int caseNo = i + 1;
+                java.awt.Color color = caseColor(caseNo, s.failed());
+                var full = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(s.png()));
+                // 每頁可容納的截圖高度（像素），以 A4 寬度等比換算
+                int chunkPx = Math.max(1, (int) Math.floor(full.getWidth() * (imgAreaH / pageW)));
+                int total = Math.max(1, (int) Math.ceil(full.getHeight() / (double) chunkPx));
+                for (int p = 0; p < total; p++) {
+                    int y = p * chunkPx;
+                    int h = Math.min(chunkPx, full.getHeight() - y);
+                    var part = full.getSubimage(0, y, full.getWidth(), h);
+                    var img = org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory
+                            .createFromImage(doc, part);
+                    var pg = new org.apache.pdfbox.pdmodel.PDPage(
+                            org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
+                    doc.addPage(pg);
+                    pdfPages++;
+                    try (var cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, pg)) {
+                        // 頂端色條：同一 case 的每一頁同色
+                        cs.setNonStrokingColor(color);
+                        cs.addRect(0, pageH - barH, pageW, barH);
+                        cs.fill();
+                        cs.setNonStrokingColor(java.awt.Color.WHITE);
+                        cs.beginText();
+                        cs.setFont(font, 12);
+                        cs.newLineAtOffset(16, pageH - barH + 8);
+                        cs.showText("Case " + caseNo + (s.failed() ? "  [FAILED]" : "") +
+                                "   (" + (p + 1) + "/" + total + ")");
+                        cs.endText();
+                        float drawH = h * (pageW / full.getWidth());
+                        cs.drawImage(img, 0, pageH - barH - drawH, pageW, drawH);
+                    }
                 }
             }
             doc.save("target/ui-test-report.pdf");
-            System.out.println("UI 測試截圖報告：target/ui-test-report.pdf（共 " + shots.size() + " 頁）");
+            System.out.println("UI 測試截圖報告：target/ui-test-report.pdf（" +
+                    shots.size() + " 個場景，共 " + pdfPages + " 頁）");
         } catch (Exception e) {
             System.err.println("UI 測試 PDF 報告產生失敗：" + e);
         }
