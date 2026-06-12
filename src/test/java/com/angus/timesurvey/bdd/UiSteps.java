@@ -73,15 +73,61 @@ public class UiSteps {
         page = ctx.newPage();
     }
 
+    /* ---------- UI 測試截圖與 PDF 報告 ---------- */
+
+    private record Shot(String title, boolean failed, byte[] png) {}
+    private static final List<Shot> shots = java.util.Collections.synchronizedList(new ArrayList<>());
+
+    /** 每個 @ui 場景結束：在頁面頂端壓上場景名稱與結果的橫幅後截圖（瀏覽器渲染中文，PDF 端不需字型） */
     @After("@ui")
-    public void closeBrowserContext() {
-        if (ctx != null) ctx.close();
+    public void captureAndClose(io.cucumber.java.Scenario scenario) {
+        try {
+            if (page != null) {
+                String banner = "UI 測試場景：" + scenario.getName() +
+                        "　［" + (scenario.isFailed() ? "✘ 失敗" : "✔ 通過") + "］　" +
+                        LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                String color = scenario.isFailed() ? "#c0392b" : "#1d7a35";
+                page.evaluate("t => { const b = document.createElement('div');" +
+                        "b.style.cssText = 'background:" + color + ";color:#fff;font:bold 15px sans-serif;padding:10px 16px;';" +
+                        "b.textContent = t; document.body.prepend(b); }", banner);
+                byte[] png = page.screenshot(new Page.ScreenshotOptions().setFullPage(true));
+                shots.add(new Shot(scenario.getName(), scenario.isFailed(), png));
+                scenario.attach(png, "image/png", scenario.getName());   // 同步嵌入 Cucumber HTML 報告
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (ctx != null) ctx.close();
+        }
     }
 
     @AfterAll
     public static void closeBrowser() {
         if (browser != null) browser.close();
         if (playwright != null) playwright.close();
+        writePdfReport();
+    }
+
+    /** 將本次所有 UI 截圖彙整成 target/ui-test-report.pdf，一張截圖一頁 */
+    private static void writePdfReport() {
+        if (shots.isEmpty()) return;
+        try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument()) {
+            for (Shot s : shots) {
+                var img = org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject
+                        .createFromByteArray(doc, s.png(), s.title());
+                float pageW = 595f;   // A4 寬，高度依截圖比例
+                float pageH = pageW * img.getHeight() / img.getWidth();
+                var pg = new org.apache.pdfbox.pdmodel.PDPage(
+                        new org.apache.pdfbox.pdmodel.common.PDRectangle(pageW, pageH));
+                doc.addPage(pg);
+                try (var cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, pg)) {
+                    cs.drawImage(img, 0, 0, pageW, pageH);
+                }
+            }
+            doc.save("target/ui-test-report.pdf");
+            System.out.println("UI 測試截圖報告：target/ui-test-report.pdf（共 " + shots.size() + " 頁）");
+        } catch (Exception e) {
+            System.err.println("UI 測試 PDF 報告產生失敗：" + e);
+        }
     }
 
     private String base() {
