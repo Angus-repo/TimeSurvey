@@ -59,6 +59,24 @@
   .err { text-align: center; color: #e74c3c; margin-top: 60px; font-size: 16px; }
   .muted { color: #999; font-size: 13px; }
 
+  /* 首次開啟的新手引導：壓暗背景、打亮姓名卡片、浮出指引泡泡 */
+  .onb-mask { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000; }
+  #whoCard { position: relative; }
+  #whoCard.onb-spot { z-index: 1001; animation: onbpulse 1.6s ease-in-out infinite; }
+  @keyframes onbpulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(0,168,132,.95), 0 8px 30px rgba(0,0,0,.45); }
+    50%      { box-shadow: 0 0 0 10px rgba(0,168,132,.35), 0 8px 30px rgba(0,0,0,.45); }
+  }
+  .onb-pop { position: absolute; top: calc(100% + 14px); left: 24px; z-index: 1002; background: #fff;
+             border-radius: 10px; padding: 16px 20px; max-width: 360px; font-size: 14px; line-height: 1.7;
+             box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+  .onb-pop::before { content: ''; position: absolute; bottom: 100%; left: 36px;
+                     border: 9px solid transparent; border-bottom-color: #fff; }
+  .onb-pop b { color: #00a884; }
+  .onb-pop button { margin-top: 10px; background: #00a884; color: #fff; border: none; border-radius: 6px;
+                    padding: 7px 22px; font-size: 14px; cursor: pointer; font-family: inherit; }
+  .onb-pop button:hover { background: #008f70; }
+
   /* 送出後的完成畫面 */
   #done .card { padding: 24px 28px; }
   #done h2 { margin: 0 0 12px; font-size: 19px; color: #0a7d57; }
@@ -84,10 +102,15 @@
   <p id="subtitle"></p>
 </header>
 <div class="container" id="main" style="display:none">
-  <div class="card">
+  <div class="card" id="whoCard">
     <label>您的姓名：</label>
     <select id="who"><option value="">-- 請選擇 --</option></select>
     <span class="hint">選擇後請勾選您可以出席的時間（可點全天、上午、下午快速鈕、各小時框右上角的勾勾整時選取，或個別 30 分鐘時段）</span>
+    <div class="onb-pop" id="onbPop" style="display:none">
+      👋 歡迎！<b>請先在這裡選擇您的姓名</b><br>
+      選好之後，下方的時段表格才會開放，點選您可以出席的時間再送出即可。
+      <div><button onclick="endOnboarding()">知道了</button></div>
+    </div>
   </div>
   <div class="card gridwrap" id="gridCard"></div>
   <div class="ownlink">想調查大家的時間嗎？<a href="/" target="_blank">您也可以發起自己的會議時間調查 →</a></div>
@@ -103,6 +126,7 @@
     <a class="btn-new" href="/" target="_blank">➕ 建立我自己的時間調查</a>
   </div>
 </div>
+<div class="onb-mask" id="onbMask" style="display:none" onclick="endOnboarding()"></div>
 <div class="err" id="err" style="display:none"></div>
 <div class="submit-bar" id="bar" style="display:none">
   <span class="count" id="count">已勾選 0 個時段</span>
@@ -187,6 +211,24 @@ async function init() {
   $('gridCard').classList.add('locked');   // 進頁面尚未選姓名，先鎖定格線
   $('main').style.display = '';
   $('bar').style.display = '';
+
+  // 首次開啟：以新手引導提示先選擇姓名（看過一次就不再出現）
+  if (!localStorage.getItem('surveyOnboarded')) startOnboarding();
+}
+
+/* ---------- 新手引導 ---------- */
+function startOnboarding() {
+  $('onbMask').style.display = '';
+  $('onbPop').style.display = '';
+  $('whoCard').classList.add('onb-spot');
+}
+
+function endOnboarding() {
+  localStorage.setItem('surveyOnboarded', '1');
+  $('onbMask').style.display = 'none';
+  $('onbPop').style.display = 'none';
+  $('whoCard').classList.remove('onb-spot');
+  $('who').focus();
 }
 
 function showErr(msg) {
@@ -301,6 +343,7 @@ function refreshAll() {
 
 async function loadMyResponse() {
   const name = $('who').value;
+  if (name && $('whoCard').classList.contains('onb-spot')) endOnboarding();   // 選了姓名即完成引導
   $('gridCard').classList.toggle('locked', !name);
   selected = new Set();
   if (name) {

@@ -69,7 +69,9 @@ public class UiSteps {
     @Before("@ui")
     public void openBrowserContext() {
         ctx = sharedBrowser().newContext();
-        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "')");
+        // 預設視為已看過新手引導，避免遮罩擋住一般場景；引導本身由專屬場景測試
+        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
+                "localStorage.setItem('surveyOnboarded', '1');");
         page = ctx.newPage();
     }
 
@@ -234,6 +236,29 @@ public class UiSteps {
     public void openSurveyPage(String surveyName) {
         page.navigate(base() + "/s/" + surveyIds.get(surveyName));
         page.locator(".slot").first().waitFor();   // 等格線渲染完成
+    }
+
+    @When("以首次使用者身分開啟調查 {string} 的填寫頁")
+    public void openSurveyPageFirstTime(String surveyName) {
+        // 換一個沒有「已看過引導」紀錄的全新瀏覽器環境（init script 每次載頁都會執行，無法事後移除）
+        ctx.close();
+        ctx = sharedBrowser().newContext();
+        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "')");
+        page = ctx.newPage();
+        page.navigate(base() + "/s/" + surveyIds.get(surveyName));
+        page.locator(".slot").first().waitFor();
+    }
+
+    @Then("應顯示選擇姓名的新手引導")
+    public void onboardingShown() {
+        assertThat(page.locator("#onbPop")).isVisible();
+        assertThat(page.locator("#onbMask")).isVisible();
+    }
+
+    @Then("新手引導應消失")
+    public void onboardingGone() {
+        assertThat(page.locator("#onbPop")).isHidden();
+        assertThat(page.locator("#onbMask")).isHidden();
     }
 
     @When("選擇姓名 {string}")
