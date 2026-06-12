@@ -92,8 +92,25 @@
   #resultArea .okb { border-bottom: 3px solid #28a745 !important; }
   #resultArea .okl { border-left: 3px solid #28a745 !important; }
   #resultArea .okr { border-right: 3px solid #28a745 !important; }
-  .meetbox { margin: 10px 0 14px; font-size: 14px; color: #555; }
+  .meetbox { margin: 10px 0 14px; font-size: 14px; color: #555; position: relative; }
   .meetbox input { width: 70px; display: inline-block; padding: 4px 6px; }
+  /* 首次查看結果的新手引導：壓暗頁面、打亮會議時間設定 */
+  .onb-mask { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000; }
+  .meetbox.onb-spot { z-index: 1001; background: #fff; border-radius: 8px; padding: 10px 14px;
+                      animation: onbpulse 1.6s ease-in-out infinite; }
+  @keyframes onbpulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(44,123,229,.95), 0 8px 30px rgba(0,0,0,.45); }
+    50%      { box-shadow: 0 0 0 10px rgba(44,123,229,.35), 0 8px 30px rgba(0,0,0,.45); }
+  }
+  .onb-pop { position: absolute; top: calc(100% + 14px); left: 16px; z-index: 1002; background: #fff;
+             border-radius: 10px; padding: 16px 20px; max-width: 380px; font-size: 14px; line-height: 1.7;
+             box-shadow: 0 10px 30px rgba(0,0,0,.35); color: #333; }
+  .onb-pop::before { content: ''; position: absolute; bottom: 100%; left: 36px;
+                     border: 9px solid transparent; border-bottom-color: #fff; }
+  .onb-pop b { color: #2c7be5; }
+  .onb-pop button { margin-top: 10px; background: #2c7be5; color: #fff; border: none; border-radius: 6px;
+                    padding: 7px 22px; font-size: 14px; cursor: pointer; font-family: inherit; }
+  .onb-pop button:hover { background: #1a68d1; }
   #resultArea a { color: #2c7be5; font-size: 14px; text-decoration: none; }
   #resultArea a:hover { text-decoration: underline; }
   /* 調查結論：共同有空時段的視覺化 */
@@ -168,14 +185,21 @@
 
   <div class="card" id="resultCard" style="display:none">
     <h2 id="resultTitle">調查結果</h2>
-    <div class="meetbox">
+    <div class="meetbox" id="meetBox">
       會議時間：<input type="number" id="meetHours" min="0.5" step="0.5" value="1" oninput="renderResult()"> 小時
       <span class="muted">　若有連續 n 小時「每個人都有空」的時段，會以綠框標示</span>
+      <div class="onb-pop" id="meetOnbPop" style="display:none">
+        ⏱ <b>先設定會議需要幾小時</b><br>
+        下方結論會即時找出大家都有空、且長度足以容納這場會議的<b>綠色時段</b>；
+        點綠色時段內的 📅 即可在 Outlook 開出會議邀請。
+        <div><button onclick="endMeetOnb()">知道了</button></div>
+      </div>
     </div>
     <div id="resultArea" style="overflow-x:auto"></div>
   </div>
 
 </div>
+<div class="onb-mask" id="meetOnbMask" style="display:none" onclick="endMeetOnb()"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -539,7 +563,29 @@ async function showResult(id) {
   $('resultTitle').textContent = '調查結果：' + survey.name + (survey.closedAt ? '（已結束）' : '');
   renderResult();
   $('resultCard').scrollIntoView({ behavior: 'smooth' });
+  // 首次查看結果：以新手引導提示「會議時間」的用途（看過一次就不再出現）
+  if (!localStorage.getItem('meetHoursOnboarded')) startMeetOnb();
 }
+
+/* ---------- 會議時間的新手引導 ---------- */
+function startMeetOnb() {
+  $('meetOnbMask').style.display = '';
+  $('meetOnbPop').style.display = '';
+  $('meetBox').classList.add('onb-spot');
+}
+
+function endMeetOnb() {
+  localStorage.setItem('meetHoursOnboarded', '1');
+  $('meetOnbMask').style.display = 'none';
+  $('meetOnbPop').style.display = 'none';
+  $('meetBox').classList.remove('onb-spot');
+  $('meetHours').focus();
+}
+
+// 使用者動手調整會議時間，代表已理解用途，結束引導
+$('meetHours').addEventListener('input', () => {
+  if ($('meetBox').classList.contains('onb-spot')) endMeetOnb();
+});
 
 /* 找出每一天「每個人都有空」的最大連續區塊（午休 12:00~13:00 會中斷連續性）。
    回傳 [{ date, slots: ['09:00', ...] }] */
@@ -571,12 +617,7 @@ function plus30(t) {
   return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
 }
 
-/* ---------- 會議邀請 .ics 下載 ---------- */
-/* iCalendar 文字欄位的跳脫規則（RFC 5545） */
-function icsEscape(s) {
-  return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
-}
-
+/* ---------- 產生會通（Outlook 網頁版） ---------- */
 /* 由按鈕的 data-date / data-from 取得會議起迄：自區塊開頭起算「會議時間」長度 */
 function meetingRange(el) {
   const date = el.dataset.date, from = el.dataset.from;
@@ -586,46 +627,7 @@ function meetingRange(el) {
   return { date, from, end };
 }
 
-/* 「📅 .ics」按鈕：產生會議邀請 .ics 並下載。
-   主旨＝調查名稱；與會人員寫入說明（名單只有姓名沒有 email，無法自動帶入收件者欄位）。
-   用 METHOD:PUBLISH 讓 Outlook 以「可編輯的約會」開啟，按「邀請出席者」即可寄送會通 */
-function downloadIcs(el) {
-  if (!resultState) return;
-  const survey = resultState.survey;
-  const { date, from, end } = meetingRange(el);
-  const fmt = t => date.replace(/-/g, '') + 'T' + t.replace(':', '') + '00';
-  const desc = '與會人員：' + survey.participants.join('、') +
-               '\n（由時間調查產生；收件者已帶入姓名，請按 Alt+K「檢查名稱」解析為通訊錄 email 後再傳送）';
-  // 出席者只有姓名沒有 email：mailto 直接放姓名（不含 @），Outlook 會視為未解析名稱，
-  // 開啟後按 Alt+K（檢查名稱）即可由公司通訊錄解析成正式收件者
-  const attendees = survey.participants.map(p =>
-      'ATTENDEE;ROLE=REQ-PARTICIPANT;RSVP=TRUE;CN=' + icsEscape(p) + ':mailto:' + p);
-  const ics = [
-    'BEGIN:VCALENDAR',
-    'PRODID:-//TimeSurvey//ZH-TW',
-    'VERSION:2.0',
-    'METHOD:PUBLISH',
-    'BEGIN:VEVENT',
-    'UID:' + (crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2)) + '@timesurvey',
-    'DTSTAMP:' + new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z',
-    'DTSTART:' + fmt(from),
-    'DTEND:' + fmt(end),
-    'SUMMARY:' + icsEscape(survey.name),
-    'DESCRIPTION:' + icsEscape(desc),
-    ...attendees,
-    'END:VEVENT',
-    'END:VCALENDAR'
-  ].join('\r\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
-  a.download = '會議邀請-' + survey.name + '-' + fmtMd(date).replace('/', '') + '-' + from.replace(':', '') + '.ics';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-  toast('已下載會議邀請（' + fmtMd(date) + ' ' + from + ' ~ ' + end + '），以 Outlook 開啟即可寄送');
-}
-
-/* 「🌐 網頁版」按鈕：在 Outlook 網頁版開啟預填好的新會議（需登入 Microsoft 帳號） */
+/* 「📅」按鈕：在 Outlook 網頁版開啟預填好的新會議（需登入 Microsoft 帳號） */
 function openOutlookWeb(el) {
   if (!resultState) return;
   const survey = resultState.survey;
@@ -635,6 +637,7 @@ function openOutlookWeb(el) {
       '&startdt=' + date + 'T' + from + ':00' +
       '&enddt=' + date + 'T' + end + ':00' +
       '&to=' + encodeURIComponent(survey.participants.join(';')) +
+      '&online=true' +   // 開啟「Teams 會議」開關，送出時由 Outlook 產生 Teams 連結
       '&body=' + encodeURIComponent('與會人員：' + survey.participants.join('、') + '（由時間調查產生）');
   window.open(url, '_blank');
 }
@@ -687,10 +690,8 @@ function renderResult() {
           if (fit) {
             const attrs = ' data-date="' + d + '" data-from="' + from + '"';
             html += '<span class="chip fit">' + from + ' ~ ' + to + '（' + hrs + ' 小時）✓' +
-                    '<span class="cbtn"' + attrs + ' onclick="downloadIcs(this)"' +
-                    ' data-tip="下載「會議邀請.ics」（' + meetHours + ' 小時，自 ' + from + ' 起），以桌面版 Outlook 開啟寄送會通">📅</span>' +
                     '<span class="cbtn"' + attrs + ' onclick="openOutlookWeb(this)"' +
-                    ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + from + ' 起），主旨、時間、與會人員已帶入">🌐</span>' +
+                    ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + from + ' 起），主旨、時間、與會人員已帶入，並開啟 Teams 線上會議">📅</span>' +
                     '</span>';
           } else {
             html += '<span class="chip" title="長度不足 ' + meetHours + ' 小時">' +
@@ -702,8 +703,7 @@ function renderResult() {
     }
     html += '<div class="cnote muted">綠色＝長度可容納 ' + meetHours + ' 小時會議的時段<br>' +
             '灰色＝大家都有空但長度不足<br>' +
-            '「📅」可下載會議邀請檔（桌面版 Outlook）<br>' +
-            '「🌐」可在 Outlook 網頁版開啟新會議</div>';
+            '「📅」可在 Outlook 網頁版開啟新會議（主旨、時間、與會人員已帶入，含 Teams 線上會議）</div>';
   }
   html += '</div>';
 

@@ -74,7 +74,8 @@ public class UiSteps {
         ctx = sharedBrowser().newContext();
         // 預設視為已看過新手引導，避免遮罩擋住一般場景；引導本身由專屬場景測試
         ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
-                "localStorage.setItem('surveyOnboarded', '1');");
+                "localStorage.setItem('surveyOnboarded', '1');" +
+                "localStorage.setItem('meetHoursOnboarded', '1');");
         page = ctx.newPage();
     }
 
@@ -330,6 +331,29 @@ public class UiSteps {
         page.locator("#surveyList").waitFor();
     }
 
+    @When("以首次使用者身分開啟後台維護頁")
+    public void openAdminPageFirstTime() {
+        // 換一個沒有「已看過引導」紀錄的全新瀏覽器環境
+        ctx.close();
+        ctx = sharedBrowser().newContext();
+        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "')");
+        page = ctx.newPage();
+        page.navigate(base() + "/");
+        page.locator("#surveyList").waitFor();
+    }
+
+    @Then("應顯示會議時間的新手引導")
+    public void meetOnboardingShown() {
+        assertThat(page.locator("#meetOnbPop")).isVisible();
+        assertThat(page.locator("#meetOnbMask")).isVisible();
+    }
+
+    @Then("會議時間的新手引導應消失")
+    public void meetOnboardingGone() {
+        assertThat(page.locator("#meetOnbPop")).isHidden();
+        assertThat(page.locator("#meetOnbMask")).isHidden();
+    }
+
     @When("在後台輸入調查名稱 {string} 與人員 {string}")
     public void fillAdminForm(String name, String people) {
         page.fill("#fName", name);
@@ -377,7 +401,6 @@ public class UiSteps {
     public void conclusionHasMeetingButtons() {
         assertThat(page.locator("#resultArea .cbtn").first()).isVisible();
         assertThat(page.locator("#resultArea")).containsText("📅");
-        assertThat(page.locator("#resultArea")).containsText("🌐");
     }
 
     @When("設定會議時間為 {string} 小時")
