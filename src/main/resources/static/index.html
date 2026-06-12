@@ -133,19 +133,14 @@
           font-size: 12px; font-weight: 400; cursor: pointer; background: #fff; color: #1d8c38;
           border: 1px solid #bfe3c9; user-select: none; transition: background .15s, transform .15s; }
   .cbtn:hover { background: #eafff1; transform: translateY(-1px); }
-  /* 綠色時段的文字本身也是超連結：點了與 📅 相同，開啟 Outlook 網頁版會議 */
-  .clnk { position: relative; cursor: pointer; text-decoration: underline;
-          text-underline-offset: 3px; text-decoration-color: rgba(255,255,255,.65); }
-  .clnk:hover { text-decoration-color: #fff; }
-  .cbtn::after, .clnk::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%;
+  .cbtn::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%;
                  transform: translateX(-50%); background: #2c3e50; color: #fff; font-size: 12px; font-weight: 400;
                  padding: 6px 10px; border-radius: 6px; white-space: nowrap; opacity: 0; visibility: hidden;
                  transition: opacity .08s; pointer-events: none; z-index: 30; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
-  .cbtn::before, .clnk::before { content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%;
+  .cbtn::before { content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%;
                   transform: translateX(-50%); border: 5px solid transparent; border-top-color: #2c3e50;
                   opacity: 0; visibility: hidden; transition: opacity .08s; pointer-events: none; z-index: 30; }
-  .cbtn:hover::after, .cbtn:hover::before,
-  .clnk:hover::after, .clnk:hover::before { opacity: 1; visibility: visible; }
+  .cbtn:hover::after, .cbtn:hover::before { opacity: 1; visibility: visible; }
 </style>
 </head>
 <body>
@@ -758,13 +753,10 @@ function renderResult() {
             for (let k = 0; k < winCount; k++) {
               const wFrom = r.slots[k * need];
               const wTo = plus30(r.slots[k * need + need - 1]);
-              const attrs = ' data-date="' + d + '" data-from="' + wFrom + '"' +
-                            ' onclick="openOutlookWeb(this)"' +
-                            ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + wFrom + ' 起），主旨、時間、與會人員已帶入，並開啟 Teams 線上會議"';
-              // 時段文字與 📅 都是超連結，點了行為相同（開啟 Outlook 網頁版會議）
-              html += '<span class="chip fit">' +
-                      '<span class="clnk"' + attrs + '>' + wFrom + ' ~ ' + wTo + '（' + meetHours + ' 小時）✓</span>' +
-                      '<span class="cbtn"' + attrs + '>📅</span>' +
+              const attrs = ' data-date="' + d + '" data-from="' + wFrom + '"';
+              html += '<span class="chip fit">' + wFrom + ' ~ ' + wTo + '（' + meetHours + ' 小時）✓' +
+                      '<span class="cbtn"' + attrs + ' onclick="openOutlookWeb(this)"' +
+                      ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + wFrom + ' 起），主旨、時間、與會人員已帶入，並開啟 Teams 線上會議">📅</span>' +
                       '</span>';
             }
           } else {
@@ -777,7 +769,7 @@ function renderResult() {
     }
     html += '<div class="cnote muted">綠色＝可挑選的 ' + meetHours + ' 小時會議時段（共同有空的時間較長時，會切成多段供選擇）<br>' +
             '灰色＝大家都有空但長度不足<br>' +
-            '點綠色時段的文字或「📅」可在 Outlook 網頁版開啟新會議（主旨、時間、與會人員已帶入，含 Teams 線上會議）</div>';
+            '「📅」可在 Outlook 網頁版開啟新會議（主旨、時間、與會人員已帶入，含 Teams 線上會議）</div>';
   }
   html += '</div>';
 

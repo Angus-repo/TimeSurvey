@@ -452,17 +452,6 @@ public class UiSteps {
                 .first()).isVisible();
     }
 
-    @Then("綠色時段的文字應為可開啟會議的超連結")
-    public void fitChipTextIsLink() {
-        var links = page.locator("#resultArea .chip.fit .clnk[onclick]");
-        assertThat(links.first()).isVisible();
-        // 每個綠色時段的文字都要是超連結，且提示說明與 📅 相同（開啟 Outlook 會議）
-        org.junit.jupiter.api.Assertions.assertEquals(
-                page.locator("#resultArea .chip.fit").count(), links.count(),
-                "每個綠色時段的文字都應是超連結");
-        assertThat(links.first()).hasAttribute("data-tip", java.util.regex.Pattern.compile(".*Outlook.*"));
-    }
-
     @Then("結論區應顯示 {int} 個可開會時段")
     public void fitChipCount(int n) {
         assertThat(page.locator("#resultArea .chip.fit")).hasCount(n);
