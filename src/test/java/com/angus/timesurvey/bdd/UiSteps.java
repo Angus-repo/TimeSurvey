@@ -178,8 +178,9 @@ public class UiSteps {
                         cs.beginText();
                         cs.setFont(font, 12);
                         cs.newLineAtOffset(16, pageH - barH + 8);
+                        // 單頁不顯示頁次；切成多頁時才標示 (頁次/總頁數)
                         cs.showText("Case " + caseNo + (s.failed() ? "  [FAILED]" : "") +
-                                "   (" + (p + 1) + "/" + total + ")");
+                                (total > 1 ? "   (" + (p + 1) + "/" + total + ")" : ""));
                         cs.endText();
                         float drawH = h * (pageW / full.getWidth());
                         cs.drawImage(img, 0, pageH - barH - drawH, pageW, drawH);
