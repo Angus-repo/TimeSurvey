@@ -59,11 +59,10 @@
            border: 1px solid #ccc; border-radius: 4px; background: #fff; cursor: text; }
   .ptags:focus-within { border-color: #2c7be5; }
   .ptag { display: inline-flex; align-items: center; gap: 7px; background: #eef6f3; border: 1px solid #bfe3d8;
-          border-radius: 14px; padding: 4px 11px; font-size: 13px; cursor: pointer; user-select: none;
+          border-radius: 14px; padding: 4px 11px; font-size: 13px; user-select: none;
           transition: background .15s, border-color .15s; }
   .ptag:hover { border-color: #00a884; }
-  .ptag.host { background: #e8f1fd; border-color: #9cc3f5; font-weight: 600; }
-  .ptag .x { color: #999; font-weight: 700; line-height: 1; }
+  .ptag .x { color: #999; font-weight: 700; line-height: 1; cursor: pointer; }
   .ptag .x:hover { color: #e74c3c; }
   .ptags input { border: none; outline: none; flex: 1; min-width: 240px; font-size: 14px; padding: 4px; width: auto; }
   .pbar { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 13px; }
@@ -143,7 +142,7 @@
     </div>
     <div class="row">
       <div>
-        <label>受調查人員（輸入姓名按 Enter，或直接貼上整串名單；👑 第一位為<b>會議主持人</b>，點名牌可改設）</label>
+        <label>受調查人員（輸入姓名按 Enter，或直接貼上整串名單）</label>
         <div class="ptags" id="pTags">
           <input id="pInput" placeholder="輸入姓名後按 Enter，或貼上「王大明;陳小明;李中明」這類名單">
         </div>
@@ -329,7 +328,7 @@ function setDefaultDates() {
 }
 
 /* ---------- 受調查人員：名牌式輸入 ---------- */
-let plist = [];   // 人員名單，第 0 位為會議主持人
+let plist = [];   // 人員名單
 
 function renderTags() {
   const box = $('pTags');
@@ -337,10 +336,9 @@ function renderTags() {
   box.querySelectorAll('.ptag').forEach(el => el.remove());
   plist.forEach((name, i) => {
     const tag = document.createElement('span');
-    tag.className = 'ptag' + (i === 0 ? ' host' : '');
-    tag.title = i === 0 ? '會議主持人' : '點擊設為會議主持人（移到第一位）';
+    tag.className = 'ptag';
     const label = document.createElement('span');
-    label.textContent = (i === 0 ? '👑 ' : '') + name;
+    label.textContent = name;
     const x = document.createElement('span');
     x.className = 'x';
     x.textContent = '×';
@@ -350,17 +348,10 @@ function renderTags() {
       plist.splice(i, 1);
       renderTags();
     };
-    tag.onclick = () => {
-      if (i === 0) return;
-      plist.splice(i, 1);
-      plist.unshift(name);
-      renderTags();
-      toast('已將「' + name + '」設為會議主持人');
-    };
     tag.append(label, x);
     box.insertBefore(tag, input);
   });
-  $('pCount').textContent = '共 ' + plist.length + ' 人' + (plist.length ? '（👑 ' + plist[0] + ' 為主持人）' : '');
+  $('pCount').textContent = '共 ' + plist.length + ' 人';
 }
 
 /* 把整串文字拆成多位人名：支援換行、逗號、分號、頓號、全形標點與空白 */
