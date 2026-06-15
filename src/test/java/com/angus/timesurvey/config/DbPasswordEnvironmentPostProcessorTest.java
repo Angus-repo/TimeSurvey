@@ -48,10 +48,10 @@ class DbPasswordEnvironmentPostProcessorTest {
     }
 
     /** 用與 jasypt-spring-boot 3.x 相同的參數解開 ENC(...)，證明執行期 Jasypt 解得開。 */
-    private String decrypt(String enc) {
+    private String decrypt(String key, String enc) {
         PooledPBEStringEncryptor e = new PooledPBEStringEncryptor();
         SimpleStringPBEConfig c = new SimpleStringPBEConfig();
-        c.setPassword(MASTER);
+        c.setPassword(key);
         c.setAlgorithm("PBEWITHHMACSHA512ANDAES_256");
         c.setKeyObtentionIterations("1000");
         c.setPoolSize("1");
@@ -70,7 +70,7 @@ class DbPasswordEnvironmentPostProcessorTest {
         String enc = readEnc(dir);
         assertNotNull(enc, "應寫出密碼");
         assertTrue(enc.startsWith("ENC(") && enc.endsWith(")"), "應為 ENC(...) 密文");
-        assertEquals(32, decrypt(enc).length(), "解密後應為 32 字元隨機密碼");
+        assertEquals(32, decrypt(MASTER, enc).length(), "解密後應為 32 字元隨機密碼");
         assertEquals(enc, env.getProperty("spring.datasource.password"), "應已注入密文供 Jasypt 解密");
     }
 
@@ -91,8 +91,21 @@ class DbPasswordEnvironmentPostProcessorTest {
     }
 
     @Test
-    void 首次產生但缺主金鑰應報錯(@TempDir Path dir) {
-        assertThrows(IllegalStateException.class, () -> run(fileDbEnv(dir, false)));
+    void 未提供主金鑰時改用hostname並可自解(@TempDir Path dir) throws Exception {
+        StandardEnvironment env = fileDbEnv(dir, false);   // 不提供主金鑰
+        run(env);
+
+        String key = env.getProperty("jasypt.encryptor.password");
+        assertNotNull(key, "應回填預設主金鑰供 jasypt 解密");
+        assertTrue(!key.isBlank());
+        // 用被回填的預設金鑰解開密碼檔，證明產生與解密用的是同一把（hostname）金鑰
+        assertEquals(32, decrypt(key, readEnc(dir)).length(), "產生與解密應用同一把預設金鑰");
+    }
+
+    @Test
+    void 預設主金鑰為主機名稱() throws Exception {
+        assertEquals(java.net.InetAddress.getLocalHost().getHostName(),
+                DbPasswordEnvironmentPostProcessor.defaultHostname());
     }
 
     @Test

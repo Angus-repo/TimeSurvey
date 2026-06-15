@@ -55,8 +55,15 @@ JASYPT_ENCRYPTOR_PASSWORD=你的主金鑰 java -jar target/timesurvey-1.0.0.jar
 - 若資料庫檔已存在但密碼檔遺失，啟動會直接報錯（原密碼已無法復原）——
   此時請刪除整個 `data/` 目錄重新開始。
 
-主金鑰由環境變數 `JASYPT_ENCRYPTOR_PASSWORD` 提供：**首次產生密碼時用它加密、
-之後每次啟動用它解密**，未提供時應用程式會拒絕啟動。
+主金鑰用途：**首次產生密碼時用它加密、之後每次啟動用它解密**。來源優先序：
+
+1. 環境變數 `JASYPT_ENCRYPTOR_PASSWORD`（或屬性 `jasypt.encryptor.password`、JVM 參數 `-Djasypt.encryptor.password=`）。
+2. 都沒提供時，**改用主機名稱（hostname）作為預設主金鑰**。
+
+> ⚠️ 用 hostname 當預設要注意兩點：①**主機名稱一旦改變**（換機器、改 hostname、容器重建成不同名稱），
+> 舊密碼檔就會解不開、連不進既有資料庫——需沿用相同 hostname，或改用固定的環境變數金鑰。
+> ②hostname 通常是可猜測的低強度字串，保護力遠不如自訂金鑰；**正式環境仍建議明確設定
+> `JASYPT_ENCRYPTOR_PASSWORD`**，hostname 預設主要是方便本機 / 開發啟動。
 
 ### 設定主金鑰環境變數
 

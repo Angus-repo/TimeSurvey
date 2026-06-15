@@ -11,6 +11,7 @@ import org.springframework.core.env.PropertiesPropertySource;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.SecureRandom;
@@ -29,12 +30,15 @@ import java.util.Properties;
  *
  * 只在 {@code spring.datasource.url} 為 {@code jdbc:h2:file:} 時作用；
  * 測試用的 in-memory（{@code jdbc:h2:mem:}）資料庫不受影響。
- * 主金鑰由環境變數 {@code JASYPT_ENCRYPTOR_PASSWORD}（對應屬性 {@code jasypt.encryptor.password}）提供。
+ * 主金鑰優先取環境變數 {@code JASYPT_ENCRYPTOR_PASSWORD}（對應屬性 {@code jasypt.encryptor.password}）；
+ * 未提供時改用主機名稱（hostname）作為預設主金鑰，並回填給 jasypt-spring-boot，
+ * 確保「產生密碼」與「啟動解密」用的是同一把金鑰。
  */
 public class DbPasswordEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
 
     private static final String FILE_URL_PREFIX = "jdbc:h2:file:";
     private static final String PWD_KEY = "spring.datasource.password";
+    private static final String MASTER_KEY = "jasypt.encryptor.password";
     private static final String PROPERTY_SOURCE_NAME = "dbSecret";
     private static final String SECRET_FILE_NAME = "db-secret.properties";
 
@@ -47,6 +51,12 @@ public class DbPasswordEnvironmentPostProcessor implements EnvironmentPostProces
         if (env.getPropertySources().contains(PROPERTY_SOURCE_NAME)) {
             return;   // devtools restart 等情況下避免重複加入
         }
+
+        // 主金鑰：優先用傳入的 jasypt.encryptor.password / JASYPT_ENCRYPTOR_PASSWORD，
+        // 未提供時以主機名稱（hostname）作為預設值
+        String provided = env.getProperty(MASTER_KEY);
+        boolean usingDefault = isBlank(provided);
+        String masterKey = usingDefault ? defaultHostname() : provided;
 
         String base = url.substring(FILE_URL_PREFIX.length());
         int sep = base.indexOf(';');
@@ -63,13 +73,18 @@ public class DbPasswordEnvironmentPostProcessor implements EnvironmentPostProces
                             "找到資料庫 " + dbFile + " 但密碼檔 " + secretFile + " 遺失，無法取得原密碼。"
                           + "若要重新開始，請刪除整個 data/ 目錄後再啟動。");
                 }
-                generateSecretFile(secretFile, masterKey(env));
+                generateSecretFile(secretFile, masterKey);
             }
             Properties props = new Properties();
             try (var in = Files.newInputStream(secretFile)) {
                 props.load(in);
             }
-            // 注入的是 ENC(...) 密文，稍後由 jasypt-spring-boot 讀取時自動解密
+            // 使用者沒提供主金鑰時，把預設（hostname）回填給 jasypt-spring-boot，
+            // 讓它解密 spring.datasource.password 的 ENC(...) 時用同一把金鑰
+            if (usingDefault) {
+                props.setProperty(MASTER_KEY, masterKey);
+            }
+            // spring.datasource.password 是 ENC(...) 密文，稍後由 jasypt-spring-boot 讀取時自動解密
             env.getPropertySources().addFirst(new PropertiesPropertySource(PROPERTY_SOURCE_NAME, props));
         } catch (IOException e) {
             throw new UncheckedIOException("讀寫資料庫密碼檔失敗：" + secretFile, e);
@@ -88,16 +103,25 @@ public class DbPasswordEnvironmentPostProcessor implements EnvironmentPostProces
         Files.writeString(secretFile, content);
     }
 
-    private String masterKey(ConfigurableEnvironment env) {
-        String key = env.getProperty("jasypt.encryptor.password");
-        if (key == null || key.isBlank()) {
-            key = env.getProperty("JASYPT_ENCRYPTOR_PASSWORD");
+    /** 主機名稱作為主金鑰預設值；取不到時退回固定字串，避免空金鑰。 */
+    static String defaultHostname() {
+        try {
+            String h = InetAddress.getLocalHost().getHostName();
+            if (!isBlank(h)) {
+                return h;
+            }
+        } catch (Exception ignored) {
+            // 落到下面的環境變數 / 保底值
         }
-        if (key == null || key.isBlank()) {
-            throw new IllegalStateException(
-                    "需要產生資料庫密碼，但找不到主金鑰。請先設定環境變數 JASYPT_ENCRYPTOR_PASSWORD 再啟動。");
+        String env = System.getenv("HOSTNAME");
+        if (isBlank(env)) {
+            env = System.getenv("COMPUTERNAME");
         }
-        return key;
+        return isBlank(env) ? "timesurvey-default-key" : env;
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     /** 參數與 jasypt-spring-boot 3.x 預設一致，產出的 ENC(...) 才能被其自動解密。 */
