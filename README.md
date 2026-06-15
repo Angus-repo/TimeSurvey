@@ -58,12 +58,32 @@ JASYPT_ENCRYPTOR_PASSWORD=你的主金鑰 java -jar target/timesurvey-1.0.0.jar
 主金鑰用途：**首次產生密碼時用它加密、之後每次啟動用它解密**。來源優先序：
 
 1. 環境變數 `JASYPT_ENCRYPTOR_PASSWORD`（或屬性 `jasypt.encryptor.password`、JVM 參數 `-Djasypt.encryptor.password=`）。
-2. 都沒提供時，**改用主機名稱（hostname）作為預設主金鑰**。
+2. 都沒提供時，**自動改用主機名稱（hostname）作為預設主金鑰**。
 
-> ⚠️ 用 hostname 當預設要注意兩點：①**主機名稱一旦改變**（換機器、改 hostname、容器重建成不同名稱），
-> 舊密碼檔就會解不開、連不進既有資料庫——需沿用相同 hostname，或改用固定的環境變數金鑰。
-> ②hostname 通常是可猜測的低強度字串，保護力遠不如自訂金鑰；**正式環境仍建議明確設定
-> `JASYPT_ENCRYPTOR_PASSWORD`**，hostname 預設主要是方便本機 / 開發啟動。
+### 預設主金鑰：主機名稱（hostname）
+
+如果**完全不設定** `JASYPT_ENCRYPTOR_PASSWORD`，系統會自動以執行主機的名稱當作主金鑰，
+因此「什麼都不設定」也能直接啟動：
+
+```bash
+# 不帶任何環境變數，直接啟動 → 以 hostname 作為主金鑰
+java -jar target/timesurvey-1.0.0.jar
+```
+
+實際採用的 hostname 依下列順序取得（取到第一個非空值為止）：
+
+1. `InetAddress.getLocalHost().getHostName()`（Java 取得的主機名稱）
+2. 環境變數 `HOSTNAME`（常見於 Linux）
+3. 環境變數 `COMPUTERNAME`（Windows）
+4. 都取不到時，退回固定字串 `timesurvey-default-key`
+
+> ⚠️ 用 hostname 當預設要注意兩點：
+> 1. **主機名稱一旦改變**（換機器、改 hostname、容器重建成不同名稱），舊密碼檔就會解不開、
+>    連不進既有資料庫——需沿用相同 hostname，或改用固定的環境變數金鑰。由於資料庫密碼是在
+>    「第一次建立 `data/` 時」用當時的主金鑰定下來的，**之後就不能再切換主金鑰（含 hostname ↔ 明確金鑰）**，
+>    否則會出現 H2 `Wrong user name or password`；要換金鑰請刪除整個 `data/` 重置。
+> 2. hostname 通常是可猜測的低強度字串，保護力遠不如自訂金鑰；**正式環境仍建議明確設定
+>    `JASYPT_ENCRYPTOR_PASSWORD`**，hostname 預設主要是方便本機 / 開發 / 免設定啟動。
 
 ### 設定主金鑰環境變數
 
