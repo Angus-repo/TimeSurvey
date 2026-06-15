@@ -24,7 +24,7 @@
 
 ## 執行方式
 
-啟動前需先設定 Jasypt 主金鑰環境變數（見下方「設定檔加密」一節）：
+啟動前需先設定 Jasypt 主金鑰環境變數（見下方「資料庫密碼」一節）：
 
 ```bash
 export JASYPT_ENCRYPTOR_PASSWORD=你的主金鑰
@@ -41,11 +41,22 @@ mvn package
 JASYPT_ENCRYPTOR_PASSWORD=你的主金鑰 java -jar target/timesurvey-1.0.0.jar
 ```
 
-## 設定檔加密（Jasypt）
+## 資料庫密碼：動態產生、加密儲存
 
-`application.properties` 中的資料庫密碼以 Jasypt 加密成 `ENC(密文)` 存放，
-啟動時才用主金鑰在記憶體中解密，設定檔裡不會出現明文密碼。
-主金鑰由環境變數 `JASYPT_ENCRYPTOR_PASSWORD` 提供；未設定時應用程式會拒絕啟動。
+資料庫密碼**不寫在 git 版控的 `application.properties`**，而是由
+`DbPasswordEnvironmentPostProcessor` 在啟動時管理：
+
+- **首次啟動**（`./data/timesurvey.mv.db` 與密碼檔都不存在）：產生一組 32 字元的強隨機密碼，
+  用 Jasypt 加密成 `ENC(密文)` 後寫入 `./data/db-secret.properties`。
+- **之後每次啟動**：讀取該密碼檔，其中的 `ENC(...)` 由 jasypt-spring-boot 在讀取
+  `spring.datasource.password` 時，用主金鑰在記憶體中自動解密。
+- 因此只要不刪 `./data`，每次都用同一個密碼開同一顆資料庫；密碼檔位於已被
+  `.gitignore` 的 `data/` 內，與資料庫檔同生命週期，不會進版控。
+- 若資料庫檔已存在但密碼檔遺失，啟動會直接報錯（原密碼已無法復原）——
+  此時請刪除整個 `data/` 目錄重新開始。
+
+主金鑰由環境變數 `JASYPT_ENCRYPTOR_PASSWORD` 提供：**首次產生密碼時用它加密、
+之後每次啟動用它解密**，未提供時應用程式會拒絕啟動。
 
 ### 設定主金鑰環境變數
 
@@ -61,20 +72,27 @@ JASYPT_ENCRYPTOR_PASSWORD=你的主金鑰 java -jar target/timesurvey-1.0.0.jar
 開發機上 VS Code 的 `.vscode/launch.json` 已內建一組開發用主金鑰，按 F5 即可啟動；
 **正式環境請換成自己的主金鑰**，只設在伺服器的環境變數，不要提交進 git。
 
-### 換主金鑰（或換資料庫密碼）
+> 提醒：密碼檔躺在 `data/` 裡、和資料庫檔並排，加密要真的有意義，主金鑰就不能和它放在
+> 同一顆磁碟。請務必把主金鑰設在執行環境的環境變數，別寫進專案檔。
 
-1. 用新的主金鑰重新產生密文：
+### 重置資料庫密碼
 
-   ```bash
-   mvn jasypt:encrypt-value -Djasypt.encryptor.password=新主金鑰 -Djasypt.plugin.value='資料庫密碼'
-   ```
+刪除整個 `./data` 目錄再啟動即可——資料庫與密碼檔一起清掉，下次啟動會用目前的主金鑰
+重新產生一組新密碼。（這也會清空所有調查資料。）
 
-2. 將輸出的 `ENC(...)` 整段貼回 `application.properties` 的 `spring.datasource.password=`。
-3. 之後啟動時改用新主金鑰設定 `JASYPT_ENCRYPTOR_PASSWORD`。
+### 換主金鑰
 
-注意：H2 的 `sa` 密碼是在「第一次建立資料庫檔案」時定下來的。
-若要更換的是**資料庫密碼本身**（而非只換主金鑰），需先刪除舊的
-`./data/timesurvey.mv.db` 再啟動，否則會連不上。
+主金鑰換了之後，舊密碼檔裡的 `ENC(...)` 會解不開。最簡單的做法是用**新主金鑰**重新加密
+目前的隨機密碼：
+
+1. 取得目前密碼明文：用**舊主金鑰**解開 `./data/db-secret.properties` 的 `ENC(...)`
+   （`mvn jasypt:decrypt-value -Djasypt.encryptor.password=舊主金鑰 -Djasypt.plugin.value='貼上ENC括號內的密文'`）。
+2. 用**新主金鑰**重新加密該明文：
+   `mvn jasypt:encrypt-value -Djasypt.encryptor.password=新主金鑰 -Djasypt.plugin.value='上一步的明文'`。
+3. 把新的 `ENC(...)` 寫回 `./data/db-secret.properties`，並改用新主金鑰設定
+   `JASYPT_ENCRYPTOR_PASSWORD`。
+
+（若不在意保留現有資料，直接刪除 `./data` 用新主金鑰重新產生最省事。）
 
 ## 測試（Cucumber BDD）
 
@@ -102,4 +120,6 @@ VS Code 使用者可直接執行內建 task「BDD 測試 (Cucumber)」（終端�
 ## 資料儲存
 
 所有設定與調查資料皆存於 H2 資料庫（`./data/timesurvey.mv.db`），重啟不會遺失。
-偵錯用 H2 console：<http://localhost:8080/h2-console>（JDBC URL：`jdbc:h2:file:./data/timesurvey`，帳號 `sa`，密碼為建立資料庫時設定的密碼）。
+偵錯用 H2 console：<http://localhost:8080/h2-console>（JDBC URL：`jdbc:h2:file:./data/timesurvey`，帳號 `sa`，
+密碼為系統自動產生的隨機密碼，明文不會落地；如需登入 console，可用主金鑰解開 `./data/db-secret.properties` 取得，
+見「資料庫密碼」一節）。
