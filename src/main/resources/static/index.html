@@ -141,6 +141,33 @@
                   transform: translateX(-50%); border: 5px solid transparent; border-top-color: #2c3e50;
                   opacity: 0; visibility: hidden; transition: opacity .08s; pointer-events: none; z-index: 30; }
   .cbtn:hover::after, .cbtn:hover::before { opacity: 1; visibility: visible; }
+  /* 可拖曳時間軸：灰色＝大家都有空的可選範圍，綠色＝會議時段（可在灰底中自由移動） */
+  .tbar { display: inline-flex; align-items: center; gap: 10px; margin: 4px 8px 4px 0; flex-wrap: wrap;
+          vertical-align: middle; }
+  .tb-track { position: relative; display: inline-flex; height: 30px; border-radius: 6px;
+              background: #e9ecef; border: 1px solid #d4d8db; user-select: none; cursor: pointer; }
+  .tb-cell { width: 60px; height: 100%; border-right: 1px solid #dfe3e6; box-sizing: border-box; }
+  .tb-cell:last-child { border-right: none; }
+  .tb-win { position: absolute; top: -1px; height: 30px; background: #28a745; border: 1px solid #1d8c38;
+            border-radius: 5px; cursor: grab; box-shadow: 0 1px 5px rgba(0,0,0,.3); color: #fff;
+            font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;
+            touch-action: none; transition: left .14s ease; }
+  .tb-win.dragging { transition: none; }
+  .tb-win:active { cursor: grabbing; }
+  /* 拖曳中浮在綠色膠囊上方的時間氣泡 */
+  .tb-bubble { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+               background: #1d7a35; color: #fff; font-size: 13px; font-weight: 700; line-height: 1;
+               padding: 6px 10px; border-radius: 6px; white-space: nowrap; pointer-events: none;
+               opacity: 0; visibility: hidden; transition: opacity .1s; z-index: 20;
+               box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  .tb-bubble::after { content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+                      border: 5px solid transparent; border-top-color: #1d7a35; }
+  .tb-win.dragging .tb-bubble { opacity: 1; visibility: visible; }
+  .tb-lab { font-size: 13px; color: #1d7a35; font-weight: 600; white-space: nowrap; }
+  /* 同一天有多個時段時：每個時間軸各自獨立一行（含第一個），並對齊到日期標籤後方 */
+  .cday.multi .dlabel { display: block; margin-bottom: 6px; }
+  .cday.multi .tbar, .cday.multi .chip { display: flex; margin-left: 12px; width: fit-content; }
+  .cday.multi .chip { display: inline-flex; }
 </style>
 </head>
 <body>
@@ -738,7 +765,8 @@ function renderResult() {
     for (const d of dates) {
       const w = WEEK[new Date(d + 'T00:00:00').getDay()];
       const dayRuns = runs.filter(r => r.date === d);
-      html += '<div class="cday"><span class="dlabel">' + fmtMd(d) + '（週' + w + '）</span>';
+      const multi = dayRuns.length > 1;   // 同一天有多個時段時，讓每個時間軸各自獨立一行，較好閱讀
+      html += '<div class="cday' + (multi ? ' multi' : '') + '"><span class="dlabel">' + fmtMd(d) + '（週' + w + '）</span>';
       if (dayRuns.length === 0) {
         html += '<span class="none">— 無共同時段 —</span>';
       } else {
@@ -748,17 +776,21 @@ function renderResult() {
           const hrs = parseFloat((r.slots.length * 0.5).toFixed(1));
           const fit = r.slots.length >= need;
           if (fit) {
-            // 共同有空的時間比會議長時，切成多個剛好等於會議長度的時段，讓管理者挑選要開哪一段
-            const winCount = Math.floor(r.slots.length / need);
-            for (let k = 0; k < winCount; k++) {
-              const wFrom = r.slots[k * need];
-              const wTo = plus30(r.slots[k * need + need - 1]);
-              const attrs = ' data-date="' + d + '" data-from="' + wFrom + '"';
-              html += '<span class="chip fit">' + wFrom + ' ~ ' + wTo + '（' + meetHours + ' 小時）✓' +
-                      '<span class="cbtn"' + attrs + ' onclick="openOutlookWeb(this)"' +
-                      ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，自 ' + wFrom + ' 起），主旨、時間、與會人員已帶入，並開啟 Teams 線上會議">📅</span>' +
-                      '</span>';
-            }
+            // 灰色長條＝大家都有空的可選範圍；綠色＝會議時段，可在灰底中自由拖曳／點擊移動（預設最早）
+            const N = r.slots.length;
+            const start = r.slots[0];
+            const tid = 'tb_' + d + '_' + start.replace(':', '');
+            let bar = '<div class="tbar"><div class="tb-track" id="' + tid + '"' +
+                      ' data-date="' + d + '" data-start="' + start + '" data-n="' + N +
+                      '" data-need="' + need + '" data-pos="0">';
+            for (let i = 0; i < N; i++) bar += '<div class="tb-cell" title="' + addSlots(start, i) + '"></div>';
+            bar += '<div class="tb-win"><span class="tb-time"></span><span class="tb-bubble"></span></div></div>';
+            bar += '<span class="tb-lab" id="' + tid + '_lab"></span>';
+            bar += '<span class="cbtn" id="' + tid + '_btn" data-date="' + d + '" data-from="' + start + '"' +
+                   ' onclick="openOutlookWeb(this)"' +
+                   ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours + ' 小時，依目前選定時段），主旨、時間、與會人員已帶入，並開啟 Teams 線上會議">📅</span>';
+            bar += '</div>';
+            html += bar;
           } else {
             html += '<span class="chip" title="長度不足 ' + meetHours + ' 小時">' +
                     from + ' ~ ' + to + '（' + hrs + ' 小時）</span>';
@@ -767,8 +799,9 @@ function renderResult() {
       }
       html += '</div>';
     }
-    html += '<div class="cnote muted">綠色＝可挑選的 ' + meetHours + ' 小時會議時段（共同有空的時間較長時，會切成多段供選擇）<br>' +
-            '灰色＝大家都有空但長度不足<br>' +
+    html += '<div class="cnote muted">灰色長條＝大家都有空的時段（可選範圍）；綠色＝ ' + meetHours +
+            ' 小時會議時段，可用滑鼠拖曳或點擊灰色區域自由調整（預設為最早時段）<br>' +
+            '灰色膠囊＝大家都有空但長度不足<br>' +
             '「📅」可在 Outlook 網頁版開啟新會議（主旨、時間、與會人員已帶入，含 Teams 線上會議）</div>';
   }
   html += '</div>';
@@ -814,7 +847,97 @@ function renderResult() {
   html += '<p class="muted">✓＝可出席；—＝尚未填寫；綠色大框＝每個人都有空、且可容納 ' + meetHours + ' 小時會議的連續時段區塊。</p>';
   html += '</div>';
   $('resultArea').innerHTML = html;
+  initTimeBars();
 }
+
+/* "09:00" + n 個 30 分鐘格 -> 之後的時刻 */
+function addSlots(t, n) {
+  let r = t;
+  for (let i = 0; i < n; i++) r = plus30(r);
+  return r;
+}
+
+/* ---------- 調查結論：可拖曳會議時段的時間軸 ---------- */
+const TB_CELLW = 60;   // 每個 30 分鐘格的寬度（需與 CSS .tb-cell 一致）
+
+/* 依目前 pos 更新綠色時段位置、文字標籤與「📅」按鈕的起始時間 */
+function tbUpdate(track) {
+  const n = +track.dataset.n, need = +track.dataset.need;
+  let pos = Math.max(0, Math.min(n - need, +track.dataset.pos || 0));
+  track.dataset.pos = pos;
+  const start = track.dataset.start;
+  const from = addSlots(start, pos);
+  const to = addSlots(start, pos + need);
+  const win = track.querySelector('.tb-win');
+  win.style.width = (need * TB_CELLW) + 'px';
+  win.style.left = (pos * TB_CELLW) + 'px';
+  const t = win.querySelector('.tb-time'); if (t) t.textContent = from;
+  const b = win.querySelector('.tb-bubble'); if (b) b.textContent = from + ' ~ ' + to;
+  const hrs = parseFloat((need * 0.5).toFixed(1));
+  const lab = document.getElementById(track.id + '_lab');
+  if (lab) lab.textContent = from + ' ~ ' + to + '（' + hrs + ' 小時）';
+  const btn = document.getElementById(track.id + '_btn');
+  if (btn) { btn.dataset.date = track.dataset.date; btn.dataset.from = from; }
+}
+
+/* 拖曳中：依目前像素位置即時更新文字標籤（以最接近的 30 分鐘格為準，但不吸附綠塊本身） */
+function tbPreview(track, px) {
+  const n = +track.dataset.n, need = +track.dataset.need;
+  const pos = Math.max(0, Math.min(n - need, Math.round(px / TB_CELLW)));
+  const start = track.dataset.start;
+  const from = addSlots(start, pos);
+  const to = addSlots(start, pos + need);
+  const win = track.querySelector('.tb-win');
+  const t = win.querySelector('.tb-time'); if (t) t.textContent = from;
+  const b = win.querySelector('.tb-bubble'); if (b) b.textContent = from + ' ~ ' + to;
+  const hrs = parseFloat((need * 0.5).toFixed(1));
+  const lab = document.getElementById(track.id + '_lab');
+  if (lab) lab.textContent = from + ' ~ ' + to + '（' + hrs + ' 小時）';
+}
+
+/* 為每條時間軸接上拖曳（綠色時段）與點擊（灰色範圍）互動 */
+function initTimeBars() {
+  document.querySelectorAll('.tb-track').forEach(track => {
+    tbUpdate(track);   // 預設停在最早可行時段
+    const win = track.querySelector('.tb-win');
+    let dragged = false;
+
+    win.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      win.setPointerCapture(e.pointerId);
+      const n = +track.dataset.n, need = +track.dataset.need;
+      const maxLeft = (n - need) * TB_CELLW;
+      const startX = e.clientX, startLeft = (+track.dataset.pos || 0) * TB_CELLW;
+      dragged = false;
+      win.classList.add('dragging');   // 拖曳時關閉吸附動畫，綠色膠囊跟著指標平滑移動
+      const move = ev => {
+        let px = Math.max(0, Math.min(maxLeft, startLeft + (ev.clientX - startX)));
+        if (Math.abs(ev.clientX - startX) > 2) dragged = true;
+        win.style.left = px + 'px';
+        tbPreview(track, px);   // 即時更新標籤（以最接近的格為準）
+      };
+      const up = ev => {
+        win.releasePointerCapture(e.pointerId);
+        win.removeEventListener('pointermove', move);
+        win.removeEventListener('pointerup', up);
+        win.classList.remove('dragging');   // 放開後以動畫吸附到最近的 30 分鐘格
+        track.dataset.pos = Math.round((parseFloat(win.style.left) || 0) / TB_CELLW);
+        tbUpdate(track);
+      };
+      win.addEventListener('pointermove', move);
+      win.addEventListener('pointerup', up);
+    });
+
+    // 點擊灰色範圍：將綠色時段移到該處（拖曳剛結束時不觸發）
+    track.addEventListener('click', e => {
+      if (e.target === win || dragged) { dragged = false; return; }
+      const rect = track.getBoundingClientRect();
+      track.dataset.pos = Math.floor((e.clientX - rect.left) / TB_CELLW);
+      tbUpdate(track);
+    });
+  });
+}
+
 
 function toggleDetail() {
   detailOpen = !detailOpen;
