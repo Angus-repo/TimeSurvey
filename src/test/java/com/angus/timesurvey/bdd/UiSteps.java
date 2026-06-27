@@ -76,6 +76,7 @@ public class UiSteps {
         ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
                 "localStorage.setItem('surveyOnboarded', '1');" +
                 "localStorage.setItem('meetHoursOnboarded', '1');" +
+                "localStorage.setItem('dragSlotOnboarded', '1');" +
                 "localStorage.setItem('copyLinkOnboarded', '1');");
         page = ctx.newPage();
     }
@@ -440,7 +441,8 @@ public class UiSteps {
 
     @Then("結論區應顯示可開會時段 {string}")
     public void fitChipShown(String range) {
-        assertThat(page.locator("#resultArea .chip.fit")
+        // 新版以可拖曳時間軸呈現，.tb-lab 顯示目前選定的時段（預設為最早可行時段）
+        assertThat(page.locator("#resultArea .tb-lab")
                 .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(range))
                 .first()).isVisible();
     }
@@ -454,12 +456,13 @@ public class UiSteps {
 
     @Then("結論區應顯示 {int} 個可開會時段")
     public void fitChipCount(int n) {
-        assertThat(page.locator("#resultArea .chip.fit")).hasCount(n);
+        // 每個可容納會議的連續區塊呈現為一條可拖曳時間軸
+        assertThat(page.locator("#resultArea .tb-track")).hasCount(n);
     }
 
     @Then("結論區不應顯示可開會時段")
     public void noFitChip() {
-        assertThat(page.locator("#resultArea .chip.fit")).hasCount(0);
+        assertThat(page.locator("#resultArea .tb-track")).hasCount(0);
     }
 
     @When("展開調查明細")
