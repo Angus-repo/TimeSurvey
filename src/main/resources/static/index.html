@@ -116,6 +116,11 @@
   #linkOnbPop { position: fixed; top: auto; left: auto; }   /* 位置由 JS 依按鈕座標決定 */
   #linkOnbPop::before { left: var(--arrow-left, 36px); }    /* 箭頭由 JS 對準按鈕中心 */
   #linkOnbPop.above::before { bottom: auto; top: 100%; border-bottom-color: transparent; border-top-color: #fff; }
+  /* 「可拖曳時段」新手引導：打亮第一條時間軸並把說明泡泡定位在它旁邊 */
+  .tb-track.onb-spot { z-index: 1001; animation: onbpulse 1.6s ease-in-out infinite; }
+  #dragOnbPop { position: fixed; top: auto; left: auto; }
+  #dragOnbPop::before { left: var(--arrow-left, 36px); }
+  #dragOnbPop.above::before { bottom: auto; top: 100%; border-bottom-color: transparent; border-top-color: #fff; }
   #resultArea a { color: #2c7be5; font-size: 14px; text-decoration: none; }
   #resultArea a:hover { text-decoration: underline; }
   /* 調查結論：共同有空時段的視覺化 */
@@ -238,6 +243,13 @@
   點這顆打亮的「複製連結」按鈕，即可複製此調查的填寫超連結，
   貼到 Email 或聊天工具傳給大家，收到的人點開就能填寫。
   <div><button onclick="endLinkOnb()">知道了</button></div>
+</div>
+<div class="onb-mask" id="dragOnbMask" style="display:none" onclick="endDragOnb()"></div>
+<div class="onb-pop" id="dragOnbPop" style="display:none">
+  🖱 <b>會議時段可以自己拖曳挑選</b><br>
+  灰色長條是<b>大家都有空</b>的可選範圍，綠色方塊是<b>會議時段</b>。
+  直接用滑鼠拖曳綠色方塊，或點擊灰色區域，即可調整成你想要的時間（預設停在最早時段）。
+  <div><button onclick="endDragOnb()">知道了</button></div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -667,7 +679,52 @@ function endMeetOnb() {
   $('meetOnbPop').style.display = 'none';
   $('meetBox').classList.remove('onb-spot');
   $('meetHours').focus();
+  // 接著引導：說明綠色時段可自行拖曳挑選（看過一次就不再出現；需有可拖曳的時段才顯示）
+  if (!localStorage.getItem('dragSlotOnboarded')) setTimeout(startDragOnb, 300);
 }
+
+/* ---------- 「可拖曳時段」的新手引導 ---------- */
+let dragOnbOn = false;   // 引導進行中（捲動／縮放時重新定位泡泡用）
+
+/* 打亮第一條時間軸，並把說明泡泡定位在它旁邊、箭頭對準中心；下方放不下就改放上方 */
+function spotDragBar() {
+  const track = document.querySelector('#resultArea .tb-track');
+  if (!track) return false;
+  track.classList.add('onb-spot');
+  const r = track.getBoundingClientRect();
+  const pop = $('dragOnbPop');
+  pop.style.display = '';   // 先顯示才量得到泡泡實際寬高
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  const left = Math.max(12, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 12));
+  pop.style.left = left + 'px';
+  pop.style.setProperty('--arrow-left', (r.left + r.width / 2 - left - 9) + 'px');   // 9 = 箭頭半寬
+  if (r.bottom + 14 + ph <= window.innerHeight - 8) {
+    pop.classList.remove('above');
+    pop.style.top = (r.bottom + 14) + 'px';
+  } else {
+    pop.classList.add('above');
+    pop.style.top = Math.max(8, r.top - 14 - ph) + 'px';
+  }
+  return true;
+}
+
+function startDragOnb() {
+  if (!spotDragBar()) return;   // 沒有可拖曳的時段就不引導
+  dragOnbOn = true;
+  $('dragOnbMask').style.display = '';
+}
+
+function endDragOnb() {
+  localStorage.setItem('dragSlotOnboarded', '1');
+  dragOnbOn = false;
+  document.querySelectorAll('.tb-track.onb-spot').forEach(t => t.classList.remove('onb-spot'));
+  $('dragOnbMask').style.display = 'none';
+  $('dragOnbPop').style.display = 'none';
+}
+
+// 引導進行中若捲動或縮放視窗，時間軸位置會變，泡泡跟著重新定位
+['resize', 'scroll'].forEach(ev =>
+  window.addEventListener(ev, () => { if (dragOnbOn) spotDragBar(); }, true));
 
 // 使用者動手調整會議時間，代表已理解用途，結束引導
 $('meetHours').addEventListener('input', () => {
