@@ -7,8 +7,13 @@
 <style>
   * { box-sizing: border-box; }
   body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; margin: 0; background: #f0f2f5; color: #333; }
-  header { background: #2c3e50; color: #fff; padding: 16px 24px; }
+  header { background: #2c3e50; color: #fff; padding: 16px 24px; display: flex; align-items: center;
+           justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   header h1 { margin: 0; font-size: 20px; }
+  #resetOnbBtn { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.35);
+                 border-radius: 20px; padding: 7px 16px; font-size: 13px; font-family: inherit; cursor: pointer;
+                 transition: background .15s, border-color .15s; }
+  #resetOnbBtn:hover { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.6); }
   .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
   .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); padding: 20px; margin-bottom: 24px; }
   .card h2 { margin-top: 0; font-size: 17px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
@@ -121,6 +126,31 @@
   #dragOnbPop { position: fixed; top: auto; left: auto; }
   #dragOnbPop::before { left: var(--arrow-left, 36px); }
   #dragOnbPop.above::before { bottom: auto; top: 100%; border-bottom-color: transparent; border-top-color: #fff; }
+  /* 拖曳引導泡泡內的動畫示意：綠色膠囊在灰色軌道內左右來回滑動 */
+  .drag-demo { position: relative; display: flex; height: 30px; width: 240px; margin: 12px 0 4px;
+               border-radius: 6px; background: #e9ecef; border: 1px solid #d4d8db; overflow: hidden; }
+  .drag-demo .demo-cell { width: 60px; height: 100%; border-right: 1px solid #dfe3e6; box-sizing: border-box; }
+  .drag-demo .demo-cell:last-child { border-right: none; }
+  .drag-demo .demo-win { position: absolute; top: -1px; height: 30px; width: 60px; background: #28a745;
+                         border: 1px solid #1d8c38; border-radius: 5px; box-shadow: 0 1px 5px rgba(0,0,0,.3);
+                         color: #fff; font-size: 12px; font-weight: 600; overflow: hidden;
+                         left: 0; animation: dragdemo 2.6s ease-in-out infinite; }
+  /* 膠囊內的時間帶：膠囊往右滑時同步反向捲動，顯示的時間依序變成 09:00→10:00→11:00→12:00 */
+  .drag-demo .demo-strip { display: flex; height: 100%; animation: dragdemostrip 2.6s ease-in-out infinite; }
+  .drag-demo .demo-strip span { flex: 0 0 60px; height: 100%; display: flex; align-items: center; justify-content: center; }
+  .drag-demo .demo-cursor { position: absolute; bottom: -6px; left: 0; width: 16px; height: 16px; margin-left: 26px;
+                            pointer-events: none; animation: dragdemo 2.6s ease-in-out infinite; }
+  .drag-demo .demo-cursor svg { width: 16px; height: 16px; }
+  @keyframes dragdemo {
+    0%, 12%   { left: 0; }
+    44%, 56%  { left: 180px; }
+    88%, 100% { left: 0; }
+  }
+  @keyframes dragdemostrip {
+    0%, 12%   { transform: translateX(0); }
+    44%, 56%  { transform: translateX(-180px); }
+    88%, 100% { transform: translateX(0); }
+  }
   #resultArea a { color: #2c7be5; font-size: 14px; text-decoration: none; }
   #resultArea a:hover { text-decoration: underline; }
   /* 調查結論：共同有空時段的視覺化 */
@@ -176,7 +206,7 @@
 </style>
 </head>
 <body>
-<header><h1>⏰ 時間調查 - 後台維護</h1></header>
+<header><h1>⏰ 時間調查 - 後台維護</h1><button id="resetOnbBtn" onclick="resetOnboarding()" title="重新顯示所有操作引導">🧭 重新顯示新手引導</button></header>
 <div class="container">
 
   <div class="card">
@@ -249,6 +279,11 @@
   🖱 <b>會議時段可以自己拖曳挑選</b><br>
   灰色長條是<b>大家都有空</b>的可選範圍，綠色方塊是<b>會議時段</b>。
   直接用滑鼠拖曳綠色方塊，或點擊灰色區域，即可調整成你想要的時間（預設停在最早時段）。
+  <div class="drag-demo">
+    <div class="demo-cell"></div><div class="demo-cell"></div><div class="demo-cell"></div><div class="demo-cell"></div>
+    <div class="demo-win"><div class="demo-strip"><span>09:00</span><span>10:00</span><span>11:00</span><span>12:00</span></div></div>
+    <div class="demo-cursor"><svg viewBox="0 0 24 24" fill="#2c3e50" stroke="#fff" stroke-width="1.5"><path d="M5 3l5 16 2.5-6.5L19 10z"/></svg></div>
+  </div>
   <div><button onclick="endDragOnb()">知道了</button></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -725,6 +760,21 @@ function endDragOnb() {
 // 引導進行中若捲動或縮放視窗，時間軸位置會變，泡泡跟著重新定位
 ['resize', 'scroll'].forEach(ev =>
   window.addEventListener(ev, () => { if (dragOnbOn) spotDragBar(); }, true));
+
+/* 重新顯示新手引導：清除「看過」紀錄，讓三段引導（複製連結／會議時間／可拖曳時段）再次出現。
+   若目前正開著調查結果，立即重跑會議時間引導（結束後會自動接續可拖曳時段引導）；
+   否則提示使用者於下次相應操作時會再出現。 */
+function resetOnboarding() {
+  localStorage.removeItem('copyLinkOnboarded');
+  localStorage.removeItem('meetHoursOnboarded');
+  localStorage.removeItem('dragSlotOnboarded');
+  if ($('resultCard').style.display !== 'none' && resultState) {
+    startMeetOnb();
+    toast('已重設新手引導');
+  } else {
+    toast('已重設新手引導，下次建立調查或查看結果時會再次顯示');
+  }
+}
 
 // 使用者動手調整會議時間，代表已理解用途，結束引導
 $('meetHours').addEventListener('input', () => {

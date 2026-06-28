@@ -385,6 +385,11 @@ public class UiSteps {
         page.click(".btn-ic.copy.onb-spot");
     }
 
+    @When("點擊重新顯示新手引導按鈕")
+    public void clickResetOnboarding() {
+        page.click("#resetOnbBtn");
+    }
+
     @When("在後台輸入調查名稱 {string} 與人員 {string}")
     public void fillAdminForm(String name, String people) {
         page.fill("#fName", name);

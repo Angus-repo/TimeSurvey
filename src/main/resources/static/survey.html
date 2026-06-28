@@ -36,8 +36,11 @@
           transition: border-color .15s, background .15s; }
   .hbox.full { border-color: #00a884; background: #f2fbf8; }
   .slot { border: 1px solid #ccc; border-radius: 4px; padding: 6px 4px; font-size: 13px; text-align: center;
-          cursor: pointer; user-select: none; background: #fff; white-space: nowrap; }
+          cursor: pointer; user-select: none; background: #fff; white-space: nowrap;
+          transition: background .15s, border-color .15s, box-shadow .15s, transform .1s; }
+  .slot:hover { border-color: #00a884; background: #eef6f3; box-shadow: 0 1px 4px rgba(0,168,132,.25); }
   .slot.on { background: #00a884; border-color: #00a884; color: #fff; }
+  .slot.on:hover { background: #009675; border-color: #009675; box-shadow: 0 1px 6px rgba(0,168,132,.4); }
   /* 外框右上角的圓形勾勾徽章：勾起＝該小時兩格全選 */
   .chk { position: absolute; top: -9px; right: -9px; width: 22px; height: 22px; border-radius: 50%;
          display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2;
@@ -45,10 +48,15 @@
          line-height: 1; box-shadow: 0 1px 4px rgba(0,0,0,.18); user-select: none;
          transition: background .15s, border-color .15s, color .15s, transform .15s; }
   .chk:hover { border-color: #00a884; color: #00a884; transform: scale(1.12); }
-  .chk.on { background: linear-gradient(135deg, #00c389, #00a884); border-color: #00a884; color: #fff; }
+  .chk.on { background: linear-gradient(135deg, #00734f, #004d33); border-color: #004d33; color: #fff; }
+  /* 滑鼠移到勾勾時，連同該小時框內的時段一起呈現特效 */
+  .chk:hover ~ .slot { border-color: #00a884; background: #eef6f3; box-shadow: 0 1px 4px rgba(0,168,132,.25); }
+  /* 已選取的時段在 hover 勾勾時改用深色字，避免白字在淺底上看不清 */
+  .chk:hover ~ .slot.on { color: #024d36; }
+  .hbox:has(.chk:hover) { border-color: #00a884; background: #f2fbf8; }
 
   .submit-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; box-shadow: 0 -2px 8px rgba(0,0,0,.1);
-                padding: 10px 16px; text-align: center; }
+                padding: 10px 16px; text-align: center; z-index: 50; }
   .submit-bar button { background: #2c7be5; color: #fff; border: none; border-radius: 6px;
                        padding: 10px 40px; font-size: 16px; cursor: pointer; font-family: inherit; }
   .submit-bar button:hover { background: #1a68d1; }
