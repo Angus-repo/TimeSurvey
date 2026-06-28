@@ -50,6 +50,7 @@
   .btn-ic.copy   { --c: #00a884; }
   .btn-ic.result { --c: #6c5ce7; }
   .btn-ic.stop   { --c: #34495e; }
+  .btn-ic.reopen { --c: #28a745; }
   .btn-ic.edit   { --c: #f39c12; }
   .btn-ic.dup    { --c: #2c7be5; }
   .st { display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 13px; white-space: nowrap; }
@@ -328,6 +329,7 @@ const ICONS = {
   link:  '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
   chart: '<svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>',
   stop:  '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
+  reopen: '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>',
   edit:  '<svg viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
   dup:   '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
 };
@@ -388,8 +390,11 @@ async function loadSurveys() {
         <button class="btn-ic copy" data-sid="${s.id}" onclick="copyLink('${s.id}')" ${closed ? 'disabled' : ''}
           data-tip="${closed ? '調查已結束，連結已停用' : '複製調查連結，傳給參與者即可填寫'}" aria-label="複製調查連結">${ICONS.link}</button>
         <button class="btn-ic result" onclick="showResult('${s.id}')" data-tip="查看填寫狀況與共同有空的時段" aria-label="查看結果">${ICONS.chart}</button>
-        <button class="btn-ic stop" onclick="closeSurvey('${s.id}')" ${closed ? 'disabled' : ''}
-          data-tip="${closed ? '調查已結束' : '結束調查，參與者將無法再填寫'}" aria-label="結束調查">${ICONS.stop}</button>
+        ${closed
+          ? `<button class="btn-ic reopen" onclick="reopenSurvey('${s.id}')"
+          data-tip="重新開啟調查，參與者可再次填寫" aria-label="重新開啟調查">${ICONS.reopen}</button>`
+          : `<button class="btn-ic stop" onclick="closeSurvey('${s.id}')"
+          data-tip="結束調查，參與者將無法再填寫" aria-label="結束調查">${ICONS.stop}</button>`}
         <button class="btn-ic edit" onclick="editSurvey('${s.id}')" ${closed ? 'disabled' : ''}
           data-tip="${closed ? '調查已結束，無法編輯' : '修改調查名稱、日期時間與人員名單'}" aria-label="編輯調查">${ICONS.edit}</button>
         <button class="btn-ic dup" onclick="duplicateSurvey('${s.id}')"
@@ -606,7 +611,19 @@ async function closeSurvey(id) {
   if (!confirm('確定結束調查「' + (s ? s.name : '') + '」？結束後參與者將無法再填寫時間。')) return;
   try {
     await api('/api/surveys/' + id + '/close', { method: 'POST' });
-    toast('調查已結束');
+    toast('已結束調查');
+    loadSurveys();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function reopenSurvey(id) {
+  const s = surveys.find(x => x.id === id);
+  if (!confirm('確定重新開啟調查「' + (s ? s.name : '') + '」？開啟後參與者可再次填寫時間。')) return;
+  try {
+    await api('/api/surveys/' + id + '/reopen', { method: 'POST' });
+    toast('已重新開啟調查');
     loadSurveys();
   } catch (e) {
     toast(e.message);

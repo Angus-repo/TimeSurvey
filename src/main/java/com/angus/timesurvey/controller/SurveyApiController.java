@@ -95,6 +95,18 @@ public class SurveyApiController {
         return s;
     }
 
+    /** 重新開啟調查：清除結束時間，參與者可再次填寫、發起者可再編輯 */
+    @PostMapping("/{id}/reopen")
+    public Survey reopen(@PathVariable String id,
+                         @RequestHeader(value = "X-Owner-Token", required = false) String owner) {
+        Survey s = getOwned(id, owner);
+        if (s.getClosedAt() != null) {
+            s.setClosedAt(null);
+            s = surveyRepo.save(s);
+        }
+        return s;
+    }
+
     @DeleteMapping("/{id}")
     @Transactional
     public ResponseEntity<Void> delete(@PathVariable String id,

@@ -218,6 +218,12 @@ public class SurveySteps {
                 HttpMethod.POST, new HttpEntity<>(headers(owner)), String.class);
     }
 
+    @When("{string} 重新開啟調查 {string}")
+    public void reopenSurvey(String owner, String surveyName) {
+        last = rest.exchange("/api/surveys/" + surveyId(surveyName) + "/reopen",
+                HttpMethod.POST, new HttpEntity<>(headers(owner)), String.class);
+    }
+
     /* ---------- 共用斷言 ---------- */
 
     @Then("回應狀態碼應為 {int}")
