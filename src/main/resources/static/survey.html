@@ -55,6 +55,37 @@
   .chk:hover ~ .slot.on { color: #024d36; }
   .hbox:has(.chk:hover) { border-color: #00a884; background: #f2fbf8; }
 
+  /* 上午／下午之間的分隔欄：在午休處製造視覺斷點 */
+  th.col-sep, td.col-sep { width: 20px; min-width: 20px; padding: 0; border: none; background: transparent; }
+  th.col-sep { font-size: 11px; font-weight: 600; color: #b6bfba; white-space: nowrap; }
+  td.col-sep { background: linear-gradient(to right, transparent 9px, #d2dcd7 9px, #d2dcd7 11px, transparent 11px); }
+
+  /* 快速鈕右邊的「複製整列」圖示鈕：複製某天勾選的時段，貼到其它天 */
+  th.copy-col, td.copy-col { padding: 0 2px; vertical-align: top; }
+  .copybtn { display: inline-flex; align-items: center; justify-content: center; padding: 3px 9px;
+             position: relative; border-radius: 12px; cursor: pointer;
+             border: 1px solid #d8b8e0; background: #f6eef9; color: #8e44ad; font-family: inherit;
+             white-space: nowrap; transition: background .15s, border-color .15s, color .15s, transform .1s; }
+  .copybtn svg { display: block; }
+  /* 自製提示框：滑上立即顯示（原生 title 要等 1~2 秒），靠左對齊往右展開避免被左邊裁切 */
+  .copybtn::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 0;
+                    background: #2c3e50; color: #fff; font-size: 12px; padding: 6px 10px; border-radius: 6px;
+                    white-space: nowrap; opacity: 0; visibility: hidden; transition: opacity .08s;
+                    pointer-events: none; z-index: 9999; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  .copybtn::before { content: ''; position: absolute; bottom: calc(100% + 3px); left: 12px;
+                     border: 5px solid transparent; border-top-color: #2c3e50;
+                     opacity: 0; visibility: hidden; transition: opacity .08s; pointer-events: none; z-index: 9999; }
+  .copybtn:hover::after, .copybtn:hover::before { opacity: 1; visibility: visible; }
+  /* hover 時把按鈕整體提升到上層，避免提示框被相鄰儲存格的時段蒙住 */
+  .copybtn:hover { background: #efe1f5; border-color: #b07cc6; transform: translateY(-1px); z-index: 9999; }
+  .copybtn.paste { border-color: #2c7be5; background: #e8f1fd; color: #2c7be5; }
+  .copybtn.paste:hover { background: #d6e7fb; border-color: #1a68d1; }
+  .copybtn.cancel { border-color: #e74c3c; background: #fdecea; color: #e74c3c; }
+  .copybtn.cancel:hover { background: #fbdbd7; }
+  /* 不同週之間的分隔列 */
+  tr.week-sep td { border: none; padding: 3px 0; }
+  tr.week-sep .wline { border-top: 2px dashed #cad5d0; margin: 0 2px; }
+
   .submit-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; box-shadow: 0 -2px 8px rgba(0,0,0,.1);
                 padding: 10px 16px; text-align: center; z-index: 50; }
   .submit-bar button { background: #2c7be5; color: #fff; border: none; border-radius: 6px;
@@ -149,6 +180,14 @@ const surveyId = location.pathname.split('/')[2];
 let survey = null;
 let selected = new Set();   // "yyyy-MM-ddTHH:mm"
 let times = [], amTimes = [], pmTimes = [], hours = [];
+let copySource = null;     // 正在複製的來源日期（null 表示未進入複製狀態）
+
+/* 複製 / 貼上 / 取消的線條式圖示（stroke 用 currentColor，顏色跟隨按鈕狀態） */
+const ICON = {
+  copy: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  paste: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>',
+  cancel: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+};
 
 function toast(msg) {
   const t = $('toast');
@@ -188,6 +227,15 @@ function timeSlots(startTime, endTime) {
 }
 
 const WEEK = ['日','一','二','三','四','五','六'];
+
+/* 該日期所屬週的週一作為分組鍵，用來判斷是否進入新的一週 */
+function weekKey(ds) {
+  const dt = new Date(ds + 'T00:00:00');
+  const day = dt.getDay();               // 0=日 .. 6=六
+  const back = day === 0 ? 6 : day - 1;  // 回推到該週週一
+  dt.setDate(dt.getDate() - back);
+  return dt.getFullYear() + '-' + (dt.getMonth() + 1) + '-' + dt.getDate();
+}
 
 async function init() {
   if (!surveyId) return showErr('連結不正確');
@@ -267,7 +315,12 @@ function renderGrid() {
   }
 
   let html = '<table class="grid"><thead><tr><th style="text-align:left">日期 \\ 時間</th>';
-  for (const h of hours) html += '<th>' + h + '時</th>';
+  // 上午最後一個小時與下午第一個小時之間插入分隔欄（兩段皆有時段才插入）
+  const splitHour = (amTimes.length && pmTimes.length) ? hours.find(h => h >= '12') : null;
+  for (const h of hours) {
+    if (h === splitHour) html += '<th class="col-sep"></th>';
+    html += '<th>' + h + '時</th>';
+  }
   html += '</tr></thead><tbody>';
 
   // 每個「日期×小時」一個外框：右上角勾勾＋框內 :00/:30 兩格
@@ -280,16 +333,27 @@ function renderGrid() {
     return box + '</div></td>';
   };
 
+  // 表格總欄數＝日期欄 + 各小時欄（+ 上午下午分隔欄）；分隔列用 colspan 橫跨整列
+  const colCount = 1 + hours.length + (splitHour ? 1 : 0);
+  let prevWeek = null;
   for (const d of dates) {
     const w = WEEK[new Date(d + 'T00:00:00').getDay()];
     const md = d.slice(5).replace('-', '/');
+    if (prevWeek !== null && weekKey(d) !== prevWeek) {
+      html += '<tr class="week-sep"><td colspan="' + colCount + '"><div class="wline"></div></td></tr>';
+    }
+    prevWeek = weekKey(d);
     html += '<tr><th class="datecell"><div class="dname">' + md + '（週' + w + '）</div>' +
             '<div class="quick" data-date="' + d + '">' +
             '<label data-grp="all">全天</label>' +
             (amTimes.length ? '<label data-grp="am">上午</label>' : '') +
             (pmTimes.length ? '<label data-grp="pm">下午</label>' : '') +
+            '<button class="copybtn" data-date="' + d + '" data-state="複製" data-tip="複製此列的時段" aria-label="複製此列的時段">' + ICON.copy + '</button>' +
             '</div></th>';
-    for (const h of hours) html += hourCell(d, h);
+    for (const h of hours) {
+      if (h === splitHour) html += '<td class="col-sep"></td>';
+      html += hourCell(d, h);
+    }
     html += '</tr>';
   }
   html += '</tbody></table>';
@@ -326,7 +390,57 @@ function renderGrid() {
       refreshAll();
     });
   });
+  // 快速鈕右邊的「複製」鈕：複製→該列變取消、其餘列變貼上；按取消或貼上後復原
+  // 貼上時按住 Ctrl / ⌘ 可連續貼上（不復原成複製狀態）
+  document.querySelectorAll('.copybtn').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (!requireName()) return;
+      const d = el.dataset.date;
+      if (copySource === null) {
+        copySource = d;            // 開始複製本列
+      } else if (d === copySource) {
+        copySource = null;         // 取消複製
+      } else {
+        pasteRow(copySource, d);   // 貼上到本列
+        if (!(e.ctrlKey || e.metaKey)) copySource = null;   // 未按 Ctrl/⌘ 才結束，否則維持可連續貼上
+      }
+      refreshCopyButtons();
+    });
+  });
   refreshAll();
+  refreshCopyButtons();
+}
+
+/* 依目前複製狀態，更新各列鈕的圖示與提示：來源列＝取消、其餘列＝貼上、無複製＝複製 */
+function refreshCopyButtons() {
+  document.querySelectorAll('.copybtn').forEach(btn => {
+    btn.classList.remove('paste', 'cancel');
+    if (copySource === null) {
+      btn.dataset.state = '複製';
+      btn.innerHTML = ICON.copy;
+      btn.dataset.tip = '複製此列的時段';
+    } else if (btn.dataset.date === copySource) {
+      btn.dataset.state = '取消';
+      btn.innerHTML = ICON.cancel;
+      btn.dataset.tip = '取消複製';
+      btn.classList.add('cancel');
+    } else {
+      btn.dataset.state = '貼上';
+      btn.innerHTML = ICON.paste;
+      btn.dataset.tip = '貼上到此列（按住 Ctrl / ⌘ 可連續貼上多列）';
+      btn.classList.add('paste');
+    }
+    btn.setAttribute('aria-label', btn.dataset.tip);
+  });
+}
+
+/* 把來源日期勾選的時段套用到目標日期（先清掉目標原有勾選，再依相同時間填入） */
+function pasteRow(srcDate, dstDate) {
+  const srcTimes = times.filter(t => selected.has(srcDate + 'T' + t));
+  for (const t of times) selected.delete(dstDate + 'T' + t);
+  for (const t of srcTimes) selected.add(dstDate + 'T' + t);
+  refreshAll();
+  toast('已複製 ' + srcDate.slice(5).replace('-', '/') + ' 的時段到 ' + dstDate.slice(5).replace('-', '/'));
 }
 
 function refreshAll() {
@@ -355,6 +469,7 @@ async function loadMyResponse() {
   const name = $('who').value;
   if (name && $('whoCard').classList.contains('onb-spot')) endOnboarding();   // 選了姓名即完成引導
   $('gridCard').classList.toggle('locked', !name);
+  copySource = null;          // 切換姓名會重載內容，複製狀態一併重置
   selected = new Set();
   if (name) {
     const res = await fetch('/api/surveys/' + surveyId + '/responses');
@@ -368,6 +483,7 @@ async function loadMyResponse() {
     }
   }
   refreshAll();
+  refreshCopyButtons();
 }
 
 async function submitResponse() {

@@ -315,6 +315,23 @@ public class UiSteps {
         page.click(".hbox[data-date='" + date + "'][data-hour='" + hour + "'] .chk");
     }
 
+    @When("點擊 {string} 的複製鈕")
+    public void clickCopyBtn(String date) {
+        page.click(".copybtn[data-date='" + date + "']");
+    }
+
+    @When("按住修飾鍵點擊 {string} 的複製鈕")
+    public void modifierClickCopyBtn(String date) {
+        // macOS 上 Ctrl+click 會被視為右鍵，改用 Meta(⌘) 觸發「按住修飾鍵連續貼上」
+        page.click(".copybtn[data-date='" + date + "']", new Page.ClickOptions()
+                .setModifiers(Arrays.asList(com.microsoft.playwright.options.KeyboardModifier.META)));
+    }
+
+    @Then("{string} 的複製鈕狀態應為 {string}")
+    public void copyBtnState(String date, String state) {
+        assertThat(page.locator(".copybtn[data-date='" + date + "']")).hasAttribute("data-state", state);
+    }
+
     @When("按下送出")
     public void clickSubmit() {
         page.click("#bar button");
@@ -342,6 +359,27 @@ public class UiSteps {
         org.junit.jupiter.api.Assertions.assertEquals(0,
                 page.locator(".slot[data-slot^='" + date + "T']").count(),
                 "填寫頁不應出現被挖空的日期 " + date);
+    }
+
+    @Then("填寫頁應出現上午與下午的分隔")
+    public void fillPageHasAmPmSeparator() {
+        org.junit.jupiter.api.Assertions.assertTrue(
+                page.locator("td.col-sep").count() > 0,
+                "填寫頁應出現上午與下午之間的分隔欄");
+    }
+
+    @Then("填寫頁應出現週次分隔")
+    public void fillPageHasWeekSeparator() {
+        org.junit.jupiter.api.Assertions.assertTrue(
+                page.locator("tr.week-sep").count() > 0,
+                "填寫頁應出現不同週之間的分隔列");
+    }
+
+    @Then("填寫頁不應出現週次分隔")
+    public void fillPageHasNoWeekSeparator() {
+        org.junit.jupiter.api.Assertions.assertEquals(0,
+                page.locator("tr.week-sep").count(),
+                "單一週的調查不應出現週次分隔列");
     }
 
     @Then("應出現提示 {string}")
