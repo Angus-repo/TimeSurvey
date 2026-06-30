@@ -180,6 +180,21 @@
   .chip { display: inline-block; margin: 2px 8px 2px 0; padding: 4px 14px; border-radius: 14px; font-size: 13px;
           background: #e9ecef; color: #888; border: 1px solid #d4d8db; white-space: nowrap; }
   .chip.fit { background: #28a745; color: #fff; border-color: #28a745; font-weight: 600; }
+  /* 沒有全員共同時段時的「最多人可參與」時段：灰色膠囊，滑上顯示可／無法參與名單（會換行，不用原生 title） */
+  .chip.partial { position: relative; cursor: help; background: #eef1f4; color: #5a6470; border-color: #d4d8db; }
+  .chip.partial .pcnt { font-weight: 700; }
+  .chip.partial .pcnt .ok { color: #1d8c38; }
+  .chip.partial .pcnt .miss { color: #c0392b; }
+  .chip.partial .ptip { position: absolute; bottom: calc(100% + 8px); left: 0; min-width: 200px; max-width: 320px;
+                        background: #2c3e50; color: #fff; font-size: 12px; line-height: 1.7; font-weight: 400;
+                        text-align: left; white-space: normal; padding: 8px 12px; border-radius: 6px; opacity: 0;
+                        visibility: hidden; transition: opacity .08s; pointer-events: none; z-index: 30;
+                        box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  .chip.partial .ptip::after { content: ''; position: absolute; top: 100%; left: 22px;
+                               border: 5px solid transparent; border-top-color: #2c3e50; }
+  .chip.partial .ptip .ok { color: #7ee2b8; font-weight: 600; }
+  .chip.partial .ptip .miss { color: #ff9a9a; font-weight: 600; }
+  .chip.partial:hover .ptip { opacity: 1; visibility: visible; }
   /* 綠色時段內的「產生會通」小按鈕：白底膠囊，滑上立即顯示自製提示（不用原生 title） */
   .cbtn { position: relative; display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px;
           font-size: 12px; font-weight: 400; cursor: pointer; background: #fff; color: #1d8c38;
@@ -844,6 +859,39 @@ function computeCommonRuns(survey, sets, dates, times) {
   return runs;
 }
 
+/* 沒有「全員都有空」時段時，改找出「最多人可參與」、且長度足夠（need 格）的會議時段。
+   每個視窗需為時間連續的 need 個格子（午休 12:00~13:00 會中斷連續性），
+   參與人數取所有視窗的最大值，回傳達到最大值的所有視窗。
+   回傳 [{ date, from, to, attendees: [..], absentees: [..] }] */
+function computeBestPartialWindows(survey, sets, dates, times, need) {
+  const ps = survey.participants;
+  const toMin = t => (+t.slice(0,2)) * 60 + (+t.slice(3,5));
+  let best = [];
+  let bestCount = 0;
+  for (const d of dates) {
+    for (let i = 0; i + need <= times.length; i++) {
+      // 視窗內每一格都要與前一格相隔 30 分鐘（跨午休則不連續，略過）
+      let continuous = true;
+      for (let k = 1; k < need; k++) {
+        if (toMin(times[i + k]) !== toMin(times[i + k - 1]) + 30) { continuous = false; break; }
+      }
+      if (!continuous) continue;
+      const winSlots = [];
+      for (let k = 0; k < need; k++) winSlots.push(d + 'T' + times[i + k]);
+      const attendees = ps.filter(p => sets[p] && winSlots.every(s => sets[p].has(s)));
+      const cnt = attendees.length;
+      if (cnt === 0) continue;
+      const item = {
+        date: d, from: times[i], to: addSlots(times[i], need),
+        attendees, absentees: ps.filter(p => !attendees.includes(p))
+      };
+      if (cnt > bestCount) { bestCount = cnt; best = [item]; }
+      else if (cnt === bestCount) best.push(item);
+    }
+  }
+  return { best, bestCount };
+}
+
 /* "10:30" + 30分 -> "11:00" */
 function plus30(t) {
   let h = +t.slice(0,2), m = +t.slice(3,5) + 30;
@@ -907,7 +955,43 @@ function renderResult() {
   if (notAnswered.length) {
     html += '<div class="cnote">⚠ ' + esc(notAnswered.join('、')) + ' 尚未填寫，目前無法得出共同時段。</div>';
   } else if (runs.length === 0) {
-    html += '<div class="cnote">目前沒有所有人共同有空的時段。</div>';
+    // 沒有全員都有空的時段：改列出「最多人可參與」的會議時段，滑上看名單、仍可發會通
+    const { best, bestCount } = computeBestPartialWindows(survey, sets, dates, times, need);
+    if (best.length === 0) {
+      html += '<div class="cnote">目前沒有任何可容納 ' + meetHours + ' 小時會議的時段。</div>';
+    } else {
+      html += '<div class="cnote">⚠ 沒有「全員都有空」的時段。以下為<b>最多人可參與</b>（' +
+              bestCount + '／' + ps.length + ' 人）的 ' + meetHours +
+              ' 小時時段，滑鼠移上去可看可／無法參與名單，仍可擇一發出會議通知：</div>';
+      const byDate = {};
+      for (const w of best) (byDate[w.date] = byDate[w.date] || []).push(w);
+      const hrs = parseFloat((need * 0.5).toFixed(1));
+      for (const d of dates) {
+        if (!byDate[d]) continue;
+        const wk = WEEK[new Date(d + 'T00:00:00').getDay()];
+        const multi = byDate[d].length > 1;
+        html += '<div class="cday' + (multi ? ' multi' : '') + '"><span class="dlabel">' +
+                fmtMd(d) + '（週' + wk + '）</span>';
+        for (const w of byDate[d]) {
+          const okList = w.attendees.length ? esc(w.attendees.join('、')) : '（無）';
+          const missList = w.absentees.length ? esc(w.absentees.join('、')) : '（無）';
+          html += '<span class="tbar">';
+          html += '<span class="chip partial">' + w.from + ' ~ ' + w.to + '（' + hrs + ' 小時）· ' +
+                  '<span class="pcnt"><span class="ok">✓' + w.attendees.length + ' 人</span>／' +
+                  '<span class="miss">✗' + w.absentees.length + ' 人</span></span>' +
+                  '<span class="ptip">' +
+                  '<span class="ok">可參與（' + w.attendees.length + '）：' + okList + '</span><br>' +
+                  '<span class="miss">無法參與（' + w.absentees.length + '）：' + missList + '</span>' +
+                  '</span></span>';
+          html += '<span class="cbtn" data-date="' + d + '" data-from="' + w.from + '"' +
+                  ' onclick="openOutlookWeb(this)"' +
+                  ' data-tip="在 Outlook 網頁版開啟新會議（' + meetHours +
+                  ' 小時），主旨、時間、全部受調查人員已帶入，並開啟 Teams 線上會議">📅</span>';
+          html += '</span>';
+        }
+        html += '</div>';
+      }
+    }
   } else {
     for (const d of dates) {
       const w = WEEK[new Date(d + 'T00:00:00').getDay()];

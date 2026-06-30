@@ -470,6 +470,22 @@ public class UiSteps {
         assertThat(page.locator("#resultArea .tb-track")).hasCount(0);
     }
 
+    @Then("結論區應顯示部分可參與時段 {string}")
+    public void partialChipShown(String range) {
+        assertThat(page.locator("#resultArea .chip.partial")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(range))
+                .first()).isVisible();
+    }
+
+    @Then("部分可參與時段 {string} 應顯示可參與 {string} 與無法參與 {string}")
+    public void partialChipShowsNames(String range, String canJoin, String cannotJoin) {
+        var chip = page.locator("#resultArea .chip.partial")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(range))
+                .first();
+        assertThat(chip.locator(".ptip .ok")).containsText(canJoin);
+        assertThat(chip.locator(".ptip .miss")).containsText(cannotJoin);
+    }
+
     @When("展開調查明細")
     public void expandDetail() {
         page.click("#detailToggle");
