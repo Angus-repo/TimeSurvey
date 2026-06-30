@@ -559,8 +559,14 @@ async function saveSurvey() {
   if (!body.name) return toast('請輸入調查名稱');
   if (!body.startDate || !body.endDate) return toast('請選擇日期範圍');
   if (body.endDate < body.startDate) return toast('結束日期不可早於開始日期');
+  // 起迄日期跨度不得超過一個月（例如 6/30~7/30 為上限）
+  const _sd = new Date(body.startDate + 'T00:00:00');
+  const _maxEnd = new Date(_sd); _maxEnd.setMonth(_maxEnd.getMonth() + 1);
+  if (new Date(body.endDate + 'T00:00:00') > _maxEnd) return toast('日期範圍不可超過一個月');
   if (!body.startTime || !body.endTime || body.endTime <= body.startTime) return toast('時間範圍不正確');
   if (body.participants.length === 0) return toast('請至少輸入一位受調查人員');
+  if (body.participants.length < 2) return toast('受調查人員至少需要兩位');
+  if (body.participants.length > 30) return toast('受調查人員人數過多（上限 30 人），人數過多較難喬出共同時間召開會議');
 
   const editId = $('editId').value;
   try {

@@ -193,11 +193,22 @@ public class SurveyApiController {
         if (s.getStartDate() == null || s.getEndDate() == null || s.getEndDate().isBefore(s.getStartDate())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "日期範圍不正確");
         }
+        // 起迄日期跨度不得超過一個月（例如 6/30~7/30 為上限）
+        if (s.getEndDate().isAfter(s.getStartDate().plusMonths(1))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "日期範圍不可超過一個月");
+        }
         if (s.getStartTime() == null || s.getEndTime() == null || !s.getEndTime().isAfter(s.getStartTime())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "時間範圍不正確");
         }
         if (s.getParticipants() == null || s.getParticipants().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "請至少輸入一位受調查人員");
+        }
+        // 人數限制 2~30：太少湊不成會議，太多較難喬出共同時間
+        if (s.getParticipants().size() < 2) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "受調查人員至少需要兩位");
+        }
+        if (s.getParticipants().size() > 30) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "受調查人員人數過多（上限 30 人），人數過多較難喬出共同時間召開會議");
         }
     }
 }
