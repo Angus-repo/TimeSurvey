@@ -126,6 +126,33 @@ public class SurveySteps {
         }
     }
 
+    @When("{string} 建立調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，挖空日期 {string}")
+    public void createSurveyWithExcluded(String owner, String name, String sd, String ed, String st, String et,
+                                         String participants, String excluded) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+        body.put("startDate", sd);
+        body.put("endDate", ed);
+        body.put("startTime", st);
+        body.put("endTime", et);
+        body.put("participants", participants.isBlank() ? List.of() : Arrays.asList(participants.split(",")));
+        body.put("excludedDates", excluded.isBlank() ? List.of() : Arrays.asList(excluded.split(",")));
+        last = rest.exchange("/api/surveys", HttpMethod.POST, new HttpEntity<>(body, headers(owner)), String.class);
+        if (last.getStatusCode().is2xxSuccessful()) {
+            surveyIds.put(name, json(last.getBody()).get("id").asText());
+        }
+    }
+
+    @Then("調查 {string} 的挖空日期應包含 {string}")
+    public void excludedContains(String surveyName, String date) {
+        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        boolean found = false;
+        for (JsonNode n : s.get("excludedDates")) {
+            if (n.asText().equals(date)) found = true;
+        }
+        assertTrue(found, "挖空日期應包含 " + date + "，實際：" + s.get("excludedDates"));
+    }
+
     @When("以無識別碼建立調查 {string}")
     public void createWithoutOwner(String name) {
         Map<String, Object> body = Map.of(

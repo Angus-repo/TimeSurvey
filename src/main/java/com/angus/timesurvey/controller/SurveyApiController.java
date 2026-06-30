@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -111,6 +112,7 @@ public class SurveyApiController {
         existing.setStartTime(survey.getStartTime());
         existing.setEndTime(survey.getEndTime());
         existing.setParticipants(survey.getParticipants());
+        existing.setExcludedDates(survey.getExcludedDates());
         return surveyRepo.save(existing);
     }
 
@@ -227,6 +229,21 @@ public class SurveyApiController {
         // 起迄日期跨度不得超過一個月（例如 6/30~7/30 為上限）
         if (s.getEndDate().isAfter(s.getStartDate().plusMonths(1))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "日期範圍不可超過一個月");
+        }
+        // 被挖空（排除）的日期必須落在起迄範圍內，且不可把整段都排除掉
+        List<LocalDate> excluded = s.getExcludedDates() == null ? List.of() : s.getExcludedDates();
+        for (LocalDate ex : excluded) {
+            if (ex.isBefore(s.getStartDate()) || ex.isAfter(s.getEndDate())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "排除的日期超出調查範圍");
+            }
+        }
+        Set<LocalDate> exSet = new HashSet<>(excluded);
+        boolean anyLeft = false;
+        for (LocalDate d = s.getStartDate(); !d.isAfter(s.getEndDate()); d = d.plusDays(1)) {
+            if (!exSet.contains(d)) { anyLeft = true; break; }
+        }
+        if (!anyLeft) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "請至少保留一個調查日期");
         }
         if (s.getStartTime() == null || s.getEndTime() == null || !s.getEndTime().isAfter(s.getStartTime())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "時間範圍不正確");

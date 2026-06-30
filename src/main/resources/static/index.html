@@ -21,6 +21,7 @@
   input, textarea, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; font-family: inherit; }
   textarea { resize: vertical; }
   .row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  .row-end { align-items: flex-end; }
   .row > div { flex: 1; min-width: 150px; }
   button { cursor: pointer; border: none; border-radius: 4px; padding: 8px 16px; font-size: 14px; font-family: inherit; }
   .btn-primary { background: #2c7be5; color: #fff; }
@@ -235,6 +236,38 @@
   .cday.multi .dlabel { display: block; margin-bottom: 6px; }
   .cday.multi .tbar, .cday.multi .chip { display: flex; margin-left: 12px; width: fit-content; }
   .cday.multi .chip { display: inline-flex; }
+  /* Agoda 風格的日期範圍選擇日曆 */
+  .cal { border: 1px solid #ccc; border-radius: 8px; padding: 10px 12px; background: #fff; max-width: 460px; }
+  /* 收合用的觸發列：平時只顯示 mm/dd~mm/dd 與日曆圖示，點擊才展開日曆 */
+  .cal-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+                 width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; background: #fff;
+                 cursor: pointer; font-size: 14px; color: #333; user-select: none; }
+  .cal-trigger:hover { border-color: #2c7be5; }
+  .cal-trigger.empty { color: #999; }
+  .cal-ic { width: 18px; height: 18px; stroke: #2c7be5; fill: none; stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .cal-pop { position: absolute; z-index: 40; margin-top: 6px; left: 0; }
+  .cal-pop .cal { width: 460px; max-width: 90vw; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cal-title { font-size: 15px; font-weight: 700; color: #2c3e50; }
+  .cal-nav { background: #f0f2f5; border: 1px solid #dfe3e6; border-radius: 6px; width: 30px; height: 30px;
+             font-size: 18px; line-height: 1; color: #2c3e50; cursor: pointer; padding: 0; }
+  .cal-nav:hover:not(:disabled) { background: #e4e8ec; }
+  .cal-nav:disabled { opacity: .4; cursor: not-allowed; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; }
+  .cal-week span { text-align: center; font-size: 12px; color: #999; padding: 4px 0; }
+  .cal-day { position: relative; text-align: center; font-size: 14px; padding: 8px 0; border-radius: 6px;
+             cursor: pointer; user-select: none; color: #333; transition: background .12s, color .12s; }
+  .cal-day:hover:not(.cal-disabled):not(.cal-blank):not(.cal-start):not(.cal-end):not(.cal-single) { background: #eaf2fd; }
+  .cal-day.cal-blank { cursor: default; }
+  .cal-day.cal-disabled { color: #cbd2d8; cursor: not-allowed; }
+  .cal-day.cal-range { background: #e3f0ff; border-radius: 0; }
+  .cal-day.cal-start { background: #2c7be5; color: #fff; border-radius: 6px 0 0 6px; }
+  .cal-day.cal-end { background: #2c7be5; color: #fff; border-radius: 0 6px 6px 0; }
+  .cal-day.cal-single { background: #2c7be5; color: #fff; border-radius: 6px; }
+  .cal-day.cal-excluded { background: #fbe9e7; color: #c0392b; text-decoration: line-through; border-radius: 0; }
+  .cal-day.cal-disabled.cal-range, .cal-day.cal-disabled.cal-excluded { color: #9fb6cf; }
+  .cal-foot { margin-top: 8px; font-size: 12px; color: #888; min-height: 16px; }
 </style>
 </head>
 <body>
@@ -250,11 +283,36 @@
         <input id="fName" placeholder="例如：六月份部門會議時間調查">
       </div>
     </div>
-    <div class="row">
-      <div><label>開始日期</label><input type="date" id="fStartDate"></div>
-      <div><label>結束日期</label><input type="date" id="fEndDate"></div>
-      <div><label>每日開始時間</label><input type="time" id="fStartTime" step="1800" value="09:00"></div>
-      <div><label>每日結束時間</label><input type="time" id="fEndTime" step="1800" value="17:30"></div>
+    <div class="row row-end">
+      <div style="flex:0 1 160px; position:relative">
+        <label>調查日期範圍（先點「起日」再點「迄日」；範圍內的日期可再點一下挖空成不調查的日期）</label>
+        <div class="cal-trigger" id="calTrigger" onclick="toggleCal(event)">
+          <span id="calTriggerText">請選擇日期範圍</span>
+          <svg class="cal-ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div class="cal-pop" id="calPop" style="display:none">
+          <div class="cal" id="cal">
+            <div class="cal-head">
+              <button type="button" class="cal-nav" id="calPrev" aria-label="上個月">‹</button>
+              <span class="cal-title" id="calTitle"></span>
+              <button type="button" class="cal-nav" id="calNext" aria-label="下個月">›</button>
+            </div>
+            <div class="cal-grid cal-week">
+              <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+            </div>
+            <div class="cal-grid" id="calDays"></div>
+            <div class="cal-foot" id="calFoot"></div>
+          </div>
+        </div>
+        <input type="hidden" id="fStartDate">
+        <input type="hidden" id="fEndDate">
+      </div>
+      <div style="flex:0 1 90px">
+        <label>每日開始時間</label><select id="fStartTime"></select>
+      </div>
+      <div style="flex:0 1 90px">
+        <label>每日結束時間</label><select id="fEndTime"></select>
+      </div>
     </div>
     <div class="row">
       <div>
@@ -463,14 +521,179 @@ function ymd(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+/* ---------- Agoda 風格的日期範圍選擇日曆 ---------- */
+let calStart = null, calEnd = null;        // 起日 / 迄日，皆為 "yyyy-MM-dd" 或 null
+let calExcluded = new Set();               // 範圍內被挖空（不調查）的日期
+let calMonth = new Date(); calMonth.setDate(1);   // 目前顯示的月份（指向當月一號）
+
+function todayYmd() { const d = new Date(); d.setHours(0, 0, 0, 0); return ymd(d); }
+function isWeekend(s) { const g = new Date(s + 'T00:00:00').getDay(); return g === 0 || g === 6; }
+
+/* 起日 a 到迄日 b 的跨度是否在一個月內 */
+function within1Month(a, b) {
+  const sd = new Date(a + 'T00:00:00');
+  const max = new Date(sd); max.setMonth(max.getMonth() + 1);
+  return new Date(b + 'T00:00:00') <= max;
+}
+
+/* 把日曆狀態同步到隱藏欄位，供 readForm / saveSurvey 使用 */
+function syncCalInputs() {
+  $('fStartDate').value = calStart || '';
+  $('fEndDate').value = calEnd || calStart || '';   // 只選了起日時當作單日調查
+  updateCalTrigger();
+}
+
+/* "2026-06-15" -> "06/15" */
+function md2(ds) { return ds.slice(5).replace('-', '/'); }
+
+/* 更新收合觸發列上的文字：mm/dd~mm/dd */
+function updateCalTrigger() {
+  const el = $('calTriggerText');
+  if (!el) return;
+  const t = $('calTrigger');
+  if (!calStart) {
+    el.textContent = '請選擇日期範圍';
+    if (t) t.classList.add('empty');
+  } else {
+    const end = calEnd || calStart;
+    el.textContent = md2(calStart) + '～' + md2(end);
+    if (t) t.classList.remove('empty');
+  }
+}
+
+/* 開合日曆浮層 */
+function toggleCal(e) {
+  if (e) e.stopPropagation();
+  const pop = $('calPop');
+  if (pop.style.display === 'none') { renderCalendar(); pop.style.display = ''; }
+  else pop.style.display = 'none';
+}
+function closeCal() { const pop = $('calPop'); if (pop) pop.style.display = 'none'; }
+// 點到日曆與觸發列以外的地方就收合
+document.addEventListener('click', e => {
+  const pop = $('calPop');
+  if (!pop || pop.style.display === 'none') return;
+  if (!pop.contains(e.target) && !$('calTrigger').contains(e.target)) closeCal();
+});
+
+/* 建立「每日開始/結束時間」下拉選單：09:00～17:30，每 30 分鐘一個選項（分鐘只有 00 與 30） */
+function buildTimeSelects() {
+  const opts = [];
+  for (let t = 9 * 60; t <= 17 * 60 + 30; t += 30) {
+    const v = String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+    opts.push('<option value="' + v + '">' + v + '</option>');
+  }
+  $('fStartTime').innerHTML = opts.join('');
+  $('fEndTime').innerHTML = opts.join('');
+  $('fStartTime').value = '09:00';
+  $('fEndTime').value = '17:30';
+}
+
+/* 設定日曆的起迄與挖空日期，並切到起日所在月份後重繪 */
+function setCalRange(start, end, excluded) {
+  calStart = start || null;
+  calEnd = end || null;
+  calExcluded = new Set(excluded || []);
+  calMonth = new Date((calStart || todayYmd()) + 'T00:00:00');
+  calMonth.setDate(1);
+  syncCalInputs();
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const y = calMonth.getFullYear(), m = calMonth.getMonth();
+  $('calTitle').textContent = y + '年 ' + (m + 1) + '月';
+  const lead = new Date(y, m, 1).getDay();          // 當月一號是星期幾（0=日）
+  const dim = new Date(y, m + 1, 0).getDate();      // 當月天數
+  const today = todayYmd();
+  const cm = new Date(); cm.setDate(1); cm.setHours(0, 0, 0, 0);   // 本月一號
+  // 不允許切換到「今天之前」的月份
+  $('calPrev').disabled = (y < cm.getFullYear()) || (y === cm.getFullYear() && m <= cm.getMonth());
+
+  let html = '';
+  for (let i = 0; i < lead; i++) html += '<span class="cal-day cal-blank"></span>';
+  for (let day = 1; day <= dim; day++) {
+    const ds = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    const cls = ['cal-day'];
+    const isEdge = (ds === calStart || ds === calEnd);   // 目前的起/迄日永遠可點（以便取消）
+    if (!isEdge && (ds < today || isWeekend(ds))) cls.push('cal-disabled');
+    if (calStart && calEnd) {
+      if (ds === calStart && ds === calEnd) cls.push('cal-single');
+      else if (ds === calStart) cls.push('cal-start');
+      else if (ds === calEnd) cls.push('cal-end');
+      else if (ds > calStart && ds < calEnd) cls.push(calExcluded.has(ds) ? 'cal-excluded' : 'cal-range');
+    } else if (calStart && ds === calStart) {
+      cls.push('cal-single');
+    }
+    html += '<span class="' + cls.join(' ') + '" data-d="' + ds + '">' + day + '</span>';
+  }
+  $('calDays').innerHTML = html;
+
+  let foot = '';
+  if (!calStart) foot = '請點選調查的「起日」';
+  else if (!calEnd) foot = '起日：' + fmtMd(calStart) + '　請再點「迄日」（再點起日可取消）';
+  else {
+    foot = '調查期間：' + fmtMd(calStart) + ' ~ ' + fmtMd(calEnd);
+    if (calExcluded.size) foot += '　已挖空 ' + calExcluded.size + ' 天';
+  }
+  $('calFoot').textContent = foot;
+}
+
+/* 點選某日：依 Agoda 式範圍選取規則更新起迄與挖空狀態 */
+function onCalDayClick(ds) {
+  // 過去日期與週六日不可選；但目前的起/迄日例外，需可點擊取消
+  if (ds !== calStart && ds !== calEnd && (ds < todayYmd() || isWeekend(ds))) return;
+  if (!calStart && !calEnd) {
+    // 規則 1（前半）：沒有任何選擇時，第一點就是起日
+    calStart = ds; calEnd = null; calExcluded.clear();
+  } else if (calStart && !calEnd) {
+    if (ds === calStart) {
+      // 規則 2：只有起日時再點同一天 = 取消起日
+      calStart = null;
+    } else {
+      // 規則 1（後半）：第二點成為迄日，較早者為起日
+      let a = calStart, b = ds;
+      if (b < a) { const t = a; a = b; b = t; }
+      if (!within1Month(a, b)) return toast('日期範圍不可超過一個月');
+      calStart = a; calEnd = b; calExcluded.clear();
+    }
+  } else {
+    // 已有起迄日
+    if (ds === calEnd) {
+      // 規則 3：再點迄日 = 取消迄日（回到只有起日）
+      calEnd = null; calExcluded.clear();
+    } else if (ds === calStart) {
+      // 再點起日 = 取消起日，原迄日成為新的單一起日
+      calStart = calEnd; calEnd = null; calExcluded.clear();
+    } else if (ds > calStart && ds < calEnd) {
+      // 規則 4：點範圍內日期 = 挖空 / 復原該日
+      calExcluded.has(ds) ? calExcluded.delete(ds) : calExcluded.add(ds);
+    } else {
+      // 點範圍外日期 = 以該日為新起日重新選取
+      calStart = ds; calEnd = null; calExcluded.clear();
+    }
+  }
+  syncCalInputs();
+  renderCalendar();
+}
+
+$('calDays').addEventListener('click', e => {
+  const el = e.target.closest('.cal-day');
+  if (!el || el.classList.contains('cal-blank') || el.classList.contains('cal-disabled')) return;
+  onCalDayClick(el.dataset.d);
+});
+// 浮層內任何點擊都不往外冒泡，避免重繪後元素脫離 DOM 被外部點擊判定為「點到外面」而誤關
+$('calPop').addEventListener('click', e => e.stopPropagation());
+$('calPrev').addEventListener('click', () => { if (!$('calPrev').disabled) { calMonth.setMonth(calMonth.getMonth() - 1); renderCalendar(); } });
+$('calNext').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() + 1); renderCalendar(); });
+
 /* 日期預設：明天開始、共五天 */
 function setDefaultDates() {
   const s = new Date();
   s.setDate(s.getDate() + 1);
   const e = new Date(s);
   e.setDate(e.getDate() + 4);
-  $('fStartDate').value = ymd(s);
-  $('fEndDate').value = ymd(e);
+  setCalRange(ymd(s), ymd(e), []);
 }
 
 /* ---------- 受調查人員：名牌式輸入 ---------- */
@@ -558,10 +781,11 @@ function readForm() {
   commitPInput();   // 輸入框還有沒按 Enter 的姓名，先收進名單
   return {
     name: $('fName').value.trim(),
-    startDate: $('fStartDate').value,
-    endDate: $('fEndDate').value,
+    startDate: calStart || '',
+    endDate: calEnd || calStart || '',
     startTime: $('fStartTime').value,
     endTime: $('fEndTime').value,
+    excludedDates: [...calExcluded].sort(),
     participants: [...plist]
   };
 }
@@ -602,8 +826,7 @@ function editSurvey(id) {
   if (!s) return;
   $('editId').value = s.id;
   $('fName').value = s.name;
-  $('fStartDate').value = s.startDate;
-  $('fEndDate').value = s.endDate;
+  setCalRange(s.startDate, s.endDate, s.excludedDates || []);
   $('fStartTime').value = s.startTime.slice(0,5);
   $('fEndTime').value = s.endTime.slice(0,5);
   plist = [...s.participants];
@@ -666,14 +889,16 @@ async function reopenSurvey(id) {
 }
 
 /* ---------- 結果檢視 ---------- */
-function dateList(start, end) {
+function dateList(start, end, excluded) {
+  const ex = new Set(excluded || []);
   const out = [];
   let d = new Date(start + 'T00:00:00');
   const e = new Date(end + 'T00:00:00');
   while (d <= e) {
-    // 跳過週六(6)、週日(0)
-    if (d.getDay() !== 0 && d.getDay() !== 6) {
-      out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    const ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    // 跳過週六(6)、週日(0) 與被挖空的日期
+    if (d.getDay() !== 0 && d.getDay() !== 6 && !ex.has(ds)) {
+      out.push(ds);
     }
     d.setDate(d.getDate() + 1);
   }
@@ -924,7 +1149,7 @@ function openOutlookWeb(el) {
 function renderResult() {
   if (!resultState) return;
   const { survey, responses } = resultState;
-  const dates = dateList(survey.startDate, survey.endDate);
+  const dates = dateList(survey.startDate, survey.endDate, survey.excludedDates);
   const times = timeSlots(survey.startTime, survey.endTime);
   const ps = survey.participants;
 
@@ -1226,6 +1451,7 @@ function connectWs() {
   ws.onclose = () => setTimeout(connectWs, 3000);   // 斷線自動重連
 }
 
+buildTimeSelects();
 setDefaultDates();
 loadSurveys();
 updateNotifUi();

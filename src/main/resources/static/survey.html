@@ -157,14 +157,16 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-function dateList(start, end) {
+function dateList(start, end, excluded) {
+  const ex = new Set(excluded || []);
   const out = [];
   let d = new Date(start + 'T00:00:00');
   const e = new Date(end + 'T00:00:00');
   while (d <= e) {
-    // 跳過週六(6)、週日(0)
-    if (d.getDay() !== 0 && d.getDay() !== 6) {
-      out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+    const ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    // 跳過週六(6)、週日(0) 與被挖空的日期
+    if (d.getDay() !== 0 && d.getDay() !== 6 && !ex.has(ds)) {
+      out.push(ds);
     }
     d.setDate(d.getDate() + 1);
   }
@@ -259,7 +261,7 @@ function requireName() {
 }
 
 function renderGrid() {
-  const dates = dateList(survey.startDate, survey.endDate);
+  const dates = dateList(survey.startDate, survey.endDate, survey.excludedDates);
   if (dates.length === 0) {
     return showErr('調查日期範圍內沒有工作日（週六日不列入調查），請聯絡調查發起人調整日期。');
   }

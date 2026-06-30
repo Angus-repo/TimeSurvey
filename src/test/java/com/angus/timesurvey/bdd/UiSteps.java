@@ -226,6 +226,28 @@ public class UiSteps {
         surveyIds.put(name, s.getId());
     }
 
+    @Given("存在調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，挖空日期 {string}")
+    public void surveyExistsWithExcluded(String name, String startDate, String endDate,
+                                         String startTime, String endTime, String people, String excluded) {
+        Survey s = new Survey();
+        s.setId(UUID.randomUUID().toString());
+        s.setName(name);
+        s.setStartDate(LocalDate.parse(startDate));
+        s.setEndDate(LocalDate.parse(endDate));
+        s.setStartTime(LocalTime.parse(startTime));
+        s.setEndTime(LocalTime.parse(endTime));
+        s.setParticipants(new ArrayList<>(Arrays.asList(people.split(","))));
+        List<LocalDate> ex = new ArrayList<>();
+        if (!excluded.isBlank()) {
+            for (String d : excluded.split(",")) ex.add(LocalDate.parse(d.trim()));
+        }
+        s.setExcludedDates(ex);
+        s.setOwnerToken(OWNER);
+        s.setCreatedAt(LocalDateTime.now());
+        surveyRepo.save(s);
+        surveyIds.put(name, s.getId());
+    }
+
     @Given("調查 {string} 已有 {string} 的填寫紀錄 {string}")
     public void responseExists(String surveyName, String person, String slots) {
         SurveyResponse r = new SurveyResponse();
@@ -306,6 +328,20 @@ public class UiSteps {
     @Then("時段 {string} 不應為選取狀態")
     public void slotNotSelected(String slot) {
         assertThat(page.locator(".slot[data-slot='" + slot + "']")).hasClass("slot");
+    }
+
+    @Then("填寫頁應出現日期 {string}")
+    public void fillPageHasDate(String date) {
+        org.junit.jupiter.api.Assertions.assertTrue(
+                page.locator(".slot[data-slot^='" + date + "T']").count() > 0,
+                "填寫頁應出現日期 " + date);
+    }
+
+    @Then("填寫頁不應出現日期 {string}")
+    public void fillPageHasNoDate(String date) {
+        org.junit.jupiter.api.Assertions.assertEquals(0,
+                page.locator(".slot[data-slot^='" + date + "T']").count(),
+                "填寫頁不應出現被挖空的日期 " + date);
     }
 
     @Then("應出現提示 {string}")
