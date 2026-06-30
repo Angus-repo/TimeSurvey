@@ -391,12 +391,9 @@ function deleteHint(s) {
 
 async function loadSurveys() {
   surveys = await api('/api/surveys');
-  // 取得各調查的已填寫人數
-  const counts = await Promise.all(
-    surveys.map(s => api('/api/surveys/' + s.id + '/responses')
-      .then(rs => rs.filter(r => s.participants.includes(r.participantName)).length)
-      .catch(() => 0))
-  );
+  // 一次取得各調查的已填寫人數（surveyId -> 已填人數），避免對每筆調查各發一次請求
+  // （原本的 N+1 會隨調查數增加而變慢，是後台操作偶發卡頓的主因之一）
+  const countMap = await api('/api/surveys/response-counts').catch(() => ({}));
   const tbody = $('surveyList');
   tbody.innerHTML = '';
   if (surveys.length === 0) {
@@ -405,7 +402,7 @@ async function loadSurveys() {
   }
   surveys.forEach((s, i) => {
     const total = s.participants.length;
-    const done = counts[i];
+    const done = countMap[s.id] || 0;
     const full = total > 0 && done >= total;
     const closed = !!s.closedAt;
     const tr = document.createElement('tr');

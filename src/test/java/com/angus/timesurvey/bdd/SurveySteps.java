@@ -177,6 +177,23 @@ public class SurveySteps {
         assertFalse(body.contains("ownerToken"), "API 回應不應包含 ownerToken 欄位：" + body);
     }
 
+    @Then("{string} 的批次計數應顯示調查 {string} 已填 {int} 人")
+    public void batchCountShows(String owner, String surveyName, int expected) {
+        JsonNode counts = json(rest.exchange("/api/surveys/response-counts", HttpMethod.GET,
+                new HttpEntity<>(headers(owner)), String.class).getBody());
+        String id = surveyId(surveyName);
+        assertTrue(counts.has(id), "批次計數應包含調查「" + surveyName + "」：" + counts);
+        assertEquals(expected, counts.get(id).asInt(), "已填人數不符：" + counts);
+    }
+
+    @Then("{string} 的批次計數不應包含調查 {string}")
+    public void batchCountNotContains(String owner, String surveyName) {
+        JsonNode counts = json(rest.exchange("/api/surveys/response-counts", HttpMethod.GET,
+                new HttpEntity<>(headers(owner)), String.class).getBody());
+        assertFalse(counts.has(surveyId(surveyName)),
+                "批次計數不應包含調查「" + surveyName + "」：" + counts);
+    }
+
     /* ---------- 填寫回覆 ---------- */
 
     @When("參與者 {string} 在調查 {string} 填寫時段 {string}")

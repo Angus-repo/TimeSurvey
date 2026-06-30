@@ -14,8 +14,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -45,6 +48,34 @@ public class SurveyApiController {
             return List.of();
         }
         return surveyRepo.findByOwnerTokenOrderByCreatedAtDesc(owner);
+    }
+
+    /**
+     * 後台清單一次取得各調查的有效填寫人數（surveyId -> 已填人數）。
+     * 取代前端對每筆調查各發一次 responses 請求的 N+1 行為，避免調查一多就卡頓。
+     */
+    @GetMapping("/response-counts")
+    public Map<String, Integer> responseCounts(@RequestHeader(value = "X-Owner-Token", required = false) String owner) {
+        if (owner == null || owner.isBlank()) {
+            return Map.of();
+        }
+        List<Survey> surveys = surveyRepo.findByOwnerTokenOrderByCreatedAtDesc(owner);
+        if (surveys.isEmpty()) {
+            return Map.of();
+        }
+        List<String> ids = surveys.stream().map(Survey::getId).toList();
+        // 一次撈出所有相關回覆後在記憶體分組，避免逐筆查詢資料庫
+        Map<String, Set<String>> respondedBySurvey = new HashMap<>();
+        for (SurveyResponse r : responseRepo.findBySurveyIdIn(ids)) {
+            respondedBySurvey.computeIfAbsent(r.getSurveyId(), k -> new HashSet<>()).add(r.getParticipantName());
+        }
+        Map<String, Integer> counts = new HashMap<>();
+        for (Survey s : surveys) {
+            Set<String> responded = respondedBySurvey.getOrDefault(s.getId(), Set.of());
+            long done = s.getParticipants().stream().filter(responded::contains).count();
+            counts.put(s.getId(), (int) done);
+        }
+        return counts;
     }
 
     @GetMapping("/{id}")
