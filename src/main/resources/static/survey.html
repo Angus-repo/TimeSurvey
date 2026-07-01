@@ -55,10 +55,9 @@
   .chk:hover ~ .slot.on { color: #024d36; }
   .hbox:has(.chk:hover) { border-color: #00a884; background: #f2fbf8; }
 
-  /* 上午／下午之間的分隔欄：在午休處製造視覺斷點 */
-  th.col-sep, td.col-sep { width: 20px; min-width: 20px; padding: 0; border: none; background: transparent; }
+  /* 上午／下午之間的分隔欄：以空白間距製造視覺斷點（約半個時段寬） */
+  th.col-sep, td.col-sep { width: 30px; min-width: 30px; padding: 0; border: none; background: transparent; }
   th.col-sep { font-size: 11px; font-weight: 600; color: #b6bfba; white-space: nowrap; }
-  td.col-sep { background: linear-gradient(to right, transparent 9px, #d2dcd7 9px, #d2dcd7 11px, transparent 11px); }
 
   /* 快速鈕右邊的「複製整列」圖示鈕：複製某天勾選的時段，貼到其它天 */
   th.copy-col, td.copy-col { padding: 0 2px; vertical-align: top; }
@@ -82,9 +81,13 @@
   .copybtn.paste:hover { background: #d6e7fb; border-color: #1a68d1; }
   .copybtn.cancel { border-color: #e74c3c; background: #fdecea; color: #e74c3c; }
   .copybtn.cancel:hover { background: #fbdbd7; }
-  /* 不同週之間的分隔列 */
-  tr.week-sep td { border: none; padding: 3px 0; }
-  tr.week-sep .wline { border-top: 2px dashed #cad5d0; margin: 0 2px; }
+  /* 不同週之間的分隔：一條柔和的線，中央放上新一週的日期徽章 */
+  tr.week-sep td { border: none; padding: 14px 0 4px; }
+  .wsep { position: relative; text-align: center; }
+  .wsep::before { content: ''; position: absolute; top: 50%; left: 4px; right: 4px; border-top: 2px solid #9fc7b8; }
+  .wsep-label { position: relative; display: inline-flex; align-items: center; gap: 5px; background: #f0f7f4;
+                border: 1px solid #cfe6dd; color: #0a7d57; font-size: 12px; font-weight: 700;
+                padding: 4px 16px; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
 
   .submit-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; box-shadow: 0 -2px 8px rgba(0,0,0,.1);
                 padding: 10px 16px; text-align: center; z-index: 50; }
@@ -340,7 +343,10 @@ function renderGrid() {
     const w = WEEK[new Date(d + 'T00:00:00').getDay()];
     const md = d.slice(5).replace('-', '/');
     if (prevWeek !== null && weekKey(d) !== prevWeek) {
-      html += '<tr class="week-sep"><td colspan="' + colCount + '"><div class="wline"></div></td></tr>';
+      const wk = weekKey(d).split('-');   // [yyyy, M, D] -> 新一週的週一日期
+      const wl = wk[1] + '/' + wk[2];
+      html += '<tr class="week-sep"><td colspan="' + colCount + '"><div class="wsep">' +
+              '<span class="wsep-label">📅 ' + wl + ' 開始・新的一週</span></div></td></tr>';
     }
     prevWeek = weekKey(d);
     html += '<tr><th class="datecell"><div class="dname">' + md + '（週' + w + '）</div>' +
