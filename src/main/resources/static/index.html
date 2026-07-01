@@ -100,7 +100,8 @@
   .prog { display: inline-block; padding: 2px 10px; border-radius: 12px; background: #eee; color: #666; font-size: 13px; }
   .prog.full { background: #28a745; color: #fff; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: #fff;
-           padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+           padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none;
+           z-index: 2000; }
   .toast.show { opacity: 1; }
   /* 可點擊的完成提示：整條可按，並把「調查名稱」做成藍色底線的超連結感 */
   .toast.clickable { pointer-events: auto; cursor: pointer; }
