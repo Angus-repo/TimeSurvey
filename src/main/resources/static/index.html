@@ -145,6 +145,18 @@
   #dragOnbPop { position: fixed; top: auto; left: auto; }
   #dragOnbPop::before { left: var(--arrow-left, 36px); }
   #dragOnbPop.above::before { bottom: auto; top: 100%; border-bottom-color: transparent; border-top-color: #fff; }
+  /* 「調查日期範圍」新手引導：首次開啟大日曆時，把日曆抬到遮罩之上並在旁邊放說明泡泡 */
+  .cal-pop.onb-cal-spot { z-index: 1002; }
+  #calOnbPop { position: fixed; top: auto; left: auto; }
+  #calOnbPop::before { left: var(--arrow-left, 36px); }
+  #calOnbPop.above::before { bottom: auto; top: 100%; border-bottom-color: transparent; border-top-color: #fff; }
+  /* 日期引導的小圖例：起訖日（藍）／挖空日（紅刪除線） */
+  .cal-onb-legend { display: flex; gap: 16px; margin: 10px 0 2px; font-size: 13px; color: #555; }
+  .cal-onb-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .cal-onb-sw { width: 20px; height: 20px; border-radius: 5px; display: inline-flex; align-items: center;
+                justify-content: center; font-size: 12px; }
+  .cal-onb-sw.range { background: #2c7be5; color: #fff; }
+  .cal-onb-sw.skip { background: #fbe9e7; color: #c0392b; text-decoration: line-through; }
   /* 拖曳引導泡泡內的動畫示意：綠色膠囊在灰色軌道內左右來回滑動
      （上方預留空間給時間氣泡，故不裁切超出部分） */
   .drag-demo { position: relative; display: flex; height: 30px; width: 180px; margin: 44px 0 4px;
@@ -389,6 +401,19 @@
   </div>
   <div><button onclick="endDragOnb()">知道了</button></div>
 </div>
+<div class="onb-mask" id="calOnbMask" style="display:none" onclick="endCalOnb(event)"></div>
+<div class="onb-pop" id="calOnbPop" style="display:none">
+  🗓 <b>怎麼選調查日期範圍</b><br>
+  預設已幫你選好「明天起共 7 天」，你也可以自己重選：<br>
+  • 再點一次<b>起日或迄日</b>，會取消目前的選取、重新開始。<br>
+  • 重新選時，先點一個日期當<b>起日</b>，再點另一個日期當<b>迄日</b>，中間整段就是調查範圍。<br>
+  • 點範圍<b>中間</b>的某一天，會把那天<b>挖空</b>，代表調查會跳過該天不排。
+  <div class="cal-onb-legend">
+    <span><span class="cal-onb-sw range">15</span>起訖日</span>
+    <span><span class="cal-onb-sw skip">16</span>挖空（跳過該天）</span>
+  </div>
+  <div><button onclick="endCalOnb(event)">知道了</button></div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -577,7 +602,12 @@ function updateCalTrigger() {
 function toggleCal(e) {
   if (e) e.stopPropagation();
   const pop = $('calPop');
-  if (pop.style.display === 'none') { renderCalendar(); pop.style.display = ''; }
+  if (pop.style.display === 'none') {
+    renderCalendar();
+    pop.style.display = '';
+    // 首次開啟大日曆時，說明起迄日與挖空日的操作（看過一次就不再出現）
+    if (!localStorage.getItem('dateRangeOnboarded')) setTimeout(startCalOnb, 60);
+  }
   else pop.style.display = 'none';
 }
 function closeCal() { const pop = $('calPop'); if (pop) pop.style.display = 'none'; }
@@ -798,7 +828,6 @@ async function saveSurvey() {
   const _sd = new Date(body.startDate + 'T00:00:00');
   const _maxEnd = new Date(_sd); _maxEnd.setMonth(_maxEnd.getMonth() + 1);
   if (new Date(body.endDate + 'T00:00:00') > _maxEnd) return toast('日期範圍不可超過一個月');
-  if (!body.startTime || !body.endTime || body.endTime <= body.startTime) return toast('時間範圍不正確');
   if (body.participants.length === 0) return toast('請至少輸入一位受調查人員');
   if (body.participants.length < 2) return toast('受調查人員至少需要兩位');
   if (body.participants.length > 30) return toast('受調查人員人數過多（上限 30 人），人數過多較難喬出共同時間召開會議');
@@ -1033,6 +1062,51 @@ function endDragOnb() {
 ['resize', 'scroll'].forEach(ev =>
   window.addEventListener(ev, () => { if (dragOnbOn) spotDragBar(); }, true));
 
+/* ---------- 「調查日期範圍」的新手引導：首次開啟大日曆時說明起迄日與挖空日 ---------- */
+let calOnbOn = false;   // 引導進行中（捲動／縮放時重新定位泡泡用）
+
+/* 把大日曆抬到遮罩之上，並將說明泡泡定位在日曆旁、箭頭對準中心；下方放不下就改放上方 */
+function spotCalPop() {
+  const cal = document.querySelector('#calPop .cal');
+  if (!cal) return false;
+  $('calPop').classList.add('onb-cal-spot');
+  const r = cal.getBoundingClientRect();
+  const pop = $('calOnbPop');
+  pop.style.display = '';   // 先顯示才量得到泡泡實際寬高
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  const left = Math.max(12, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 12));
+  pop.style.left = left + 'px';
+  pop.style.setProperty('--arrow-left', (r.left + r.width / 2 - left - 9) + 'px');   // 9 = 箭頭半寬
+  if (r.bottom + 14 + ph <= window.innerHeight - 8) {
+    pop.classList.remove('above');
+    pop.style.top = (r.bottom + 14) + 'px';
+  } else {
+    pop.classList.add('above');
+    pop.style.top = Math.max(8, r.top - 14 - ph) + 'px';
+  }
+  return true;
+}
+
+function startCalOnb() {
+  if ($('calPop').style.display === 'none') return;   // 日曆已被關掉就不引導
+  if (!spotCalPop()) return;
+  calOnbOn = true;
+  $('calOnbMask').style.display = '';
+}
+
+function endCalOnb(e) {
+  if (e) e.stopPropagation();   // 別讓點擊冒泡到「點外面收合日曆」的監聽器
+  localStorage.setItem('dateRangeOnboarded', '1');
+  calOnbOn = false;
+  $('calPop').classList.remove('onb-cal-spot');
+  $('calOnbMask').style.display = 'none';
+  $('calOnbPop').style.display = 'none';
+}
+
+// 引導進行中若捲動或縮放視窗，日曆位置會變，泡泡跟著重新定位
+['resize', 'scroll'].forEach(ev =>
+  window.addEventListener(ev, () => { if (calOnbOn) spotCalPop(); }, true));
+
 /* 重新顯示新手引導：清除「看過」紀錄，讓三段引導（複製連結／會議時間／可拖曳時段）再次出現。
    若目前正開著調查結果，立即重跑會議時間引導（結束後會自動接續可拖曳時段引導）；
    否則提示使用者於下次相應操作時會再出現。 */
@@ -1040,6 +1114,7 @@ function resetOnboarding() {
   localStorage.removeItem('copyLinkOnboarded');
   localStorage.removeItem('meetHoursOnboarded');
   localStorage.removeItem('dragSlotOnboarded');
+  localStorage.removeItem('dateRangeOnboarded');
   if ($('resultCard').style.display !== 'none' && resultState) {
     startMeetOnb();
     toast('已重設新手引導');

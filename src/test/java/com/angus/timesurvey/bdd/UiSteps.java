@@ -77,6 +77,7 @@ public class UiSteps {
                 "localStorage.setItem('surveyOnboarded', '1');" +
                 "localStorage.setItem('meetHoursOnboarded', '1');" +
                 "localStorage.setItem('dragSlotOnboarded', '1');" +
+                "localStorage.setItem('dateRangeOnboarded', '1');" +
                 "localStorage.setItem('copyLinkOnboarded', '1');");
         page = ctx.newPage();
     }
@@ -462,6 +463,31 @@ public class UiSteps {
     @When("點擊重新顯示新手引導按鈕")
     public void clickResetOnboarding() {
         page.click("#resetOnbBtn");
+    }
+
+    @When("開啟調查日期範圍日曆")
+    public void openDateRangeCalendar() {
+        page.click("#calTrigger");
+        page.locator("#calPop").waitFor();
+    }
+
+    @Then("應顯示調查日期範圍的新手引導")
+    public void dateRangeOnboardingShown() {
+        assertThat(page.locator("#calOnbPop")).isVisible();
+        assertThat(page.locator("#calOnbMask")).isVisible();
+        // 引導進行時大日曆需抬到遮罩之上，使用者才能一邊看說明一邊操作
+        assertThat(page.locator("#calPop.onb-cal-spot")).isVisible();
+    }
+
+    @When("點擊日期範圍引導的知道了")
+    public void dismissDateRangeOnboarding() {
+        page.click("#calOnbPop button");
+    }
+
+    @Then("調查日期範圍的新手引導應消失")
+    public void dateRangeOnboardingGone() {
+        assertThat(page.locator("#calOnbPop")).isHidden();
+        assertThat(page.locator("#calOnbMask")).isHidden();
     }
 
     @When("在後台輸入調查名稱 {string} 與人員 {string}")
