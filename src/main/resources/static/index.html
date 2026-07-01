@@ -141,6 +141,12 @@
   .onb-pop button:hover { background: #1a68d1; }
   /* 首次建立調查的新手引導：打亮清單上的「複製連結」按鈕，提示把超連結傳給受調查人員 */
   .btn-ic.onb-spot { z-index: 1001; background: #fff; animation: onbpulse 1.6s ease-in-out infinite; }
+  /* 建立調查後：清單第一筆的「複製連結」按鈕高亮閃爍 3 秒，引導使用者複製連結 */
+  .btn-ic.flash-hl { z-index: 5; background: #fff; animation: flashhl .6s ease-in-out 5; }
+  @keyframes flashhl {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0,168,132,0); }
+    50%      { box-shadow: 0 0 0 5px rgba(0,168,132,.55); background: #eafff6; }
+  }
   #linkOnbPop { position: fixed; top: auto; left: auto; }   /* 位置由 JS 依按鈕座標決定 */
   #linkOnbPop::before { left: var(--arrow-left, 36px); }    /* 箭頭由 JS 對準按鈕中心 */
   #linkOnbPop.above::before { bottom: auto; top: 100%; border-bottom-color: transparent; border-top-color: #fff; }
@@ -859,6 +865,19 @@ async function saveSurvey() {
     toast(editId ? '已更新調查' : '已建立調查');
     resetForm();
     await loadSurveys();
+    // 建立調查後，將畫面捲動到調查清單的第一筆
+    if (!editId) {
+      const firstRow = $('surveyList').querySelector('tr');
+      if (firstRow) {
+        firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // 高亮閃爍第一筆的「複製連結」按鈕 3 秒，提示可複製連結傳給受調查人員
+        const copyBtn = firstRow.querySelector('.btn-ic.copy');
+        if (copyBtn) {
+          copyBtn.classList.add('flash-hl');
+          setTimeout(() => copyBtn.classList.remove('flash-hl'), 3000);
+        }
+      }
+    }
     // 首次建立調查：以新手引導提示複製超連結傳給受調查人員（看過一次就不再出現）
     if (!editId && !localStorage.getItem('copyLinkOnboarded')) startLinkOnb(saved.id);
   } catch (e) {

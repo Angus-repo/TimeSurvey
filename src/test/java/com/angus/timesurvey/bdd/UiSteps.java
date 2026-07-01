@@ -533,6 +533,17 @@ public class UiSteps {
         assertThat(page.locator("#surveyList")).containsText(name);
     }
 
+    @Then("調查清單第一筆應捲動至可視範圍內")
+    public void firstRowScrolledIntoView() {
+        assertThat(page.locator("#surveyList tr").first()).isInViewport();
+    }
+
+    @Then("調查清單第一筆的複製連結按鈕應高亮閃爍")
+    public void firstRowCopyBtnFlashes() {
+        assertThat(page.locator("#surveyList tr").first().locator(".btn-ic.copy"))
+                .hasClass(java.util.regex.Pattern.compile(".*\\bflash-hl\\b.*"));
+    }
+
     @Then("結論區應顯示會通按鈕")
     public void conclusionHasMeetingButtons() {
         assertThat(page.locator("#resultArea .cbtn").first()).isVisible();
