@@ -830,7 +830,8 @@ async function saveSurvey() {
   if (new Date(body.endDate + 'T00:00:00') > _maxEnd) return toast('日期範圍不可超過一個月');
   if (body.participants.length === 0) return toast('請至少輸入一位受調查人員');
   if (body.participants.length < 2) return toast('受調查人員至少需要兩位');
-  if (body.participants.length > 30) return toast('受調查人員人數過多（上限 30 人），人數過多較難喬出共同時間召開會議');
+  // 超過 30 人僅提示、不阻擋（人數過多較難喬出共同時間召開會議）
+  if (body.participants.length > 30) toast('提醒：受調查人員已超過 30 人，人數過多較難喬出共同時間召開會議');
 
   const editId = $('editId').value;
   try {
