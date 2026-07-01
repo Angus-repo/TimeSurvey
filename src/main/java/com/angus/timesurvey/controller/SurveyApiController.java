@@ -15,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +26,10 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/surveys")
 public class SurveyApiController {
+
+    /** 每日調查時間固定為 09:00~17:30，不由前端提供 */
+    private static final LocalTime FIXED_START_TIME = LocalTime.of(9, 0);
+    private static final LocalTime FIXED_END_TIME = LocalTime.of(17, 30);
 
     private final SurveyRepository surveyRepo;
     private final SurveyResponseRepository responseRepo;
@@ -91,6 +96,9 @@ public class SurveyApiController {
         if (owner == null || owner.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "缺少發起者識別碼");
         }
+        // 每日時間固定 09:00~17:30，不由前端提供
+        survey.setStartTime(FIXED_START_TIME);
+        survey.setEndTime(FIXED_END_TIME);
         validate(survey);
         survey.setId(UUID.randomUUID().toString());
         survey.setOwnerToken(owner);
@@ -109,8 +117,9 @@ public class SurveyApiController {
         existing.setName(survey.getName());
         existing.setStartDate(survey.getStartDate());
         existing.setEndDate(survey.getEndDate());
-        existing.setStartTime(survey.getStartTime());
-        existing.setEndTime(survey.getEndTime());
+        // 每日時間固定 09:00~17:30，不由前端提供
+        existing.setStartTime(FIXED_START_TIME);
+        existing.setEndTime(FIXED_END_TIME);
         existing.setParticipants(survey.getParticipants());
         existing.setExcludedDates(survey.getExcludedDates());
         return surveyRepo.save(existing);

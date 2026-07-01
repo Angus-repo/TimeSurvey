@@ -263,7 +263,7 @@
   .cal-trigger.empty { color: #aab2bd; }
   .cal-ic { width: 18px; height: 18px; stroke: #2c7be5; fill: none; stroke-width: 2;
             stroke-linecap: round; stroke-linejoin: round; flex: none; }
-  .cal-pop { position: absolute; z-index: 40; margin-top: 6px; left: 0; }
+  .cal-pop { position: absolute; z-index: 40; margin-top: 6px; right: 0; left: auto; }
   .cal-pop .cal { width: 460px; max-width: 90vw; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
   .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .cal-title { font-size: 15px; font-weight: 700; color: #2c3e50; }
@@ -299,7 +299,7 @@
         <label>調查名稱</label>
         <input id="fName" placeholder="例如：六月份部門會議時間調查">
       </div>
-      <div style="flex:0 1 150px; min-width:150px; position:relative">
+      <div style="flex:0 1 260px; min-width:260px; position:relative">
         <label>調查日期範圍</label>
         <div class="cal-trigger" id="calTrigger" onclick="toggleCal(event)">
           <span id="calTriggerText">請選擇日期範圍</span>
@@ -321,12 +321,6 @@
         </div>
         <input type="hidden" id="fStartDate">
         <input type="hidden" id="fEndDate">
-      </div>
-      <div style="flex:0 1 92px; min-width:92px">
-        <label>每日開始時間</label><select id="fStartTime"></select>
-      </div>
-      <div style="flex:0 1 92px; min-width:92px">
-        <label>每日結束時間</label><select id="fEndTime"></select>
       </div>
     </div>
     <div class="field-hint" style="margin:-10px 0 18px; text-align:right">日期範圍：先點「起日」再點「迄日」；範圍內的日期可再點一下挖空成不調查的日期</div>
@@ -594,18 +588,7 @@ document.addEventListener('click', e => {
   if (!pop.contains(e.target) && !$('calTrigger').contains(e.target)) closeCal();
 });
 
-/* 建立「每日開始/結束時間」下拉選單：09:00～17:30，每 30 分鐘一個選項（分鐘只有 00 與 30） */
-function buildTimeSelects() {
-  const opts = [];
-  for (let t = 9 * 60; t <= 17 * 60 + 30; t += 30) {
-    const v = String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
-    opts.push('<option value="' + v + '">' + v + '</option>');
-  }
-  $('fStartTime').innerHTML = opts.join('');
-  $('fEndTime').innerHTML = opts.join('');
-  $('fStartTime').value = '09:00';
-  $('fEndTime').value = '17:30';
-}
+/* 每日時間固定為 09:00～17:30，由 Java 端設定，前端不需提供 */
 
 /* 設定日曆的起迄與挖空日期，並切到起日所在月份後重繪 */
 function setCalRange(start, end, excluded) {
@@ -801,8 +784,6 @@ function readForm() {
     name: $('fName').value.trim(),
     startDate: calStart || '',
     endDate: calEnd || calStart || '',
-    startTime: $('fStartTime').value,
-    endTime: $('fEndTime').value,
     excludedDates: [...calExcluded].sort(),
     participants: [...plist]
   };
@@ -845,8 +826,6 @@ function editSurvey(id) {
   $('editId').value = s.id;
   $('fName').value = s.name;
   setCalRange(s.startDate, s.endDate, s.excludedDates || []);
-  $('fStartTime').value = s.startTime.slice(0,5);
-  $('fEndTime').value = s.endTime.slice(0,5);
   plist = [...s.participants];
   renderTags();
   $('formTitle').textContent = '編輯調查：' + s.name;
@@ -872,8 +851,6 @@ function resetForm() {
   $('editId').value = '';
   $('fName').value = '';
   setDefaultDates();
-  $('fStartTime').value = '09:00';
-  $('fEndTime').value = '17:30';
   plist = [];
   $('pInput').value = '';
   renderTags();
@@ -1469,7 +1446,6 @@ function connectWs() {
   ws.onclose = () => setTimeout(connectWs, 3000);   // 斷線自動重連
 }
 
-buildTimeSelects();
 setDefaultDates();
 loadSurveys();
 updateNotifUi();

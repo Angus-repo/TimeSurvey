@@ -27,13 +27,13 @@ public class Survey {
     @Column(nullable = false)
     private LocalDate endDate;
 
-    /** 每日可調查的開始時間 */
+    /** 每日可調查的開始時間（固定 09:00，不由前端提供） */
     @Column(nullable = false)
-    private LocalTime startTime;
+    private LocalTime startTime = LocalTime.of(9, 0);
 
-    /** 每日可調查的結束時間 */
+    /** 每日可調查的結束時間（固定 17:30，不由前端提供） */
     @Column(nullable = false)
-    private LocalTime endTime;
+    private LocalTime endTime = LocalTime.of(17, 30);
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "survey_participant", joinColumns = @JoinColumn(name = "survey_id"))
