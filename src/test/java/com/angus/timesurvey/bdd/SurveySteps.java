@@ -327,6 +327,15 @@ public class SurveySteps {
         assertTrue(ok, "未收到調查「" + surveyName + "」的完成通知，收到的訊息：" + wsMessages.get(owner));
     }
 
+    @Then("{string} 收到調查 {string} 的完成通知帶有可開啟結果的網址")
+    public void completionNotificationHasResultUrl(String owner, String surveyName) {
+        String surveyId = surveyIds.get(surveyName);
+        boolean ok = waitFor(() -> wsMessages.getOrDefault(owner, List.of()).stream()
+                .anyMatch(m -> m.contains("surveyComplete") && m.contains(surveyName)
+                        && m.contains("\"url\":\"/?result=" + surveyId + "\"")), 3000);
+        assertTrue(ok, "完成通知未帶有結果網址 /?result=" + surveyId + "，收到的訊息：" + wsMessages.get(owner));
+    }
+
     @Then("{string} 收到的完成通知總數應為 {int}")
     public void notificationCount(String owner, int expected) {
         waitFor(() -> false, 600);   // 留時間讓重複通知有機會到達

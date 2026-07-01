@@ -102,6 +102,10 @@
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: #fff;
            padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; }
   .toast.show { opacity: 1; }
+  /* 可點擊的完成提示：整條可按，並把「調查名稱」做成藍色底線的超連結感 */
+  .toast.clickable { pointer-events: auto; cursor: pointer; }
+  .toast .tlink { color: #7ecbff; text-decoration: underline; font-weight: 700; }
+  .toast.clickable:hover .tlink { color: #a9dcff; }
   /* 結果表：欄=人名，列=日期+時間 */
   #resultArea table { width: auto; min-width: 60%; font-size: 13px; }
   #resultArea th, #resultArea td { border: 1px solid #ddd; text-align: center; padding: 4px 10px; vertical-align: middle; }
@@ -429,11 +433,23 @@ const OWNER = (() => {
   return t;
 })();
 
+let toastTimer = null;
 function toast(msg) {
+  showToast(esc(msg));
+}
+/* 顯示提示；opts.onClick 有值時整條可點（並維持較久，方便使用者按下） */
+function showToast(html, opts) {
+  opts = opts || {};
   const t = $('toast');
-  t.textContent = msg;
+  t.innerHTML = html;
+  t.onclick = opts.onClick || null;
+  t.classList.toggle('clickable', !!opts.onClick);
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    t.classList.remove('show', 'clickable');
+    t.onclick = null;
+  }, opts.duration || 2000);
 }
 
 async function api(url, opts) {
@@ -1490,11 +1506,36 @@ function askNotif() {
 
 function notifyDone(m) {
   const msg = '調查「' + m.name + '」已全部填寫完成（' + m.total + '/' + m.total + '）！';
-  toast(msg);
+  // 通知帶有可點選的結果網址：點擊後開啟此調查結果並停在該處
+  const url = m.url ? location.origin + m.url : resultUrl(m.surveyId);
+  const open = () => {
+    if (surveys.some(s => s.id === m.surveyId)) {
+      showResult(m.surveyId);   // 頁面仍開著：直接開結果並捲動到該處
+    } else {
+      location.href = url;      // 否則導向帶 result 參數的網址，載入後自動開啟
+    }
+  };
+  // 頁面上的提示：把「調查名稱」做成藍色底線超連結，讓使用者知道可點擊查看結果
+  showToast('調查「<span class="tlink">' + esc(m.name) + '</span>」已全部填寫完成（' +
+    m.total + '/' + m.total + '）！', { onClick: open, duration: 8000 });
   if ('Notification' in window && Notification.permission === 'granted') {
-    const n = new Notification('⏰ 時間調查完成', { body: msg });
-    n.onclick = () => { window.focus(); showResult(m.surveyId); n.close(); };
+    const n = new Notification('⏰ 時間調查完成', { body: msg + '（點此查看調查結果）' });
+    n.onclick = () => { window.focus(); open(); n.close(); };
   }
+}
+
+/* 開啟此調查結果並停在該處的後台網址 */
+function resultUrl(id) {
+  return location.origin + location.pathname + '?result=' + encodeURIComponent(id);
+}
+
+/* 若網址帶有 ?result=<id>（例如由完成通知點入），載入後自動開啟該調查結果並捲動到該處 */
+function openResultFromUrl() {
+  const rid = new URLSearchParams(location.search).get('result');
+  if (!rid) return;
+  if (surveys.some(s => s.id === rid)) showResult(rid);
+  // 開啟後清掉網址參數，避免重新整理又跳回結果
+  history.replaceState(null, '', location.pathname);
 }
 
 /* 與後端建立 WebSocket，最後一人填寫完成時由伺服器即時推播 */
@@ -1523,7 +1564,7 @@ function connectWs() {
 }
 
 setDefaultDates();
-loadSurveys();
+loadSurveys().then(openResultFromUrl);
 updateNotifUi();
 connectWs();
 // 通知預設啟用：進入後台就自動向瀏覽器要求授權

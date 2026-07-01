@@ -220,7 +220,9 @@ public class SurveyApiController {
                             "type", "surveyComplete",
                             "surveyId", survey.getId(),
                             "name", survey.getName(),
-                            "total", survey.getParticipants().size())));
+                            "total", survey.getParticipants().size(),
+                            // 點通知後開啟此調查結果並停在該處的後台網址
+                            "url", "/?result=" + survey.getId())));
                 }
             } catch (Exception ignored) {
             }
