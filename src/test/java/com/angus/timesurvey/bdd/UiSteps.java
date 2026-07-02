@@ -623,6 +623,15 @@ public class UiSteps {
                 .hasAttribute("data-tip", java.util.regex.Pattern.compile(".*" + java.util.regex.Pattern.quote(tipContains) + ".*"));
     }
 
+    @Then("調查清單中 {string} 的日期範圍應顯示挖空天數徽章 {string}")
+    public void listDateRangeShowsExcludedBadge(String surveyName, String tipContains) {
+        var row = page.locator("#surveyList tr")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+        // 挖空天數只顯示符號，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
+        assertThat(row.locator(".slotbadge.skipbadge"))
+                .hasAttribute("data-tip", java.util.regex.Pattern.compile(".*" + java.util.regex.Pattern.quote(tipContains) + ".*"));
+    }
+
     @Then("意見回饋按鈕不應顯示")
     public void feedbackButtonHidden() {
         assertThat(page.locator("#feedbackBtn")).isHidden();
