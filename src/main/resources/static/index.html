@@ -160,8 +160,8 @@
   /* 「調查日期範圍」新手引導：首次開啟大日曆時，把日曆抬到遮罩之上並在旁邊放說明泡泡 */
   .cal-pop.onb-cal-spot { z-index: 1002; }
   #calOnbPop { position: fixed; top: auto; left: auto; }
-  #calOnbPop::before { left: var(--arrow-left, 36px); }
-  #calOnbPop.above::before { bottom: auto; top: 100%; border-bottom-color: transparent; border-top-color: #fff; }
+  #calOnbPop::before { bottom: auto; top: var(--arrow-top, 50%); left: 100%; transform: translateY(-50%);
+                       border-bottom-color: transparent; border-left-color: #fff; }
   /* 日期引導的小圖例：起訖日（藍）／挖空日（紅刪除線） */
   .cal-onb-legend { display: flex; gap: 16px; margin: 10px 0 2px; font-size: 13px; color: #555; }
   .cal-onb-legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -634,6 +634,7 @@ function toggleCal(e) {
   if (pop.style.display === 'none') {
     renderCalendar();
     pop.style.display = '';
+    pop.scrollIntoView({ behavior: 'smooth', block: 'center' });   // 捲動頁面，讓大日曆維持在原本的位置（日期欄位左側）但置中顯示
     calScrollToSel();   // 捲到起日（或今天）所在的那一列
     // 首次開啟大日曆時，說明起迄日與挖空日的操作（看過一次就不再出現）
     if (!localStorage.getItem('dateRangeOnboarded')) setTimeout(startCalOnb, 60);
@@ -1119,7 +1120,7 @@ function endDragOnb() {
 /* ---------- 「調查日期範圍」的新手引導：首次開啟大日曆時說明起迄日與挖空日 ---------- */
 let calOnbOn = false;   // 引導進行中（捲動／縮放時重新定位泡泡用）
 
-/* 把大日曆抬到遮罩之上，並將說明泡泡定位在日曆旁、箭頭對準中心；下方放不下就改放上方 */
+/* 把大日曆抬到遮罩之上，並將說明泡泡定位在日曆的左邊、箭頭對準日曆垂直中心 */
 function spotCalPop() {
   const cal = document.querySelector('#calPop .cal');
   if (!cal) return false;
@@ -1128,16 +1129,11 @@ function spotCalPop() {
   const pop = $('calOnbPop');
   pop.style.display = '';   // 先顯示才量得到泡泡實際寬高
   const pw = pop.offsetWidth, ph = pop.offsetHeight;
-  const left = Math.max(12, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 12));
+  const left = Math.max(12, r.left - pw - 14);
+  const top = Math.max(8, Math.min(r.top + r.height / 2 - ph / 2, window.innerHeight - ph - 8));
   pop.style.left = left + 'px';
-  pop.style.setProperty('--arrow-left', (r.left + r.width / 2 - left - 9) + 'px');   // 9 = 箭頭半寬
-  if (r.bottom + 14 + ph <= window.innerHeight - 8) {
-    pop.classList.remove('above');
-    pop.style.top = (r.bottom + 14) + 'px';
-  } else {
-    pop.classList.add('above');
-    pop.style.top = Math.max(8, r.top - 14 - ph) + 'px';
-  }
+  pop.style.top = top + 'px';
+  pop.style.setProperty('--arrow-top', (r.top + r.height / 2 - top) + 'px');
   return true;
 }
 
