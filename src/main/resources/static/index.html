@@ -100,6 +100,16 @@
   #surveyList td { vertical-align: middle; }
   .prog { display: inline-block; padding: 2px 10px; border-radius: 12px; background: #eee; color: #666; font-size: 13px; }
   .prog.full { background: #28a745; color: #fff; }
+  /* 調查清單：是否存在全員都有空的共同時段（只顯示符號，滑鼠移上才顯示說明文字） */
+  .slotbadge { position: relative; display: inline-block; font-size: 16px; line-height: 1; cursor: help; }
+  .slotbadge::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%;
+                      transform: translateX(-50%); background: #2c3e50; color: #fff; font-size: 12px; font-weight: 400;
+                      padding: 6px 10px; border-radius: 6px; white-space: nowrap; opacity: 0; visibility: hidden;
+                      transition: opacity .08s; pointer-events: none; z-index: 30; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  .slotbadge::before { content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%;
+                       transform: translateX(-50%); border: 5px solid transparent; border-top-color: #2c3e50;
+                       opacity: 0; visibility: hidden; transition: opacity .08s; pointer-events: none; z-index: 30; }
+  .slotbadge:hover::after, .slotbadge:hover::before { opacity: 1; visibility: visible; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: #fff;
            padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none;
            z-index: 2000; }
@@ -379,7 +389,7 @@
     <h2>調查清單 <span id="notifUi" style="float:right;font-weight:400;font-size:13px"></span></h2>
     <table>
       <thead>
-        <tr><th style="width:30%">調查名稱</th><th style="width:120px">日期範圍</th><th style="width:100px">填寫狀況(人)</th><th style="width:150px">目前狀態</th><th style="width:210px">操作</th></tr>
+        <tr><th style="width:25%">調查名稱</th><th style="width:110px">日期範圍</th><th style="width:100px">填寫狀況(人)</th><th style="width:150px">目前狀態</th><th style="width:210px">操作</th></tr>
       </thead>
       <tbody id="surveyList"></tbody>
     </table>
@@ -519,9 +529,9 @@ function deleteHint(s) {
 
 async function loadSurveys() {
   surveys = await api('/api/surveys');
-  // 一次取得各調查的已填寫人數（surveyId -> 已填人數），避免對每筆調查各發一次請求
+  // 一次取得各調查的填寫狀況（surveyId -> { done, hasCommonSlot }），避免對每筆調查各發一次請求
   // （原本的 N+1 會隨調查數增加而變慢，是後台操作偶發卡頓的主因之一）
-  const countMap = await api('/api/surveys/response-counts').catch(() => ({}));
+  const statusMap = await api('/api/surveys/response-counts').catch(() => ({}));
   const tbody = $('surveyList');
   tbody.innerHTML = '';
   if (surveys.length === 0) {
@@ -530,7 +540,8 @@ async function loadSurveys() {
   }
   surveys.forEach((s, i) => {
     const total = s.participants.length;
-    const done = countMap[s.id] || 0;
+    const st = statusMap[s.id] || {};
+    const done = st.done || 0;
     const full = total > 0 && done >= total;
     const closed = !!s.closedAt;
     const tr = document.createElement('tr');
@@ -538,7 +549,7 @@ async function loadSurveys() {
       <td>${esc(s.name)}</td>
       <td>${fmtMd(s.startDate)} ~ ${fmtMd(s.endDate)}</td>
       <td><span class="prog${full ? ' full' : ''}" title="${full ? '全部填寫完成' : '尚有 ' + (total - done) + ' 人未填'}">${done} / ${total}${full ? ' ✓' : ''}</span></td>
-      <td><span class="st ${closed ? 'st-closed' : 'st-open'}">${closed ? '已結束' : '進行中'}</span>
+      <td><span class="st ${closed ? 'st-closed' : 'st-open'}">${slotBadgeHtml(st.hasCommonSlot)} ${closed ? '已結束' : '進行中'}</span>
         <div class="muted" style="font-size:12px;margin-top:4px"
              title="調查迄日經過 7 天後，系統批次（每晚 20:00）會自動刪除調查與填寫資料">${deleteHint(s)}</div></td>
       <td><div class="ops">
@@ -562,6 +573,18 @@ async function loadSurveys() {
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* 調查清單「共同時段」欄位：只顯示符號，滑鼠移上才顯示說明文字（自製提示，不用原生 title 的延遲）。
+   hasCommonSlot 為 true/false 才能判斷是否有全員都有空的時段，尚未全部填寫時為 null（無法判斷） */
+function slotBadgeHtml(hasCommonSlot) {
+  if (hasCommonSlot === true) {
+    return '<span class="slotbadge yes" data-tip="有共同時段：所有受調查人員都有共同可出席的時段">✅</span>';
+  }
+  if (hasCommonSlot === false) {
+    return '<span class="slotbadge no" data-tip="無共同時段：所有人都已填寫，但沒有全員都能出席的時段">⚠️</span>';
+  }
+  return '<span class="slotbadge pending" data-tip="尚未確定：尚未所有人填寫，無法判斷是否有共同時段">➖</span>';
 }
 
 function surveyUrl(id) {

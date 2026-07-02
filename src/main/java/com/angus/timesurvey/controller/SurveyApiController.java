@@ -57,11 +57,13 @@ public class SurveyApiController {
     }
 
     /**
-     * 後台清單一次取得各調查的有效填寫人數（surveyId -> 已填人數）。
+     * 後台清單一次取得各調查的填寫狀況（surveyId -> { done, hasCommonSlot }）。
      * 取代前端對每筆調查各發一次 responses 請求的 N+1 行為，避免調查一多就卡頓。
+     * hasCommonSlot：全員都已填寫時為 true/false（是否存在全員都有空的時段）；
+     *                尚未全部填寫則為 null（無法判斷）。
      */
     @GetMapping("/response-counts")
-    public Map<String, Integer> responseCounts(@RequestHeader(value = "X-Owner-Token", required = false) String owner) {
+    public Map<String, Map<String, Object>> responseCounts(@RequestHeader(value = "X-Owner-Token", required = false) String owner) {
         if (owner == null || owner.isBlank()) {
             return Map.of();
         }
@@ -71,17 +73,41 @@ public class SurveyApiController {
         }
         List<String> ids = surveys.stream().map(Survey::getId).toList();
         // 一次撈出所有相關回覆後在記憶體分組，避免逐筆查詢資料庫
-        Map<String, Set<String>> respondedBySurvey = new HashMap<>();
+        Map<String, Map<String, Set<String>>> slotsBySurvey = new HashMap<>();
         for (SurveyResponse r : responseRepo.findBySurveyIdIn(ids)) {
-            respondedBySurvey.computeIfAbsent(r.getSurveyId(), k -> new HashSet<>()).add(r.getParticipantName());
+            Set<String> slots = new HashSet<>();
+            if (r.getSlots() != null && !r.getSlots().isBlank()) {
+                for (String slot : r.getSlots().split(",")) {
+                    if (!slot.isBlank()) slots.add(slot);
+                }
+            }
+            slotsBySurvey.computeIfAbsent(r.getSurveyId(), k -> new HashMap<>())
+                    .put(r.getParticipantName(), slots);
         }
-        Map<String, Integer> counts = new HashMap<>();
+        Map<String, Map<String, Object>> result = new HashMap<>();
         for (Survey s : surveys) {
-            Set<String> responded = respondedBySurvey.getOrDefault(s.getId(), Set.of());
-            long done = s.getParticipants().stream().filter(responded::contains).count();
-            counts.put(s.getId(), (int) done);
+            Map<String, Set<String>> slotsByParticipant = slotsBySurvey.getOrDefault(s.getId(), Map.of());
+            List<String> participants = s.getParticipants();
+            long done = participants.stream().filter(slotsByParticipant::containsKey).count();
+            Boolean hasCommonSlot = null;
+            if (!participants.isEmpty() && done == participants.size()) {
+                Set<String> common = null;
+                for (String p : participants) {
+                    Set<String> slots = slotsByParticipant.get(p);
+                    if (common == null) {
+                        common = new HashSet<>(slots);
+                    } else {
+                        common.retainAll(slots);
+                    }
+                }
+                hasCommonSlot = common != null && !common.isEmpty();
+            }
+            Map<String, Object> row = new HashMap<>();
+            row.put("done", (int) done);
+            row.put("hasCommonSlot", hasCommonSlot);
+            result.put(s.getId(), row);
         }
-        return counts;
+        return result;
     }
 
     @GetMapping("/{id}")

@@ -600,6 +600,15 @@ public class UiSteps {
                 .hasClass(java.util.regex.Pattern.compile(".*\\bflash-hl\\b.*"));
     }
 
+    @Then("調查清單中 {string} 應顯示共同時段徽章 {string}")
+    public void listShowsSlotBadge(String surveyName, String badgeText) {
+        var row = page.locator("#surveyList tr")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+        // 共同時段欄位只顯示符號，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
+        assertThat(row.locator(".slotbadge"))
+                .hasAttribute("data-tip", java.util.regex.Pattern.compile(".*" + java.util.regex.Pattern.quote(badgeText) + ".*"));
+    }
+
     @Then("意見回饋按鈕不應顯示")
     public void feedbackButtonHidden() {
         assertThat(page.locator("#feedbackBtn")).isHidden();
