@@ -490,6 +490,39 @@ public class UiSteps {
         assertThat(page.locator("#calOnbMask")).isHidden();
     }
 
+    /* ---------- 大日曆：連續顯示本月＋下月、捲軸捲動 ---------- */
+
+    @Then("大日曆應連續顯示本月與下月的日期")
+    public void calendarShowsThisAndNextMonth() {
+        LocalDate first = LocalDate.now().withDayOfMonth(1);                 // 本月一號
+        LocalDate nextEnd = first.plusMonths(2).minusDays(1);               // 下個月月底
+        // 本月一號到下個月月底都在同一份週曆中，跨月日期得以連續呈現
+        assertThat(page.locator("#calDays [data-d='" + first + "']")).hasCount(1);
+        assertThat(page.locator("#calDays [data-d='" + nextEnd + "']")).hasCount(1);
+        // 最多兩個月：不顯示下下個月的日期
+        assertThat(page.locator("#calDays [data-d='" + first.plusMonths(2) + "']")).hasCount(0);
+    }
+
+    @Then("大日曆不應提供上下月切換按鈕")
+    public void calendarHasNoMonthNav() {
+        assertThat(page.locator("#calPrev")).hasCount(0);
+        assertThat(page.locator("#calNext")).hasCount(0);
+    }
+
+    @When("在大日曆中滾動滑鼠捲軸")
+    public void wheelScrollCalendar() {
+        // 開啟日曆時會自動捲到起日所在列；先捲回頂端，確保測的是「捲軸能往下捲動」本身
+        page.evaluate("document.getElementById('calScroll').scrollTop = 0");
+        page.hover("#calScroll");
+        page.mouse().wheel(0, 200);
+    }
+
+    @Then("大日曆應向下捲動")
+    public void calendarScrolledDown() {
+        // mouse.wheel 不會等捲動完成，需等待 scrollTop 實際變化
+        page.waitForFunction("document.getElementById('calScroll').scrollTop > 0");
+    }
+
     @When("在後台輸入調查名稱 {string} 與人員 {string}")
     public void fillAdminForm(String name, String people) {
         page.fill("#fName", name);

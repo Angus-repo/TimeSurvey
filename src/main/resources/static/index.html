@@ -290,10 +290,10 @@
   .cal-pop .cal { width: 460px; max-width: 90vw; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
   .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .cal-title { font-size: 15px; font-weight: 700; color: #2c3e50; }
-  .cal-nav { background: #f0f2f5; border: 1px solid #dfe3e6; border-radius: 6px; width: 30px; height: 30px;
-             font-size: 18px; line-height: 1; color: #2c3e50; cursor: pointer; padding: 0; }
-  .cal-nav:hover:not(:disabled) { background: #e4e8ec; }
-  .cal-nav:disabled { opacity: .4; cursor: not-allowed; }
+  .cal-hint { font-size: 12px; color: #99a2ad; }
+  /* 連續顯示本月＋下月（最多兩個月）的可捲動區域：滑鼠捲軸即可上下移動日曆 */
+  .cal-scroll { max-height: 240px; overflow-y: auto; overscroll-behavior: contain; }
+  .cal-day.cal-m1 { font-weight: 700; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; }
   .cal-week span { text-align: center; font-size: 12px; color: #999; padding: 4px 0; }
   .cal-day { position: relative; text-align: center; font-size: 14px; padding: 8px 0; border-radius: 6px;
@@ -331,14 +331,15 @@
         <div class="cal-pop" id="calPop" style="display:none">
           <div class="cal" id="cal">
             <div class="cal-head">
-              <button type="button" class="cal-nav" id="calPrev" aria-label="上個月">‹</button>
               <span class="cal-title" id="calTitle"></span>
-              <button type="button" class="cal-nav" id="calNext" aria-label="下個月">›</button>
+              <span class="cal-hint">↕ 捲軸可上下捲動</span>
             </div>
             <div class="cal-grid cal-week">
               <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
             </div>
-            <div class="cal-grid" id="calDays"></div>
+            <div class="cal-scroll" id="calScroll">
+              <div class="cal-grid" id="calDays"></div>
+            </div>
             <div class="cal-foot" id="calFoot"></div>
           </div>
         </div>
@@ -582,7 +583,6 @@ function ymd(d) {
 /* ---------- Agoda 風格的日期範圍選擇日曆 ---------- */
 let calStart = null, calEnd = null;        // 起日 / 迄日，皆為 "yyyy-MM-dd" 或 null
 let calExcluded = new Set();               // 範圍內被挖空（不調查）的日期
-let calMonth = new Date(); calMonth.setDate(1);   // 目前顯示的月份（指向當月一號）
 
 function todayYmd() { const d = new Date(); d.setHours(0, 0, 0, 0); return ymd(d); }
 function isWeekend(s) { const g = new Date(s + 'T00:00:00').getDay(); return g === 0 || g === 6; }
@@ -626,6 +626,7 @@ function toggleCal(e) {
   if (pop.style.display === 'none') {
     renderCalendar();
     pop.style.display = '';
+    calScrollToSel();   // 捲到起日（或今天）所在的那一列
     // 首次開啟大日曆時，說明起迄日與挖空日的操作（看過一次就不再出現）
     if (!localStorage.getItem('dateRangeOnboarded')) setTimeout(startCalOnb, 60);
   }
@@ -641,31 +642,38 @@ document.addEventListener('click', e => {
 
 /* 每日時間固定為 09:00～17:30，由 Java 端設定，前端不需提供 */
 
-/* 設定日曆的起迄與挖空日期，並切到起日所在月份後重繪 */
+/* 設定日曆的起迄與挖空日期並重繪；開著日曆時捲到起日所在的那一列 */
 function setCalRange(start, end, excluded) {
   calStart = start || null;
   calEnd = end || null;
   calExcluded = new Set(excluded || []);
-  calMonth = new Date((calStart || todayYmd()) + 'T00:00:00');
-  calMonth.setDate(1);
   syncCalInputs();
   renderCalendar();
+  const pop = $('calPop');
+  if (pop && pop.style.display !== 'none') calScrollToSel();
 }
 
+/* 捲動日曆，讓起日（或今天）所在的那一列出現在可視範圍頂端附近 */
+function calScrollToSel() {
+  const sc = $('calScroll');
+  const el = document.querySelector('#calDays [data-d="' + (calStart || todayYmd()) + '"]');
+  if (!sc || !el) return;
+  sc.scrollTop = Math.max(0, el.offsetTop - sc.offsetTop - 4);
+}
+
+/* 日曆固定連續顯示「本月一號～下個月月底」（最多兩個月），跨月日期（如 7/26~8/2）
+   在同一份週曆中連續呈現，以滑鼠捲軸上下移動 */
 function renderCalendar() {
-  const y = calMonth.getFullYear(), m = calMonth.getMonth();
-  $('calTitle').textContent = y + '年 ' + (m + 1) + '月';
-  const lead = new Date(y, m, 1).getDay();          // 當月一號是星期幾（0=日）
-  const dim = new Date(y, m + 1, 0).getDate();      // 當月天數
+  const base = new Date(); base.setDate(1); base.setHours(0, 0, 0, 0);       // 本月一號
+  const endM = new Date(base.getFullYear(), base.getMonth() + 2, 0);         // 下個月月底
+  $('calTitle').textContent = base.getFullYear() + '年 ' + (base.getMonth() + 1) + '月 ～ ' +
+      endM.getFullYear() + '年 ' + (endM.getMonth() + 1) + '月';
   const today = todayYmd();
-  const cm = new Date(); cm.setDate(1); cm.setHours(0, 0, 0, 0);   // 本月一號
-  // 不允許切換到「今天之前」的月份
-  $('calPrev').disabled = (y < cm.getFullYear()) || (y === cm.getFullYear() && m <= cm.getMonth());
 
   let html = '';
-  for (let i = 0; i < lead; i++) html += '<span class="cal-day cal-blank"></span>';
-  for (let day = 1; day <= dim; day++) {
-    const ds = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  for (let i = 0; i < base.getDay(); i++) html += '<span class="cal-day cal-blank"></span>';
+  for (const d = new Date(base); d <= endM; d.setDate(d.getDate() + 1)) {
+    const ds = ymd(d);
     const cls = ['cal-day'];
     const isEdge = (ds === calStart || ds === calEnd);   // 目前的起/迄日永遠可點（以便取消）
     if (!isEdge && (ds < today || isWeekend(ds))) cls.push('cal-disabled');
@@ -677,7 +685,10 @@ function renderCalendar() {
     } else if (calStart && ds === calStart) {
       cls.push('cal-single');
     }
-    html += '<span class="' + cls.join(' ') + '" data-d="' + ds + '">' + day + '</span>';
+    // 每月一號標成「M/1」粗體，跨月時一眼看出月份交界（週的排列不中斷）
+    const label = d.getDate() === 1 ? (d.getMonth() + 1) + '/1' : d.getDate();
+    if (d.getDate() === 1) cls.push('cal-m1');
+    html += '<span class="' + cls.join(' ') + '" data-d="' + ds + '">' + label + '</span>';
   }
   $('calDays').innerHTML = html;
 
@@ -736,8 +747,6 @@ $('calDays').addEventListener('click', e => {
 });
 // 浮層內任何點擊都不往外冒泡，避免重繪後元素脫離 DOM 被外部點擊判定為「點到外面」而誤關
 $('calPop').addEventListener('click', e => e.stopPropagation());
-$('calPrev').addEventListener('click', () => { if (!$('calPrev').disabled) { calMonth.setMonth(calMonth.getMonth() - 1); renderCalendar(); } });
-$('calNext').addEventListener('click', () => { calMonth.setMonth(calMonth.getMonth() + 1); renderCalendar(); });
 
 /* 日期預設：明天開始、共七天 */
 function setDefaultDates() {
