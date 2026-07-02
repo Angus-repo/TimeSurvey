@@ -86,6 +86,8 @@ public class UiSteps {
 
     private record Shot(String title, boolean failed, byte[] png) {}
     private static final List<Shot> shots = java.util.Collections.synchronizedList(new ArrayList<>());
+    /** 總覽頁截圖（在瀏覽器關閉前產生，內容含中文，故以瀏覽器渲染後轉圖片） */
+    private static byte[] summaryPng;
 
     /** 頁面標題橫幅與 PDF 頂端色條同色：通過為綠底，失敗為紅底 */
     private static final java.awt.Color PASS_COLOR = new java.awt.Color(0x1d7a35);
@@ -136,9 +138,64 @@ public class UiSteps {
 
     @AfterAll
     public static void closeBrowser() {
-        if (browser != null) browser.close();
+        if (browser != null) {
+            captureSummaryShot();
+            browser.close();
+        }
         if (playwright != null) playwright.close();
         writePdfReport();
+    }
+
+    /** 在瀏覽器關閉前，用一個獨立頁面渲染「總覽」統計（總數／通過／失敗）並截圖，供 PDF 第一頁使用 */
+    private static void captureSummaryShot() {
+        if (shots.isEmpty()) return;
+        try {
+            int total = shots.size();
+            long failed = shots.stream().filter(Shot::failed).count();
+            long passed = total - failed;
+            StringBuilder rows = new StringBuilder();
+            for (int i = 0; i < shots.size(); i++) {
+                Shot s = shots.get(i);
+                rows.append("<div style='display:flex;align-items:center;gap:12px;padding:9px 16px;")
+                        .append(i % 2 == 0 ? "background:#f7f7f7;" : "")
+                        .append("'>")
+                        .append("<span style='width:32px;color:#888;font-weight:700;'>").append(i + 1).append("</span>")
+                        .append("<span style='flex:1;font-size:15px;'>").append(escapeHtml(s.title())).append("</span>")
+                        .append("<span style='font-weight:700;color:").append(hex(caseColor(i + 1, s.failed()))).append(";'>")
+                        .append(s.failed() ? "✘ 失敗" : "✔ 通過").append("</span>")
+                        .append("</div>");
+            }
+            String time = LocalDateTime.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String html = "<html><body style='margin:0;font-family:sans-serif;width:1240px;'>" +
+                    "<div style='padding:36px 44px;'>" +
+                    "<h1 style='margin:0 0 6px;font-size:30px;'>UI 測試報告總覽</h1>" +
+                    "<div style='color:#666;font-size:14px;margin-bottom:26px;'>產出時間：" + time + "</div>" +
+                    "<div style='display:flex;gap:20px;margin-bottom:30px;'>" +
+                    statCard("測試案例總數", String.valueOf(total), "#333") +
+                    statCard("通過", String.valueOf(passed), hex(PASS_COLOR)) +
+                    statCard("失敗", String.valueOf(failed), hex(FAIL_COLOR)) +
+                    "</div>" +
+                    "<div style='border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;'>" + rows + "</div>" +
+                    "</div></body></html>";
+            try (BrowserContext c = browser.newContext()) {
+                Page p = c.newPage();
+                p.setContent(html);
+                summaryPng = p.screenshot(new Page.ScreenshotOptions().setFullPage(true));
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static String statCard(String label, String value, String color) {
+        return "<div style='flex:1;border:1px solid #e0e0e0;border-radius:8px;padding:18px 20px;text-align:center;'>" +
+                "<div style='font-size:13px;color:#888;margin-bottom:6px;'>" + label + "</div>" +
+                "<div style='font-size:34px;font-weight:800;color:" + color + ";'>" + value + "</div>" +
+                "</div>";
+    }
+
+    private static String escapeHtml(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     /**
@@ -156,41 +213,17 @@ public class UiSteps {
                 org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD);
         try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument()) {
             int pdfPages = 0;
+            // 第一頁：總覽（測試案例總數／通過／失敗），以瀏覽器渲染的圖片呈現（PDFBox 內建字型不支援中文）
+            if (summaryPng != null) {
+                pdfPages += addImagePages(doc, summaryPng, "Summary", new java.awt.Color(0x333333),
+                        font, pageW, pageH, barH, imgAreaH);
+            }
             for (int i = 0; i < shots.size(); i++) {
                 Shot s = shots.get(i);
                 int caseNo = i + 1;
-                java.awt.Color color = caseColor(caseNo, s.failed());
-                var full = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(s.png()));
-                // 每頁可容納的截圖高度（像素），以 A4 寬度等比換算
-                int chunkPx = Math.max(1, (int) Math.floor(full.getWidth() * (imgAreaH / pageW)));
-                int total = Math.max(1, (int) Math.ceil(full.getHeight() / (double) chunkPx));
-                for (int p = 0; p < total; p++) {
-                    int y = p * chunkPx;
-                    int h = Math.min(chunkPx, full.getHeight() - y);
-                    var part = full.getSubimage(0, y, full.getWidth(), h);
-                    var img = org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory
-                            .createFromImage(doc, part);
-                    var pg = new org.apache.pdfbox.pdmodel.PDPage(
-                            org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
-                    doc.addPage(pg);
-                    pdfPages++;
-                    try (var cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, pg)) {
-                        // 頂端色條：同一 case 的每一頁同色
-                        cs.setNonStrokingColor(color);
-                        cs.addRect(0, pageH - barH, pageW, barH);
-                        cs.fill();
-                        cs.setNonStrokingColor(java.awt.Color.WHITE);
-                        cs.beginText();
-                        cs.setFont(font, 12);
-                        cs.newLineAtOffset(16, pageH - barH + 8);
-                        // 單頁不顯示頁次；切成多頁時才標示 (頁次/總頁數)
-                        cs.showText("Case " + caseNo + (s.failed() ? "  [FAILED]" : "") +
-                                (total > 1 ? "   (" + (p + 1) + "/" + total + ")" : ""));
-                        cs.endText();
-                        float drawH = h * (pageW / full.getWidth());
-                        cs.drawImage(img, 0, pageH - barH - drawH, pageW, drawH);
-                    }
-                }
+                String label = "Case " + caseNo + (s.failed() ? "  [FAILED]" : "");
+                pdfPages += addImagePages(doc, s.png(), label, caseColor(caseNo, s.failed()),
+                        font, pageW, pageH, barH, imgAreaH);
             }
             doc.save("target/ui-test-report.pdf");
             System.out.println("UI 測試截圖報告：target/ui-test-report.pdf（" +
@@ -198,6 +231,43 @@ public class UiSteps {
         } catch (Exception e) {
             System.err.println("UI 測試 PDF 報告產生失敗：" + e);
         }
+    }
+
+    /**
+     * 將一張截圖（過長時切成多頁）畫入 PDF，每頁頂端加上同色色條與標籤文字。
+     * 回傳實際新增的頁數。
+     */
+    private static int addImagePages(org.apache.pdfbox.pdmodel.PDDocument doc, byte[] png, String baseLabel,
+            java.awt.Color color, org.apache.pdfbox.pdmodel.font.PDType1Font font,
+            float pageW, float pageH, float barH, float imgAreaH) throws Exception {
+        var full = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
+        // 每頁可容納的截圖高度（像素），以 A4 寬度等比換算
+        int chunkPx = Math.max(1, (int) Math.floor(full.getWidth() * (imgAreaH / pageW)));
+        int total = Math.max(1, (int) Math.ceil(full.getHeight() / (double) chunkPx));
+        for (int p = 0; p < total; p++) {
+            int y = p * chunkPx;
+            int h = Math.min(chunkPx, full.getHeight() - y);
+            var part = full.getSubimage(0, y, full.getWidth(), h);
+            var img = org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory.createFromImage(doc, part);
+            var pg = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
+            doc.addPage(pg);
+            try (var cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, pg)) {
+                // 頂端色條：同一張截圖的每一頁同色
+                cs.setNonStrokingColor(color);
+                cs.addRect(0, pageH - barH, pageW, barH);
+                cs.fill();
+                cs.setNonStrokingColor(java.awt.Color.WHITE);
+                cs.beginText();
+                cs.setFont(font, 12);
+                cs.newLineAtOffset(16, pageH - barH + 8);
+                // 單頁不顯示頁次；切成多頁時才標示 (頁次/總頁數)
+                cs.showText(baseLabel + (total > 1 ? "   (" + (p + 1) + "/" + total + ")" : ""));
+                cs.endText();
+                float drawH = h * (pageW / full.getWidth());
+                cs.drawImage(img, 0, pageH - barH - drawH, pageW, drawH);
+            }
+        }
+        return total;
     }
 
     private String base() {
