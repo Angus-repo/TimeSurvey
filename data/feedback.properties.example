@@ -1,0 +1,15 @@
+# 意見回饋功能設定範例。
+#
+# 使用方式：
+#   1. 複製本檔為同目錄下的 feedback.properties（去掉 .example 副檔名）。
+#   2. 填入下方的收件者信箱（必填），主旨可選填。
+#   3. 重新啟動應用程式即可在後台頁右上角看到「意見回饋」按鈕。
+#
+# feedback.properties 本身位於 .gitignore 的 data/ 目錄內，不會進版控；
+# 若完全不建立 feedback.properties（或收件者留空），後台頁就不會顯示此功能。
+
+# 必填：收件者信箱，可用逗號分隔多個地址，例如 a@example.com,b@example.com
+feedback.recipient=example@your-company.com
+
+# 選填：郵件主旨，未填則採用預設值 "[TimeSurvey] 意見回饋"
+feedback.subject=[TimeSurvey] 意見回饋

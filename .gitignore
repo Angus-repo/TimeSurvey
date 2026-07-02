@@ -1,5 +1,6 @@
 target/
-data/
+data/*
+!data/feedback.properties.example
 *.mv.db
 *.trace.db
 .idea/

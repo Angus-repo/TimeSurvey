@@ -600,6 +600,11 @@ public class UiSteps {
                 .hasClass(java.util.regex.Pattern.compile(".*\\bflash-hl\\b.*"));
     }
 
+    @Then("意見回饋按鈕不應顯示")
+    public void feedbackButtonHidden() {
+        assertThat(page.locator("#feedbackBtn")).isHidden();
+    }
+
     @Then("結論區應顯示會通按鈕")
     public void conclusionHasMeetingButtons() {
         assertThat(page.locator("#resultArea .cbtn").first()).isVisible();
