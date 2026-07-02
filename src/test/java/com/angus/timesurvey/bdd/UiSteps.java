@@ -609,6 +609,20 @@ public class UiSteps {
                 .hasAttribute("data-tip", java.util.regex.Pattern.compile(".*" + java.util.regex.Pattern.quote(badgeText) + ".*"));
     }
 
+    @When("點擊調查 {string} 的編輯")
+    public void clickEditForSurvey(String surveyName) {
+        var row = page.locator("#surveyList tr")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+        row.locator(".btn-ic.edit").click();
+    }
+
+    @Then("日期範圍欄位應顯示挖空天數徽章 {string}")
+    public void dateRangeShowsExcludedBadge(String tipContains) {
+        // 挖空天數只顯示符號，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
+        assertThat(page.locator("#calTriggerText .slotbadge"))
+                .hasAttribute("data-tip", java.util.regex.Pattern.compile(".*" + java.util.regex.Pattern.quote(tipContains) + ".*"));
+    }
+
     @Then("意見回饋按鈕不應顯示")
     public void feedbackButtonHidden() {
         assertThat(page.locator("#feedbackBtn")).isHidden();

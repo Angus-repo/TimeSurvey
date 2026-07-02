@@ -103,6 +103,8 @@
                box-shadow: 0 1px 4px rgba(15,122,77,.35); }
   /* 調查清單：是否存在全員都有空的共同時段（只顯示符號，滑鼠移上才顯示說明文字） */
   .slotbadge { position: relative; display: inline-block; font-size: 16px; line-height: 1; cursor: help; }
+  /* 日期範圍旁的「跳過幾天不調查」提示徽章，與前面的日期文字拉開一點距離 */
+  .slotbadge.skipbadge { margin-left: 8px; font-size: 13px; vertical-align: middle; }
   .slotbadge::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%;
                       transform: translateX(-50%); background: #2c3e50; color: #fff; font-size: 12px; font-weight: 400;
                       padding: 6px 10px; border-radius: 6px; white-space: nowrap; opacity: 0; visibility: hidden;
@@ -548,7 +550,7 @@ async function loadSurveys() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${esc(s.name)}</td>
-      <td>${fmtMd(s.startDate)} ~ ${fmtMd(s.endDate)}</td>
+      <td>${fmtMd(s.startDate)} ~ ${fmtMd(s.endDate)}${excludedBadgeHtml(s.excludedDates)}</td>
       <td><span class="prog${full ? ' full' : ''}" title="${full ? '全部填寫完成' : '尚有 ' + (total - done) + ' 人未填'}">${slotBadgeHtml(st.hasCommonSlot)} ${done} / ${total}</span></td>
       <td><span class="st ${closed ? 'st-closed' : 'st-open'}">${closed ? '已結束' : '進行中'}</span>
         <div class="muted" style="font-size:12px;margin-top:4px"
@@ -637,7 +639,15 @@ function syncCalInputs() {
 /* "2026-06-15" -> "06/15" */
 function md2(ds) { return ds.slice(5).replace('-', '/'); }
 
-/* 更新收合觸發列上的文字：mm/dd~mm/dd */
+/* 日期範圍旁的「跳過幾天不調查」提示徽章（只顯示符號，滑鼠移上才顯示被跳過的日期） */
+function excludedBadgeHtml(excludedDates) {
+  const ex = excludedDates || [];
+  if (ex.length === 0) return '';
+  const list = [...ex].sort().map(fmtMd).join('、');
+  return ' <span class="slotbadge skipbadge" data-tip="已跳過 ' + ex.length + ' 天不調查：' + esc(list) + '">🚫' + ex.length + ' 天</span>';
+}
+
+/* 更新收合觸發列上的文字：mm/dd~mm/dd，若有挖空日則附上符號提示（滑鼠移上顯示說明） */
 function updateCalTrigger() {
   const el = $('calTriggerText');
   if (!el) return;
@@ -647,7 +657,8 @@ function updateCalTrigger() {
     if (t) t.classList.add('empty');
   } else {
     const end = calEnd || calStart;
-    el.textContent = md2(calStart) + '～' + md2(end);
+    const html = esc(md2(calStart) + '～' + md2(end)) + excludedBadgeHtml([...calExcluded]);
+    el.innerHTML = html;
     if (t) t.classList.remove('empty');
   }
 }
