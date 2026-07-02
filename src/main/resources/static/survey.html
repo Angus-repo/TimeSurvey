@@ -239,6 +239,11 @@ function timeSlots(startTime, endTime) {
 }
 
 const WEEK = ['日','一','二','三','四','五','六'];
+/* "2026-07-06" -> "7/6" */
+function fmtMd(d) {
+  const [, m, dd] = d.split('-');
+  return (+m) + '/' + (+dd);
+}
 
 /* 該日期所屬週的週一作為分組鍵，用來判斷是否進入新的一週 */
 function weekKey(ds) {
@@ -257,7 +262,7 @@ async function init() {
 
   $('title').textContent = survey.name;
   readOnly = !!survey.closedAt;   // 已結束的調查仍可查看已填時段，但不可再修改
-  $('subtitle').textContent = '調查期間：' + survey.startDate + ' ~ ' + survey.endDate +
+  $('subtitle').textContent = '調查期間：' + fmtMd(survey.startDate) + ' ~ ' + fmtMd(survey.endDate) +
       '，每日 ' + survey.startTime.slice(0,5) + ' ~ ' + survey.endTime.slice(0,5) + '（不含週六日及 12:00~13:00 午休）' +
       (readOnly ? '　｜　📋 本調查已結束（唯讀）' : '');
 
@@ -359,7 +364,7 @@ function renderGrid() {
   let prevWeek = null;
   for (const d of dates) {
     const w = WEEK[new Date(d + 'T00:00:00').getDay()];
-    const md = d.slice(5).replace('-', '/');
+    const md = fmtMd(d);
     if (prevWeek !== null && weekKey(d) !== prevWeek) {
       const wk = weekKey(d).split('-');   // [yyyy, M, D] -> 新一週的週一日期
       const wl = wk[1] + '/' + wk[2];
@@ -464,7 +469,7 @@ function pasteRow(srcDate, dstDate) {
   for (const t of times) selected.delete(dstDate + 'T' + t);
   for (const t of srcTimes) selected.add(dstDate + 'T' + t);
   refreshAll();
-  toast('已複製 ' + srcDate.slice(5).replace('-', '/') + ' 的時段到 ' + dstDate.slice(5).replace('-', '/'));
+  toast('已複製 ' + fmtMd(srcDate) + ' 的時段到 ' + fmtMd(dstDate));
 }
 
 function refreshAll() {
@@ -561,7 +566,7 @@ function showDone(name) {
         ranges.push(start + ' ~ ' + plus30(prev));
         start = prev = cur;
       }
-      html += '<div class="dday"><span class="dlabel">' + d.slice(5).replace('-', '/') + '（週' + w + '）</span>' +
+      html += '<div class="dday"><span class="dlabel">' + fmtMd(d) + '（週' + w + '）</span>' +
               ranges.map(r => '<span class="chip">' + r + '</span>').join('') + '</div>';
     }
   }

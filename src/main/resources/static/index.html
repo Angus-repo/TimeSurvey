@@ -637,7 +637,7 @@ function syncCalInputs() {
 }
 
 /* "2026-06-15" -> "06/15" */
-function md2(ds) { return ds.slice(5).replace('-', '/'); }
+function md2(ds) { return fmtMd(ds); }
 
 /* 日期範圍旁的「跳過幾天不調查」提示徽章（只顯示符號，滑鼠移上才顯示被跳過的日期） */
 function excludedBadgeHtml(excludedDates) {
