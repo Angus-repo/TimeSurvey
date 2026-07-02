@@ -369,7 +369,7 @@
     <h2>調查清單 <span id="notifUi" style="float:right;font-weight:400;font-size:13px"></span></h2>
     <table>
       <thead>
-        <tr><th>調查名稱</th><th>日期範圍</th><th>每日時間</th><th>人員</th><th>填寫狀況</th><th>目前狀態</th><th style="width:210px">操作</th></tr>
+        <tr><th style="width:30%">調查名稱</th><th style="width:120px">日期範圍</th><th style="width:100px">填寫狀況(人)</th><th style="width:150px">目前狀態</th><th style="width:210px">操作</th></tr>
       </thead>
       <tbody id="surveyList"></tbody>
     </table>
@@ -515,7 +515,7 @@ async function loadSurveys() {
   const tbody = $('surveyList');
   tbody.innerHTML = '';
   if (surveys.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="muted">尚無調查，請先建立。</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="muted">尚無調查，請先建立。</td></tr>';
     return;
   }
   surveys.forEach((s, i) => {
@@ -526,9 +526,7 @@ async function loadSurveys() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${esc(s.name)}</td>
-      <td>${fmtYmd(s.startDate)} ~ ${fmtYmd(s.endDate)}</td>
-      <td>${s.startTime.slice(0,5)} ~ ${s.endTime.slice(0,5)}</td>
-      <td title="${esc(s.participants.join('、'))}">${total} 人</td>
+      <td>${fmtMd(s.startDate)} ~ ${fmtMd(s.endDate)}</td>
       <td><span class="prog${full ? ' full' : ''}" title="${full ? '全部填寫完成' : '尚有 ' + (total - done) + ' 人未填'}">${done} / ${total}${full ? ' ✓' : ''}</span></td>
       <td><span class="st ${closed ? 'st-closed' : 'st-open'}">${closed ? '已結束' : '進行中'}</span>
         <div class="muted" style="font-size:12px;margin-top:4px"
