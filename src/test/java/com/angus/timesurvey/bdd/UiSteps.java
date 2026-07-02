@@ -255,6 +255,13 @@ public class UiSteps {
         responseRepo.save(r);
     }
 
+    @Given("調查 {string} 已結束")
+    public void surveyClosed(String surveyName) {
+        Survey s = surveyRepo.findById(surveyIds.get(surveyName)).orElseThrow();
+        s.setClosedAt(LocalDateTime.now());
+        surveyRepo.save(s);
+    }
+
     @Given("調查 {string} 已被開啟 {int} 次，來自 {int} 個不同 IP")
     public void visitsExist(String surveyName, int visits, int ips) {
         for (int i = 0; i < visits; i++) {
@@ -304,7 +311,9 @@ public class UiSteps {
 
     @When("點擊時段 {string}")
     public void clickSlot(String slot) {
-        page.click(".slot[data-slot='" + slot + "']");
+        // force：唯讀模式下時段有 pointer-events:none，一般點擊會因無法命中而逾時等待，
+        // 用 force 直接觸發點擊座標即可（若被唯讀樣式擋下，點擊將落在外層 hbox 而不會選取該時段）
+        page.click(".slot[data-slot='" + slot + "']", new Page.ClickOptions().setForce(true));
     }
 
     @When("點擊 {string} 的 {string} 時勾勾")
@@ -394,6 +403,17 @@ public class UiSteps {
     @Then("完成畫面應包含 {string}")
     public void doneViewContains(String text) {
         assertThat(page.locator("#doneList")).containsText(text);
+    }
+
+    @Then("送出按鈕不應顯示")
+    public void submitButtonHidden() {
+        assertThat(page.locator("#submitBtn")).isHidden();
+    }
+
+    @Then("應顯示調查已結束的唯讀提示橫幅")
+    public void closedBannerShown() {
+        assertThat(page.locator("#closedBanner")).isVisible();
+        assertThat(page.locator("#closedBanner")).containsText("已結束");
     }
 
     /* ---------- 後台維護頁 ---------- */

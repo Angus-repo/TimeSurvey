@@ -19,6 +19,12 @@
   /* 時段表格：每個日期一列，同一小時的 :00/:30 上下兩格 */
   .gridwrap { overflow-x: auto; }
   .gridwrap.locked { opacity: .5; }   /* 未選姓名前格線半透明，提示先選姓名 */
+  .gridwrap.readonly .slot,
+  .gridwrap.readonly .chk,
+  .gridwrap.readonly .quick label,
+  .gridwrap.readonly .copybtn { cursor: not-allowed; }   /* 調查已結束：仍可點擊，但會跓出提示並不會真的修改 */
+  .closed-banner { display: flex; align-items: center; gap: 8px; background: #fff7e6; border: 1px solid #ffd591;
+                   color: #ad6800; border-radius: 8px; padding: 12px 18px; margin-bottom: 16px; font-size: 14px; }
   table.grid { border-collapse: separate; border-spacing: 3px; width: 100%; }
   table.grid thead th { font-size: 13px; color: #777; font-weight: 600; padding: 4px 2px; }
   .datecell { background: #f7f9f8; border: 1px solid #e2e8e5; border-radius: 6px; padding: 8px 10px;
@@ -144,6 +150,7 @@
   <p id="subtitle"></p>
 </header>
 <div class="container" id="main" style="display:none">
+  <div class="closed-banner" id="closedBanner" style="display:none">📋 本調查已結束，您僅能查看先前填寫的時段，無法再修改。</div>
   <div class="card" id="whoCard">
     <label>您的姓名：</label>
     <select id="who"><option value="">-- 請選擇 --</option></select>
@@ -172,7 +179,8 @@
 <div class="err" id="err" style="display:none"></div>
 <div class="submit-bar" id="bar" style="display:none">
   <span class="count" id="count">已勾選 0 個時段</span>
-  <button onclick="submitResponse()">送出我的可出席時間</button>
+  <span class="hint" id="roNote" style="display:none">📋 調查已結束，僅能查看，無法修改</span>
+  <button id="submitBtn" onclick="submitResponse()">送出我的可出席時間</button>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -184,6 +192,7 @@ let survey = null;
 let selected = new Set();   // "yyyy-MM-ddTHH:mm"
 let times = [], amTimes = [], pmTimes = [], hours = [];
 let copySource = null;     // 正在複製的來源日期（null 表示未進入複製狀態）
+let readOnly = false;      // 調查已結束：只能查看已填時段，不可再修改
 
 /* 複製 / 貼上 / 取消的線條式圖示（stroke 用 currentColor，顏色跟隨按鈕狀態） */
 const ICON = {
@@ -247,13 +256,10 @@ async function init() {
   survey = await res.json();
 
   $('title').textContent = survey.name;
+  readOnly = !!survey.closedAt;   // 已結束的調查仍可查看已填時段，但不可再修改
   $('subtitle').textContent = '調查期間：' + survey.startDate + ' ~ ' + survey.endDate +
-      '，每日 ' + survey.startTime.slice(0,5) + ' ~ ' + survey.endTime.slice(0,5) + '（不含週六日及 12:00~13:00 午休）';
-
-  // 已結束的調查不開放填寫
-  if (survey.closedAt) {
-    return showErr('📋 本調查已結束，無法再填寫時間。如有疑問請聯絡調查發起人。');
-  }
+      '，每日 ' + survey.startTime.slice(0,5) + ' ~ ' + survey.endTime.slice(0,5) + '（不含週六日及 12:00~13:00 午休）' +
+      (readOnly ? '　｜　📋 本調查已結束（唯讀）' : '');
 
   const who = $('who');
   for (const p of survey.participants) {
@@ -270,11 +276,18 @@ async function init() {
 
   renderGrid();
   $('gridCard').classList.add('locked');   // 進頁面尚未選姓名，先鎖定格線
+  if (readOnly) $('gridCard').classList.add('readonly');
   $('main').style.display = '';
   $('bar').style.display = '';
+  if (readOnly) {
+    $('submitBtn').style.display = 'none';
+    $('roNote').style.display = '';
+    $('closedBanner').style.display = '';
+    toast('📋 本調查已結束，僅能查看，無法修改');
+  }
 
-  // 首次開啟：以新手引導提示先選擇姓名（看過一次就不再出現）
-  if (!localStorage.getItem('surveyOnboarded')) startOnboarding();
+  // 首次開啟：以新手引導提示先選擇姓名（看過一次就不再出現）；已結束的調查不需再引導填寫
+  if (!readOnly && !localStorage.getItem('surveyOnboarded')) startOnboarding();
 }
 
 /* ---------- 新手引導 ---------- */
@@ -302,8 +315,13 @@ function dayHourSlots(d, h) {
   return times.filter(t => t.slice(0, 2) === h).map(t => d + 'T' + t);
 }
 
-/* 還沒選姓名前不可勾時段：切換姓名會重載該人內容，先勾的會被清掉造成誤會 */
+/* 還沒選姓名前不可勾時段：切換姓名會重載該人內容，先勾的會被清掉造成誤會；
+   調查已結束後也不可勾選，這裡直接跓出明確提示 */
 function requireName() {
+  if (readOnly) {
+    toast('📋 調查已結束，僅能查看已填時段，無法再修改');
+    return false;
+  }
   if (!$('who').value) {
     toast('請先選擇您的姓名，再勾選時段');
     return false;
@@ -484,7 +502,7 @@ async function loadMyResponse() {
       const mine = list.find(r => r.participantName === name);
       if (mine && mine.slots) {
         selected = new Set(mine.slots.split(',').filter(x => x));
-        toast('已載入您先前填寫的內容，可直接修改後再送出');
+        toast(readOnly ? '已顯示您先前填寫的時段（調查已結束，僅能查看）' : '已載入您先前填寫的內容，可直接修改後再送出');
       }
     }
   }
@@ -493,6 +511,7 @@ async function loadMyResponse() {
 }
 
 async function submitResponse() {
+  if (readOnly) return toast('調查已結束，無法再送出');
   const name = $('who').value;
   if (!name) return toast('請先選擇您的姓名');
   const res = await fetch('/api/surveys/' + surveyId + '/responses', {
