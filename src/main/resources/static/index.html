@@ -99,7 +99,8 @@
   .muted { color: #99a2ad; font-size: 13px; }
   #surveyList td { vertical-align: middle; }
   .prog { display: inline-block; padding: 2px 10px; border-radius: 12px; background: #eee; color: #666; font-size: 13px; }
-  .prog.full { background: #28a745; color: #fff; }
+  .prog.full { background: linear-gradient(90deg, #1fa971, #0f7a4d); color: #fff; font-weight: 600;
+               box-shadow: 0 1px 4px rgba(15,122,77,.35); }
   /* 調查清單：是否存在全員都有空的共同時段（只顯示符號，滑鼠移上才顯示說明文字） */
   .slotbadge { position: relative; display: inline-block; font-size: 16px; line-height: 1; cursor: help; }
   .slotbadge::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%;
@@ -548,8 +549,8 @@ async function loadSurveys() {
     tr.innerHTML = `
       <td>${esc(s.name)}</td>
       <td>${fmtMd(s.startDate)} ~ ${fmtMd(s.endDate)}</td>
-      <td><span class="prog${full ? ' full' : ''}" title="${full ? '全部填寫完成' : '尚有 ' + (total - done) + ' 人未填'}">${done} / ${total}${full ? ' ✓' : ''}</span></td>
-      <td><span class="st ${closed ? 'st-closed' : 'st-open'}">${slotBadgeHtml(st.hasCommonSlot)} ${closed ? '已結束' : '進行中'}</span>
+      <td><span class="prog${full ? ' full' : ''}" title="${full ? '全部填寫完成' : '尚有 ' + (total - done) + ' 人未填'}">${slotBadgeHtml(st.hasCommonSlot)} ${done} / ${total}</span></td>
+      <td><span class="st ${closed ? 'st-closed' : 'st-open'}">${closed ? '已結束' : '進行中'}</span>
         <div class="muted" style="font-size:12px;margin-top:4px"
              title="調查迄日經過 7 天後，系統批次（每晚 20:00）會自動刪除調查與填寫資料">${deleteHint(s)}</div></td>
       <td><div class="ops">
