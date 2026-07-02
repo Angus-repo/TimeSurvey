@@ -210,7 +210,7 @@ public class SurveySteps {
                 new HttpEntity<>(headers(owner)), String.class).getBody());
         String id = surveyId(surveyName);
         assertTrue(counts.has(id), "批次計數應包含調查「" + surveyName + "」：" + counts);
-        assertEquals(expected, counts.get(id).asInt(), "已填人數不符：" + counts);
+        assertEquals(expected, counts.get(id).get("done").asInt(), "已填人數不符：" + counts);
     }
 
     @Then("{string} 的批次計數不應包含調查 {string}")

@@ -605,8 +605,7 @@ public class UiSteps {
         var row = page.locator("#surveyList tr")
                 .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
         // 共同時段欄位只顯示符號，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
-        assertThat(row.locator(".slotbadge"))
-                .hasAttribute("data-tip", java.util.regex.Pattern.compile(".*" + java.util.regex.Pattern.quote(badgeText) + ".*"));
+        assertDataTipContains(row.locator(".slotbadge"), badgeText);
     }
 
     @When("點擊調查 {string} 的編輯")
@@ -619,8 +618,7 @@ public class UiSteps {
     @Then("日期範圍欄位應顯示挖空天數徽章 {string}")
     public void dateRangeShowsExcludedBadge(String tipContains) {
         // 挖空天數只顯示符號，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
-        assertThat(page.locator("#calTriggerText .slotbadge"))
-                .hasAttribute("data-tip", java.util.regex.Pattern.compile(".*" + java.util.regex.Pattern.quote(tipContains) + ".*"));
+        assertDataTipContains(page.locator("#calTriggerText .slotbadge"), tipContains);
     }
 
     @Then("調查清單中 {string} 的日期範圍應顯示挖空天數徽章 {string}")
@@ -628,8 +626,20 @@ public class UiSteps {
         var row = page.locator("#surveyList tr")
                 .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
         // 挖空天數只顯示符號，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
-        assertThat(row.locator(".slotbadge.skipbadge"))
-                .hasAttribute("data-tip", java.util.regex.Pattern.compile(".*" + java.util.regex.Pattern.quote(tipContains) + ".*"));
+        assertDataTipContains(row.locator(".slotbadge.skipbadge"), tipContains);
+    }
+
+    /**
+     * 檢查元素的 data-tip 屬性是否包含指定文字。
+     * 不用 Playwright 的 Pattern 版 hasAttribute：Java 的 Pattern.quote 會產生 \Q..\E，
+     * 但 Playwright 是把 regex 轉譯到瀏覽器端以 JS RegExp 執行，JS 不支援 \Q..\E，
+     * 導致條件恆為不符。改為等待元素出現後直接讀取屬性做子字串比對。
+     */
+    private void assertDataTipContains(com.microsoft.playwright.Locator locator, String expectedSubstring) {
+        assertThat(locator).isVisible();
+        String tip = locator.getAttribute("data-tip");
+        org.junit.jupiter.api.Assertions.assertTrue(tip != null && tip.contains(expectedSubstring),
+                "data-tip 應包含「" + expectedSubstring + "」，實際為：" + tip);
     }
 
     @Then("意見回饋按鈕不應顯示")
