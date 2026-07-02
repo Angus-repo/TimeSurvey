@@ -293,8 +293,10 @@
   .cal-hint { font-size: 12px; color: #99a2ad; }
   /* 連續顯示本月＋下月（最多兩個月）的可捲動區域：滑鼠捲軸即可上下移動日曆 */
   .cal-scroll { max-height: 240px; overflow-y: auto; overscroll-behavior: contain; }
-  .cal-day.cal-m1 { font-weight: 700; }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; }
+  /* 月份交界：整行的小間隔＋標籤，讓跨月（如 7/26~8/2）一眼看出進入下一個月 */
+  .cal-month-divider { grid-column: 1 / -1; margin-top: 14px; padding: 8px 2px 4px; border-top: 1px dashed #dfe3e6;
+                        font-size: 12.5px; font-weight: 700; color: #2c7be5; letter-spacing: .02em; }
   .cal-week span { text-align: center; font-size: 12px; color: #999; padding: 4px 0; }
   .cal-day { position: relative; text-align: center; font-size: 14px; padding: 8px 0; border-radius: 6px;
              cursor: pointer; user-select: none; color: #333; transition: background .12s, color .12s; }
@@ -673,6 +675,11 @@ function renderCalendar() {
   let html = '';
   for (let i = 0; i < base.getDay(); i++) html += '<span class="cal-day cal-blank"></span>';
   for (const d = new Date(base); d <= endM; d.setDate(d.getDate() + 1)) {
+    // 月份交界（次月的一號）：插入一小段間隔＋「N月」標籤，並補上該月第一週的空白格
+    if (d.getDate() === 1 && d.getTime() !== base.getTime()) {
+      html += '<div class="cal-month-divider">' + (d.getMonth() + 1) + '月</div>';
+      for (let i = 0; i < d.getDay(); i++) html += '<span class="cal-day cal-blank"></span>';
+    }
     const ds = ymd(d);
     const cls = ['cal-day'];
     const isEdge = (ds === calStart || ds === calEnd);   // 目前的起/迄日永遠可點（以便取消）
@@ -685,10 +692,7 @@ function renderCalendar() {
     } else if (calStart && ds === calStart) {
       cls.push('cal-single');
     }
-    // 每月一號標成「M/1」粗體，跨月時一眼看出月份交界（週的排列不中斷）
-    const label = d.getDate() === 1 ? (d.getMonth() + 1) + '/1' : d.getDate();
-    if (d.getDate() === 1) cls.push('cal-m1');
-    html += '<span class="' + cls.join(' ') + '" data-d="' + ds + '">' + label + '</span>';
+    html += '<span class="' + cls.join(' ') + '" data-d="' + ds + '">' + d.getDate() + '</span>';
   }
   $('calDays').innerHTML = html;
 

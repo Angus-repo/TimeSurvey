@@ -87,16 +87,12 @@ public class UiSteps {
     private record Shot(String title, boolean failed, byte[] png) {}
     private static final List<Shot> shots = java.util.Collections.synchronizedList(new ArrayList<>());
 
-    /** 每個 test case 一個專屬顏色：頁面標題橫幅與 PDF 頂端色條同色，跨頁時靠顏色快速辨識同一案例 */
-    private static final java.awt.Color[] CASE_COLORS = {
-            new java.awt.Color(0x1d7a35), new java.awt.Color(0x2c7be5), new java.awt.Color(0x6c5ce7),
-            new java.awt.Color(0xe67e22), new java.awt.Color(0x16a085), new java.awt.Color(0xc2185b),
-            new java.awt.Color(0x34495e), new java.awt.Color(0x795548)
-    };
+    /** 頁面標題橫幅與 PDF 頂端色條同色：通過為綠底，失敗為紅底 */
+    private static final java.awt.Color PASS_COLOR = new java.awt.Color(0x1d7a35);
     private static final java.awt.Color FAIL_COLOR = new java.awt.Color(0xc0392b);
 
     private static java.awt.Color caseColor(int caseNo, boolean failed) {
-        return failed ? FAIL_COLOR : CASE_COLORS[(caseNo - 1) % CASE_COLORS.length];
+        return failed ? FAIL_COLOR : PASS_COLOR;
     }
 
     private static String hex(java.awt.Color c) {
@@ -507,6 +503,13 @@ public class UiSteps {
     public void calendarHasNoMonthNav() {
         assertThat(page.locator("#calPrev")).hasCount(0);
         assertThat(page.locator("#calNext")).hasCount(0);
+    }
+
+    @Then("大日曆應顯示下個月份的交界標籤")
+    public void calendarShowsMonthDivider() {
+        LocalDate nextMonth1st = LocalDate.now().withDayOfMonth(1).plusMonths(1);
+        // 月份交界的分隔列需標示下一個月的月份數字，讓跨月一眼可辨識
+        assertThat(page.locator(".cal-month-divider")).hasText(nextMonth1st.getMonthValue() + "月");
     }
 
     @When("在大日曆中滾動滑鼠捲軸")
