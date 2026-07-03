@@ -149,8 +149,10 @@
                        padding: 10px 40px; font-size: 16px; cursor: pointer; font-family: inherit; }
   .submit-bar button:hover { background: #1a68d1; }
   .submit-bar .count { font-size: 13px; color: #777; margin-right: 16px; }
+  /* z-index 必須高於所有彈窗（modal-mask 1150 / modal-card 1200），
+     否則邀請、換員彈窗開啟時的提示（例如重複姓名已略過）會被遮罩壓住看不到 */
   .toast { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); background: #333; color: #fff;
-           padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 10; }
+           padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 1300; }
   .toast.show { opacity: 1; }
   .err { text-align: center; color: #e74c3c; margin-top: 60px; font-size: 16px; }
   .muted { color: #999; font-size: 13px; }
@@ -830,7 +832,15 @@ $('inviteTags').addEventListener('click', e => {
    所有結果（新增成功、被略過、失敗）合併成一則提示一次顯示，不連續跳出多則來不及看清楚 */
 async function confirmInvite() {
   const pending = commitInviteInput(true);   // 還未確認的輸入框文字先静默處理，稍後與最終結果合併顯示
-  if (inviteList.length === 0) return toast('請輸入至少一位姓名');
+  if (inviteList.length === 0) {
+    // 名單是空的也要把「輸入的姓名其實是重複而被略過」明確告訴使用者，
+    // 不能只提示「請輸入至少一位姓名」讓人誤以為沒輸入過
+    const parts = [];
+    if (pending.existingNames.length > 0) parts.push('「' + pending.existingNames.join('、') + '」已在受調查人員名單中，無法重複邀請，已略過');
+    if (pending.dupNames.length > 0) parts.push('「' + pending.dupNames.join('、') + '」重複輸入，已略過');
+    parts.push('請輸入至少一位姓名');
+    return toast(parts.join('；'));
+  }
   const inviter = whoValue;
   if (!inviter) { closeInviteModal(); return toast('請先選擇您的姓名，再邀請其他人加入'); }
 
@@ -969,7 +979,14 @@ async function confirmSwap() {
   const pending = commitSwapInput(true);   // 還未確認的輸入框文字先静默處理，稍後與最終結果合併顯示
   const current = whoValue;
   if (!current) { closeSwapModal(); return toast('請先選擇您的姓名，再進行換員'); }
-  if (swapList.length === 0) return toast('請輸入新的姓名');
+  if (swapList.length === 0) {
+    // 同「確認邀請」：輸入的姓名若因重複被略過，要明確告知，不能只提示「請輸入新的姓名」
+    const parts = [];
+    if (pending.existingNames.length > 0) parts.push('「' + pending.existingNames.join('、') + '」已在受調查人員名單中，無法換成同一人，已略過');
+    if (pending.dupNames.length > 0) parts.push('「' + pending.dupNames.join('、') + '」重複輸入，已略過');
+    parts.push('請輸入新的姓名');
+    return toast(parts.join('；'));
+  }
   const newNames = [...swapList];
   if (!confirm('確定將「' + current + '」換成「' + newNames.join('、') + '」？換人後原本填寫的時段會被清除，需由新的人重新填寫。')) return;
   const res = await fetch('/api/surveys/' + surveyId + '/replace-participant', {

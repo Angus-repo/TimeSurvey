@@ -75,6 +75,7 @@ public class UiSteps {
         // 預設視為已看過新手引導，避免遮罩擋住一般場景；引導本身由專屬場景測試
         ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
                 "localStorage.setItem('surveyOnboarded', '1');" +
+                "localStorage.setItem('surveyGridOnboarded', '1');" +
                 "localStorage.setItem('meetHoursOnboarded', '1');" +
                 "localStorage.setItem('dragSlotOnboarded', '1');" +
                 "localStorage.setItem('dateRangeOnboarded', '1');" +
@@ -315,6 +316,15 @@ public class UiSteps {
         surveyIds.put(name, s.getId());
     }
 
+    @Given("存在調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，允許成員加寄")
+    public void surveyExistsWithInvite(String name, String startDate, String endDate,
+                                       String startTime, String endTime, String people) {
+        surveyExists(name, startDate, endDate, startTime, endTime, people);
+        Survey s = surveyRepo.findById(surveyIds.get(name)).orElseThrow();
+        s.setAllowAddParticipant(true);
+        surveyRepo.save(s);
+    }
+
     @Given("調查 {string} 已有 {string} 的填寫紀錄 {string}")
     public void responseExists(String surveyName, String person, String slots) {
         SurveyResponse r = new SurveyResponse();
@@ -370,8 +380,14 @@ public class UiSteps {
 
     @Then("新手引導應消失")
     public void onboardingGone() {
+        // 只驗證姓名引導泡泡消失；遮罩可能因緊接著的表格操作引導而繼續顯示
         assertThat(page.locator("#onbPop")).isHidden();
-        assertThat(page.locator("#onbMask")).isHidden();
+    }
+
+    @Then("應顯示表格操作的新手引導")
+    public void gridOnboardingShown() {
+        assertThat(page.locator("#onbPopGrid")).isVisible();
+        assertThat(page.locator("#onbMask")).isVisible();
     }
 
     @When("選擇姓名 {string}")
@@ -464,6 +480,41 @@ public class UiSteps {
     @Then("應出現提示 {string}")
     public void toastShows(String message) {
         assertThat(page.locator("#toast")).containsText(message);
+    }
+
+    /* ---------- 邀請他人加入視窗 ---------- */
+
+    @When("開啟邀請他人加入視窗")
+    public void openInviteModal() {
+        page.click("#btnInvite");
+        assertThat(page.locator("#inviteModal")).isVisible();
+    }
+
+    @When("在邀請視窗輸入姓名 {string} 並按下 Enter")
+    public void typeInviteNameAndEnter(String name) {
+        page.fill("#inviteInput", name);
+        page.press("#inviteInput", "Enter");
+    }
+
+    @When("在邀請視窗輸入姓名 {string}")
+    public void typeInviteName(String name) {
+        page.fill("#inviteInput", name);
+    }
+
+    @When("按下確認邀請")
+    public void clickConfirmInvite() {
+        page.click("#inviteModal .topbtn");
+    }
+
+    @Then("提示訊息應顯示在邀請視窗之上")
+    public void toastAboveInviteModal() {
+        // toast 的 z-index 必須高於彈窗與其遮罩，否則提示會被遮罩壓住看不到
+        int toastZ = Integer.parseInt((String) page.evaluate(
+                "getComputedStyle(document.getElementById('toast')).zIndex"));
+        int modalZ = Integer.parseInt((String) page.evaluate(
+                "getComputedStyle(document.getElementById('inviteModal')).zIndex"));
+        org.junit.jupiter.api.Assertions.assertTrue(toastZ > modalZ,
+                "提示訊息的 z-index (" + toastZ + ") 應高於邀請視窗 (" + modalZ + ")，否則會被遮罩壓住看不到");
     }
 
     @Then("應顯示完成畫面，且姓名為 {string}")
