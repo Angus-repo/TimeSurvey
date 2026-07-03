@@ -674,8 +674,16 @@ public class UiSteps {
     public void listShowsSlotBadge(String surveyName, String badgeText) {
         var row = page.locator("#surveyList tr")
                 .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
-        // 共同時段欄位只顯示符號，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
-        assertDataTipContains(row.locator(".slotbadge"), badgeText);
+        // 共同時段徽章位於「填寫狀況」欄位（.prog）內，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
+        assertDataTipContains(row.locator(".prog .slotbadge"), badgeText);
+    }
+
+    @Then("調查清單中 {string} 不應顯示共同時段徽章")
+    public void listShowsNoSlotBadge(String surveyName) {
+        var row = page.locator("#surveyList tr")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+        // 只有「無共同時段」（⚠️）才顯示徽章，其餘狀況（有共同時段／尚未確定）不顯示任何符號
+        assertThat(row.locator(".prog .slotbadge")).hasCount(0);
     }
 
     @When("點擊調查 {string} 的編輯")
