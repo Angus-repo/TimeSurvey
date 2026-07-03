@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -148,7 +149,90 @@ public class SurveyApiController {
         existing.setEndTime(FIXED_END_TIME);
         existing.setParticipants(survey.getParticipants());
         existing.setExcludedDates(survey.getExcludedDates());
+        existing.setAllowAddParticipant(survey.isAllowAddParticipant());
+        existing.setAllowReplaceParticipant(survey.isAllowReplaceParticipant());
         return surveyRepo.save(existing);
+    }
+
+    /** 邀請他人加入：填寫頁的參與者自行新增其他需要參與會議的人（需 allowAddParticipant 開啟且調查未結束） */
+    @PostMapping("/{id}/participants")
+    public Survey addParticipant(@PathVariable String id, @RequestBody Map<String, String> body) {
+        Survey survey = get(id);
+        if (survey.getClosedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "調查已結束，無法再新增人員");
+        }
+        if (!survey.isAllowAddParticipant()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "此調查不允許自行新增人員");
+        }
+        String name = body.getOrDefault("name", "").trim();
+        String inviter = body.getOrDefault("inviter", "").trim();
+        if (name.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "請輸入姓名");
+        }
+        if (inviter.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "請先選擇您的姓名，再邀請他人加入");
+        }
+        if (survey.getParticipants().contains(name)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "此姓名已在受調查人員名單中：「" + name + "」已存在，無法重複邀請");
+        }
+        survey.getParticipants().add(name);
+        survey.getParticipantNotes().put(name, "由 " + inviter + " 邀請加入");
+        return surveyRepo.save(survey);
+    }
+
+    /** 換員：填寫頁的參與者把自己的名字換成其它還不在名單中的人，可一次換成多位（需 allowReplaceParticipant 開啟且調查未結束）。
+     *  body 支援 newNames（字串陣列，換成多位）或 newName（單一字串，向下相容）；
+     *  第一位頂替原本的位置並沿用「換員轉入」說明，其餘則視為一併加入的新人員。 */
+    @PostMapping("/{id}/replace-participant")
+    @Transactional
+    public Survey replaceParticipant(@PathVariable String id, @RequestBody Map<String, Object> body) {
+        Survey survey = get(id);
+        if (survey.getClosedAt() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "調查已結束，無法再更換人員");
+        }
+        if (!survey.isAllowReplaceParticipant()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "此調查不允許更換人員");
+        }
+        String oldName = String.valueOf(body.getOrDefault("oldName", "")).trim();
+        if (oldName.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "請選擇要更換的姓名");
+        }
+
+        List<String> newNames = new ArrayList<>();
+        Object rawNames = body.get("newNames");
+        if (rawNames instanceof List<?> list) {
+            for (Object o : list) {
+                if (o != null && !o.toString().isBlank()) newNames.add(o.toString().trim());
+            }
+        } else if (body.get("newName") != null) {
+            String single = body.get("newName").toString().trim();
+            if (!single.isEmpty()) newNames.add(single);
+        }
+        // 去除重複（保留第一次出現的順序）
+        newNames = newNames.stream().distinct().toList();
+        if (newNames.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "請輸入新的姓名");
+        }
+
+        int idx = survey.getParticipants().indexOf(oldName);
+        if (idx < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "此姓名不在受調查人員名單中");
+        }
+        for (String newName : newNames) {
+            if (survey.getParticipants().contains(newName)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "此姓名已在受調查人員名單中：「" + newName + "」已存在，無法換成同一人");
+            }
+        }
+
+        survey.getParticipants().set(idx, newNames.get(0));
+        survey.getParticipantNotes().remove(oldName);
+        survey.getParticipantNotes().put(newNames.get(0), "由 " + oldName + " 換員轉入");
+        for (int i = 1; i < newNames.size(); i++) {
+            survey.getParticipants().add(newNames.get(i));
+            survey.getParticipantNotes().put(newNames.get(i), "由 " + oldName + " 換員加入");
+        }
+        responseRepo.deleteBySurveyIdAndParticipantName(id, oldName);
+        return surveyRepo.save(survey);
     }
 
     /** 結束調查：之後參與者不能再填寫 */

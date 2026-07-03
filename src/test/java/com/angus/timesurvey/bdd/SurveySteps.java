@@ -143,6 +143,24 @@ public class SurveySteps {
         }
     }
 
+    @When("{string} 建立調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，允許成員加寄 {string}，允許換員 {string}")
+    public void createSurveyWithFlags(String owner, String name, String sd, String ed, String st, String et,
+                                      String participants, String allowAdd, String allowSwap) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+        body.put("startDate", sd);
+        body.put("endDate", ed);
+        body.put("startTime", st);
+        body.put("endTime", et);
+        body.put("participants", participants.isBlank() ? List.of() : Arrays.asList(participants.split(",")));
+        body.put("allowAddParticipant", "是".equals(allowAdd));
+        body.put("allowReplaceParticipant", "是".equals(allowSwap));
+        last = rest.exchange("/api/surveys", HttpMethod.POST, new HttpEntity<>(body, headers(owner)), String.class);
+        if (last.getStatusCode().is2xxSuccessful()) {
+            surveyIds.put(name, json(last.getBody()).get("id").asText());
+        }
+    }
+
     @Then("調查 {string} 的挖空日期應包含 {string}")
     public void excludedContains(String surveyName, String date) {
         JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
@@ -252,6 +270,56 @@ public class SurveySteps {
     public void resultsOk(String surveyName) {
         ResponseEntity<String> res = rest.getForEntity("/api/surveys/" + surveyId(surveyName) + "/responses", String.class);
         assertEquals(200, res.getStatusCode().value());
+    }
+
+    /* ---------- 邀請他人加入 / 換員 ---------- */
+
+    @When("參與者 {string} 在調查 {string} 邀請 {string} 加入")
+    public void inviteParticipant(String inviter, String surveyName, String newName) {
+        Map<String, String> body = Map.of("name", newName, "inviter", inviter);
+        last = rest.exchange("/api/surveys/" + surveyId(surveyName) + "/participants",
+                HttpMethod.POST, new HttpEntity<>(body, headers(null)), String.class);
+    }
+
+    @When("參與者 {string} 在調查 {string} 把自己換成 {string}")
+    public void replaceParticipant(String oldName, String surveyName, String newName) {
+        Map<String, String> body = Map.of("oldName", oldName, "newName", newName);
+        last = rest.exchange("/api/surveys/" + surveyId(surveyName) + "/replace-participant",
+                HttpMethod.POST, new HttpEntity<>(body, headers(null)), String.class);
+    }
+
+    @When("參與者 {string} 在調查 {string} 把自己換成多位 {string}")
+    public void replaceParticipantMulti(String oldName, String surveyName, String newNamesCsv) {
+        Map<String, Object> body = Map.of("oldName", oldName, "newNames", Arrays.asList(newNamesCsv.split(",")));
+        last = rest.exchange("/api/surveys/" + surveyId(surveyName) + "/replace-participant",
+                HttpMethod.POST, new HttpEntity<>(body, headers(null)), String.class);
+    }
+
+    @Then("調查 {string} 的人員名單應包含 {string}")
+    public void participantListContains(String surveyName, String participant) {
+        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        boolean found = false;
+        for (JsonNode n : s.get("participants")) if (n.asText().equals(participant)) found = true;
+        assertTrue(found, "人員名單應包含「" + participant + "」，實際：" + s.get("participants"));
+    }
+
+    @Then("調查 {string} 的人員名單應不包含 {string}")
+    public void participantListNotContains(String surveyName, String participant) {
+        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        for (JsonNode n : s.get("participants")) {
+            assertNotEquals(participant, n.asText(), "人員名單不應包含「" + participant + "」");
+        }
+    }
+
+    @Then("調查 {string} 中 {string} 的來源說明應包含 {string}")
+    public void participantNoteContains(String surveyName, String participant, String expected) {
+        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        JsonNode notes = s.get("participantNotes");
+        assertNotNull(notes, "調查回應不包含 participantNotes：" + s);
+        JsonNode note = notes.get(participant);
+        assertNotNull(note, "找不到「" + participant + "」的來源說明：" + notes);
+        assertTrue(note.asText().contains(expected),
+                "「" + participant + "」的來源說明應包含「" + expected + "」，實際為：" + note.asText());
     }
 
     /* ---------- 結束調查 ---------- */

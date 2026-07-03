@@ -11,4 +11,5 @@ public interface SurveyResponseRepository extends JpaRepository<SurveyResponse, 
     List<SurveyResponse> findBySurveyIdIn(List<String> surveyIds);
     Optional<SurveyResponse> findBySurveyIdAndParticipantName(String surveyId, String participantName);
     void deleteBySurveyId(String surveyId);
+    void deleteBySurveyIdAndParticipantName(String surveyId, String participantName);
 }

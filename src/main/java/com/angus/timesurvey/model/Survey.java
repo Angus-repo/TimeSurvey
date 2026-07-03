@@ -7,7 +7,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "survey")
@@ -57,6 +59,24 @@ public class Survey {
     @Column(length = 64)
     private String ownerToken;
 
+    /** 是否允許填寫者在填寫頁自行邀請其他需要參與會議的人加入受調查名單
+     *  columnDefinition 帶預設值，讓既有資料庫在新增此欄位時（ALTER TABLE ADD COLUMN）
+     *  既有資料列可取得預設值，避免 NOT NULL 但無預設值導致的欄位新增失敗 */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean allowAddParticipant = false;
+
+    /** 是否允許填寫者將自己的名字換成其它還不在名單中的人（同上，帶預設值避免既有資料庫升級失敗） */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean allowReplaceParticipant = false;
+
+    /** 記錄透過「邀請他人加入」或「換員」新增的參與者是由誰邀請／換成的（key＝參與者姓名，value＝說明文字）。
+     *  發起者自行輸入的人員不會有紀錄；此 map 只用於顯示來源說明，非必要欄位。 */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "survey_participant_note", joinColumns = @JoinColumn(name = "survey_id"))
+    @MapKeyColumn(name = "participant_name")
+    @Column(name = "note", length = 200)
+    private Map<String, String> participantNotes = new HashMap<>();
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 
@@ -91,4 +111,15 @@ public class Survey {
 
     public String getOwnerToken() { return ownerToken; }
     public void setOwnerToken(String ownerToken) { this.ownerToken = ownerToken; }
+
+    public boolean isAllowAddParticipant() { return allowAddParticipant; }
+    public void setAllowAddParticipant(boolean allowAddParticipant) { this.allowAddParticipant = allowAddParticipant; }
+
+    public boolean isAllowReplaceParticipant() { return allowReplaceParticipant; }
+    public void setAllowReplaceParticipant(boolean allowReplaceParticipant) { this.allowReplaceParticipant = allowReplaceParticipant; }
+
+    public Map<String, String> getParticipantNotes() { return participantNotes; }
+    public void setParticipantNotes(Map<String, String> participantNotes) {
+        this.participantNotes = participantNotes == null ? new HashMap<>() : participantNotes;
+    }
 }

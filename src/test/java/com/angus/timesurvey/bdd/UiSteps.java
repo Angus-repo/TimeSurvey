@@ -376,7 +376,10 @@ public class UiSteps {
 
     @When("選擇姓名 {string}")
     public void chooseName(String name) {
-        page.selectOption("#who", name);
+        // 「您的姓名」已改為自訂下拉（按鈕＋浮動清單，而非原生 <select>），
+        // 好讓來源說明（例如「（由 X 邀請加入）」）能以灰色文字呈現
+        page.click("#whoTrigger");
+        page.click(".who-item[data-name='" + name + "']");
     }
 
     @When("點擊時段 {string}")

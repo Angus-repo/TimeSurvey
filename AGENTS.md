@@ -42,6 +42,7 @@ src/
 | `survey_management.feature` | 調查建立、編輯、刪除與驗證 |
 | `owner_isolation.feature` | 發起者隔離（每人只看得到自己的調查） |
 | `response_submission.feature` | 參與者填寫與覆寫 |
+| `participant_self_service.feature` | 允許成員加寄（邀請他人加入）／允許換員 |
 | `survey_stats.feature` | 調查結果統計與會議時段計算 |
 | `close_survey.feature` | 結束調查 |
 | `completion_notification.feature` | WebSocket 完成通知 |

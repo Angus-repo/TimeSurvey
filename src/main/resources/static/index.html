@@ -84,6 +84,7 @@
           border-radius: 14px; padding: 4px 11px; font-size: 13px; user-select: none;
           transition: background .15s, border-color .15s; }
   .ptag:hover { border-color: #00a884; }
+  .ptag .note { color: #999; margin-left: 2px; }
   .ptag .x { color: #999; font-weight: 700; line-height: 1; cursor: pointer; }
   .ptag .x:hover { color: #e74c3c; }
   .ptags input { border: none; outline: none; flex: 1; min-width: 240px; font-size: 14px; padding: 4px; width: auto; }
@@ -124,6 +125,7 @@
   #resultArea table { width: auto; min-width: 60%; font-size: 13px; }
   #resultArea th, #resultArea td { border: 1px solid #ddd; text-align: center; padding: 4px 10px; vertical-align: middle; }
   #resultArea th.dcell { background: #f7f9f8; white-space: nowrap; }
+  #resultArea .pnote { font-weight: 400; font-size: 11px; color: #999; margin-top: 2px; white-space: nowrap; }
   #resultArea th.tcell { font-weight: 400; color: #555; white-space: nowrap; }
   #resultArea td.yes { background: #d2f4e8; color: #0a7d57; font-weight: 700; }
   #resultArea td.no { color: #ddd; }
@@ -378,9 +380,19 @@
         <div class="pbar">
           <span class="muted" id="pCount">共 0 人</span>
           <a href="javascript:void(0)" onclick="copyParticipants()">📋 複製全部人名</a>
-          <div style="margin-left:auto; display:flex; gap:10px; flex-wrap:wrap">
-            <button class="btn-cancel" onclick="resetForm()" id="cancelBtn" style="display:none">取消修改</button>
-            <button class="btn-primary" onclick="saveSurvey()" id="saveBtn">建立調查</button>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap">
+            <label style="display:inline-flex;align-items:center;gap:5px;font-weight:400;cursor:pointer"
+                   title="開啟後，參與者在填寫頁可自行邀請其它需要參與會議的人加入這份調查">
+              <input type="checkbox" id="fAllowAdd" checked style="width:auto"> 允許成員加寄
+            </label>
+            <label style="display:inline-flex;align-items:center;gap:5px;font-weight:400;cursor:pointer"
+                   title="開啟後，參與者在填寫頁可將自己的名字換成其它還不在名單中的人">
+              <input type="checkbox" id="fAllowSwap" checked style="width:auto"> 允許換員
+            </label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap">
+              <button class="btn-cancel" onclick="resetForm()" id="cancelBtn" style="display:none">取消修改</button>
+              <button class="btn-primary" onclick="saveSurvey()" id="saveBtn">建立調查</button>
+            </div>
           </div>
         </div>
       </div>
@@ -802,6 +814,7 @@ function setDefaultDates() {
 
 /* ---------- 受調查人員：名牌式輸入 ---------- */
 let plist = [];   // 人員名單
+let pNotes = {};  // 名單中每位人員的來源說明（例如「由 X 邀請加入」），只讀，由後端經邀請/換員紀錄
 
 function renderTags() {
   const box = $('pTags');
@@ -812,6 +825,13 @@ function renderTags() {
     tag.className = 'ptag';
     const label = document.createElement('span');
     label.textContent = name;
+    const note = pNotes[name];
+    if (note) {
+      const noteEl = document.createElement('span');
+      noteEl.className = 'note';
+      noteEl.textContent = '（' + note + '）';
+      label.appendChild(noteEl);
+    }
     const x = document.createElement('span');
     x.className = 'x';
     x.textContent = '×';
@@ -888,7 +908,9 @@ function readForm() {
     startDate: calStart || '',
     endDate: calEnd || calStart || '',
     excludedDates: [...calExcluded].sort(),
-    participants: [...plist]
+    participants: [...plist],
+    allowAddParticipant: $('fAllowAdd').checked,
+    allowReplaceParticipant: $('fAllowSwap').checked
   };
 }
 
@@ -943,7 +965,10 @@ function editSurvey(id) {
   $('fName').value = s.name;
   setCalRange(s.startDate, s.endDate, s.excludedDates || []);
   plist = [...s.participants];
+  pNotes = { ...(s.participantNotes || {}) };
   renderTags();
+  $('fAllowAdd').checked = !!s.allowAddParticipant;
+  $('fAllowSwap').checked = !!s.allowReplaceParticipant;
   $('formTitle').textContent = '編輯調查：' + s.name;
   $('saveBtn').textContent = '儲存修改';
   $('cancelBtn').style.display = '';
@@ -957,7 +982,10 @@ function duplicateSurvey(id) {
   resetForm();
   $('fName').value = s.name;
   plist = [...s.participants];
+  pNotes = {};   // 複製為全新的調查，不承繼原調查的邀請/換員紀錄
   renderTags();
+  $('fAllowAdd').checked = !!s.allowAddParticipant;
+  $('fAllowSwap').checked = !!s.allowReplaceParticipant;
   $('formTitle').textContent = '建立新調查(複製自:' + s.name + ')';
   window.scrollTo({ top: 0, behavior: 'smooth' });
   toast('已帶入「' + s.name + '」的主旨與人員，確認日期後即可建立');
@@ -968,8 +996,11 @@ function resetForm() {
   $('fName').value = '';
   setDefaultDates();
   plist = [];
+  pNotes = {};
   $('pInput').value = '';
   renderTags();
+  $('fAllowAdd').checked = true;
+  $('fAllowSwap').checked = true;
   $('formTitle').textContent = '建立新調查';
   $('saveBtn').textContent = '建立調查';
   $('cancelBtn').style.display = 'none';
@@ -1419,7 +1450,10 @@ function renderResult() {
   html += '<div id="detailWrap"' + (detailOpen ? '' : ' style="display:none"') + '>';
 
   html += '<table><thead><tr><th>日期</th><th>時間</th>';
-  for (const p of ps) html += '<th>' + esc(p) + '</th>';
+  for (const p of ps) {
+    const note = survey.participantNotes && survey.participantNotes[p];
+    html += '<th>' + esc(p) + (note ? '<div class="pnote">' + esc(note) + '</div>' : '') + '</th>';
+  }
   html += '</tr></thead><tbody>';
 
   for (const d of dates) {
