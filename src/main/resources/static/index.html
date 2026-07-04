@@ -68,6 +68,23 @@
   .btn-ic.reopen { --c: #28a745; }
   .btn-ic.edit   { --c: #f39c12; }
   .btn-ic.dup    { --c: #2c7be5; }
+  /* 複製連結的複合按鈕：左邊主要動作 + 右邊小箭頭可展開選單切換分享方式 */
+  .splitbtn { position: relative; display: inline-flex; }
+  .splitbtn .btn-ic.main { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .splitbtn .btn-ic.caret { width: 17px; margin-left: -1px; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+  .splitbtn .btn-ic.caret svg { width: 10px; height: 10px; }
+  .sharemenu { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+               background: #fff; border: 1px solid #e4e8ec; border-radius: 8px; padding: 4px;
+               min-width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.16); }
+  .sharemenu.open { display: block; }
+  .sharemenu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 10px;
+                      background: none; border: none; border-radius: 6px; font-size: 13px; color: #333;
+                      cursor: pointer; text-align: left; font-family: inherit; white-space: nowrap; }
+  .sharemenu button:hover { background: #f0f4f8; }
+  .sharemenu button svg { width: 14px; height: 14px; stroke: currentColor; fill: none;
+                          stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .sharemenu button .ck { margin-left: auto; color: #00a884; font-weight: 700; visibility: hidden; }
+  .sharemenu button.active .ck { visibility: visible; }
   .st { display: inline-block; padding: 2px 12px; border-radius: 12px; font-size: 13px; white-space: nowrap; }
   .st-open { background: #e6f7ef; color: #0a7d57; border: 1px solid #b3e6cf; }
   .st-closed { background: #eceff1; color: #78838c; border: 1px solid #d5dbdf; }
@@ -515,7 +532,9 @@ const ICONS = {
   stop:  '<svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>',
   reopen: '<svg viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>',
   edit:  '<svg viewBox="0 0 24 24"><path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
-  dup:   '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+  dup:   '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  caret: '<svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>',
+  teams: '<svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>'
 };
 
 const WEEK = ['日','一','二','三','四','五','六'];
@@ -567,8 +586,7 @@ async function loadSurveys() {
         <div class="muted" style="font-size:12px;margin-top:4px"
              title="調查迄日經過 7 天後，系統批次（每晚 20:00）會自動刪除調查與填寫資料">${deleteHint(s)}</div></td>
       <td><div class="ops">
-        <button class="btn-ic copy" data-sid="${s.id}" onclick="copyLink('${s.id}')" ${closed ? 'disabled' : ''}
-          data-tip="${closed ? '調查已結束，連結已停用' : '複製調查連結，傳給參與者即可填寫'}" aria-label="複製調查連結">${ICONS.link}</button>
+        ${shareBtnHtml(s, closed)}
         <button class="btn-ic result" onclick="showResult('${s.id}')" data-tip="查看填寫狀況與共同有空的時段" aria-label="查看結果">${ICONS.chart}</button>
         ${closed
           ? `<button class="btn-ic reopen" onclick="reopenSurvey('${s.id}')"
@@ -600,6 +618,86 @@ function slotBadgeHtml(hasCommonSlot) {
 
 function surveyUrl(id) {
   return location.origin + '/s/' + id;
+}
+
+/* ---------- 複製連結／Teams 分享的複合按鈕 ---------- */
+/* 使用者最後一次選擇的分享方式（記在 localStorage）：'copy' 複製連結 / 'teams' Teams 分享 */
+function shareMode() {
+  return localStorage.getItem('shareMode') === 'teams' ? 'teams' : 'copy';
+}
+
+/* 清單「複製連結」欄位的複合按鈕：主按鈕執行上次選的分享方式，右側小箭頭展開選單切換 */
+function shareBtnHtml(s, closed) {
+  const teams = shareMode() === 'teams';
+  const dis = closed ? 'disabled' : '';
+  const tip = closed ? '調查已結束，連結已停用'
+            : teams  ? '在 Teams 分享調查連結給受調查人員'
+                     : '複製調查連結，傳給參與者即可填寫';
+  const label = teams ? '在 Teams 分享調查連結' : '複製調查連結';
+  return `<div class="splitbtn">
+    <button class="btn-ic copy main" data-sid="${s.id}" onclick="shareMain('${s.id}')" ${dis}
+      data-tip="${tip}" aria-label="${label}">${teams ? ICONS.teams : ICONS.link}</button>
+    <button class="btn-ic copy caret" onclick="toggleShareMenu(event, '${s.id}')" ${dis}
+      data-tip="選擇分享方式" aria-label="選擇分享方式">${ICONS.caret}</button>
+    <div class="sharemenu" id="shareMenu-${s.id}">
+      <button data-mode="copy" class="${teams ? '' : 'active'}" onclick="pickShare('copy','${s.id}')">${ICONS.link}複製連結<span class="ck">✓</span></button>
+      <button data-mode="teams" class="${teams ? 'active' : ''}" onclick="pickShare('teams','${s.id}')">${ICONS.teams}分享到 Teams<span class="ck">✓</span></button>
+    </div>
+  </div>`;
+}
+
+/* 主按鈕：依上次記住的分享方式執行 */
+function shareMain(id) {
+  if (shareMode() === 'teams') teamsShare(id); else copyLink(id);
+}
+
+/* 從選單挑選分享方式：記住這次的選擇並立即執行 */
+function pickShare(mode, id) {
+  localStorage.setItem('shareMode', mode);
+  refreshShareBtns();
+  if (mode === 'teams') teamsShare(id); else copyLink(id);
+}
+
+function toggleShareMenu(ev, id) {
+  ev.stopPropagation();   // 避免立刻被 document 的關閉選單處理吃掉
+  const menu = $('shareMenu-' + id);
+  const wasOpen = menu.classList.contains('open');
+  closeShareMenus();
+  if (!wasOpen) menu.classList.add('open');
+}
+
+function closeShareMenus() {
+  document.querySelectorAll('.sharemenu.open').forEach(m => m.classList.remove('open'));
+}
+document.addEventListener('click', closeShareMenus);
+
+/* 切換分享方式後，就地更新清單上所有複合按鈕的圖示與提示（不重打 API 重繪清單） */
+function refreshShareBtns() {
+  const teams = shareMode() === 'teams';
+  document.querySelectorAll('.splitbtn .btn-ic.main').forEach(b => {
+    b.innerHTML = teams ? ICONS.teams : ICONS.link;
+    if (!b.disabled) {
+      b.dataset.tip = teams ? '在 Teams 分享調查連結給受調查人員' : '複製調查連結，傳給參與者即可填寫';
+    }
+    b.setAttribute('aria-label', teams ? '在 Teams 分享調查連結' : '複製調查連結');
+  });
+  document.querySelectorAll('.sharemenu button').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === (teams ? 'teams' : 'copy')));
+}
+
+/* 開啟 Teams 聊天並預填收件人與訊息：受調查人員、調查名稱、調查連結（需登入 Teams） */
+function teamsShare(id) {
+  if (linkOnbSid) endLinkOnb();   // 照著引導把連結分享出去，代表已學會，結束引導
+  const s = surveys.find(x => x.id === id);
+  if (!s) return;
+  const msg = '【會議時間調查】' + s.name +
+      '\n受調查人員：' + s.participants.join('、') +
+      '\n請開啟連結填寫有空的時段：' + surveyUrl(id);
+  const deeplink = 'https://teams.microsoft.com/l/chat/0/0' +
+      '?users=' + encodeURIComponent(s.participants.join(',')) +
+      '&message=' + encodeURIComponent(msg);
+  window.open(deeplink, '_blank');
+  toast('已開啟 Teams，請確認收件人後送出訊息');
 }
 
 function copyLink(id) {
