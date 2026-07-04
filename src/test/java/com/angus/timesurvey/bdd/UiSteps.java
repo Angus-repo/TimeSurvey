@@ -720,8 +720,66 @@ public class UiSteps {
 
     @Then("調查清單第一筆的複製連結按鈕應高亮閃爍")
     public void firstRowCopyBtnFlashes() {
-        assertThat(page.locator("#surveyList tr").first().locator(".btn-ic.copy"))
+        // 複合按鈕（split button）有主按鈕與小箭頭兩個 .btn-ic.copy，高亮閃爍只套在主按鈕上
+        assertThat(page.locator("#surveyList tr").first().locator(".btn-ic.copy.main"))
                 .hasClass(java.util.regex.Pattern.compile(".*\\bflash-hl\\b.*"));
+    }
+
+    /* ---------- 複製連結／Teams 分享的複合按鈕（split button） ---------- */
+
+    @When("點擊第一筆調查的分享方式小箭頭")
+    public void clickFirstRowShareCaret() {
+        page.locator("#surveyList tr").first().locator(".btn-ic.copy.caret").click();
+    }
+
+    @Then("應顯示分享方式選單")
+    public void shareMenuShown() {
+        assertThat(page.locator(".sharemenu.open")).isVisible();
+    }
+
+    @Then("分享方式選單應包含 {string} 與 {string} 選項")
+    public void shareMenuHasOptions(String a, String b) {
+        var menu = page.locator(".sharemenu.open");
+        assertThat(menu).containsText(a);
+        assertThat(menu).containsText(b);
+    }
+
+    @When("點擊分享方式選單的 {string}")
+    public void clickShareMenuOption(String label) {
+        // 攔截 window.open：測試環境不真的開新分頁連外，只記下要開啟的網址供後續驗證
+        page.evaluate("window.__openedUrl = null; window.open = u => { window.__openedUrl = String(u); return null; };");
+        page.locator(".sharemenu.open button")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(label)).click();
+    }
+
+    @Then("應開啟 Teams 分享連結，內容包含調查名稱 {string}、人員 {string} 與調查連結")
+    public void teamsShareLinkOpened(String surveyName, String people) {
+        String url = (String) page.evaluate("window.__openedUrl");
+        org.junit.jupiter.api.Assertions.assertNotNull(url, "應以 window.open 開啟 Teams 分享連結");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                url.startsWith("https://teams.microsoft.com/l/chat/0/0?"),
+                "應為 Teams 聊天深層連結：" + url);
+        String decoded = java.net.URLDecoder.decode(url, java.nio.charset.StandardCharsets.UTF_8);
+        org.junit.jupiter.api.Assertions.assertTrue(decoded.contains(surveyName),
+                "訊息應包含調查名稱 " + surveyName + "：" + decoded);
+        for (String p : people.split(",")) {
+            org.junit.jupiter.api.Assertions.assertTrue(decoded.contains(p),
+                    "訊息應包含受調查人員 " + p + "：" + decoded);
+        }
+        org.junit.jupiter.api.Assertions.assertTrue(decoded.contains("/s/"),
+                "訊息應包含調查連結（/s/調查ID）：" + decoded);
+    }
+
+    @When("重新整理後台維護頁")
+    public void reloadAdminPage() {
+        page.reload();
+        page.locator("#surveyList tr").first().waitFor();
+    }
+
+    @Then("第一筆調查的分享主按鈕應為 Teams 分享模式")
+    public void firstShareBtnInTeamsMode() {
+        assertThat(page.locator("#surveyList tr").first().locator(".btn-ic.copy.main"))
+                .hasAttribute("aria-label", "在 Teams 分享調查連結");
     }
 
     @Then("調查清單中 {string} 應顯示共同時段徽章 {string}")
