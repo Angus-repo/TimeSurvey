@@ -538,6 +538,13 @@ public class UiSteps {
         assertThat(page.locator("#suggestCalTriggerText .skipbadge")).containsText(count + " 天");
     }
 
+    @Then("建議日期區間挖空徽章應顯示即時提示 {string}")
+    public void suggestedDateRangeSkipBadgeShowsInstantTip(String tipContains) {
+        var badge = page.locator("#suggestCalTriggerText .skipbadge");
+        assertDataTipContains(badge, tipContains);
+        assertSharedSkipBadgeStyle(badge);
+    }
+
     @Then("時段 {string} 應為選取狀態")
     public void slotSelected(String slot) {
         assertThat(page.locator(".slot[data-slot='" + slot + "']")).hasClass("slot on");
@@ -1129,7 +1136,12 @@ public class UiSteps {
     @Then("日期範圍欄位應顯示挖空天數徽章 {string}")
     public void dateRangeShowsExcludedBadge(String tipContains) {
         // 挖空天數只顯示符號，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
-        assertDataTipContains(page.locator("#calTriggerText .slotbadge"), tipContains);
+        assertDataTipContains(page.locator("#calTriggerText .skipbadge"), tipContains);
+    }
+
+    @Then("日期範圍挖空徽章應使用粉紅底即時提示")
+    public void dateRangeSkipBadgeUsesSharedStyle() {
+        assertSharedSkipBadgeStyle(page.locator("#calTriggerText .skipbadge"));
     }
 
     @Then("調查清單中 {string} 的日期範圍應顯示挖空天數徽章 {string}")
@@ -1137,7 +1149,14 @@ public class UiSteps {
         var row = page.locator("#surveyList tr")
                 .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
         // 挖空天數只顯示符號，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
-        assertDataTipContains(row.locator(".slotbadge.skipbadge"), tipContains);
+        assertDataTipContains(row.locator(".skipbadge"), tipContains);
+    }
+
+    @Then("調查清單中 {string} 的日期範圍挖空徽章應使用粉紅底即時提示")
+    public void listDateRangeSkipBadgeUsesSharedStyle(String surveyName) {
+        var row = page.locator("#surveyList tr")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+        assertSharedSkipBadgeStyle(row.locator(".skipbadge"));
     }
 
     /**
@@ -1151,6 +1170,24 @@ public class UiSteps {
         String tip = locator.getAttribute("data-tip");
         org.junit.jupiter.api.Assertions.assertTrue(tip != null && tip.contains(expectedSubstring),
                 "data-tip 應包含「" + expectedSubstring + "」，實際為：" + tip);
+    }
+
+    private void assertSharedSkipBadgeStyle(com.microsoft.playwright.Locator locator) {
+        locator = locator.first();
+        assertThat(locator).isVisible();
+
+        String tip = locator.getAttribute("data-tip");
+        org.junit.jupiter.api.Assertions.assertTrue(tip != null && !tip.isBlank(), "挖空徽章應使用 data-tip 自製提示");
+        String title = locator.getAttribute("title");
+        org.junit.jupiter.api.Assertions.assertTrue(title == null || title.isBlank(),
+                "挖空徽章不應使用原生 title，避免提示延遲，實際為：" + title);
+
+        String bg = (String) locator.evaluate("el => getComputedStyle(el).backgroundColor");
+        org.junit.jupiter.api.Assertions.assertEquals("rgb(251, 233, 231)", bg, "挖空徽章應使用共用粉紅底色");
+
+        locator.hover();
+        String visibility = (String) locator.evaluate("el => getComputedStyle(el, '::after').visibility");
+        org.junit.jupiter.api.Assertions.assertEquals("visible", visibility, "hover 後自製 tooltip 應立即顯示");
     }
 
     @Then("意見回饋按鈕不應顯示")

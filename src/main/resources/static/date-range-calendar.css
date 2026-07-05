@@ -1,0 +1,226 @@
+.cal {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  max-width: 460px;
+}
+
+.cal-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d4d9e0;
+  border-radius: 7px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  color: #1f2733;
+  user-select: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.cal-trigger:hover { border-color: #2c7be5; }
+.cal-trigger.empty { color: #aab2bd; }
+
+.cal-ic {
+  width: 18px;
+  height: 18px;
+  stroke: #2c7be5;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+
+.cal-pop {
+  position: absolute;
+  z-index: var(--ts-cal-pop-z, 40);
+  margin-top: 6px;
+  left: var(--ts-cal-pop-left, auto);
+  right: var(--ts-cal-pop-right, 0);
+}
+
+.cal-pop.onb-cal-spot { z-index: var(--ts-cal-onb-z, 1002); }
+
+.cal-pop .cal {
+  width: 460px;
+  max-width: var(--ts-cal-max-width, 90vw);
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+}
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.cal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.cal-hint {
+  font-size: 12px;
+  color: #99a2ad;
+}
+
+.cal-scroll {
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px 0;
+}
+
+.cal-month-divider {
+  grid-column: 1 / -1;
+  margin-top: 14px;
+  padding: 8px 2px 4px;
+  border-top: 1px dashed #dfe3e6;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #2c7be5;
+  letter-spacing: .02em;
+}
+
+.cal-week span {
+  text-align: center;
+  font-size: 12px;
+  color: #999;
+  padding: 4px 0;
+}
+
+.cal-day {
+  position: relative;
+  text-align: center;
+  font-size: 14px;
+  padding: 8px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  color: #333;
+  transition: background .12s, color .12s;
+}
+
+.cal-day:hover:not(.cal-disabled):not(.cal-blank):not(.cal-start):not(.cal-end):not(.cal-single) { background: #eaf2fd; }
+.cal-day.cal-blank { cursor: default; }
+.cal-day.cal-disabled { color: #cbd2d8; cursor: not-allowed; }
+.cal-day.cal-range { background: #e3f0ff; border-radius: 0; }
+.cal-day.cal-start { background: #2c7be5; color: #fff; border-radius: 6px 0 0 6px; }
+.cal-day.cal-end { background: #2c7be5; color: #fff; border-radius: 0 6px 6px 0; }
+.cal-day.cal-single { background: #2c7be5; color: #fff; border-radius: 6px; }
+.cal-day.cal-excluded { background: #fbe9e7; color: #c0392b; text-decoration: line-through; border-radius: 0; }
+.cal-day.cal-disabled.cal-range,
+.cal-day.cal-disabled.cal-excluded { color: #9fb6cf; }
+
+.cal-foot {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #888;
+  min-height: 16px;
+}
+
+.skipbadge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #fbe9e7;
+  color: #c0392b;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: help;
+  vertical-align: middle;
+  text-decoration: none;
+}
+
+.skipbadge::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2c3e50;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 400;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .08s;
+  pointer-events: none;
+  z-index: 6000;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+
+.skipbadge::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #2c3e50;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .08s;
+  pointer-events: none;
+  z-index: 6000;
+}
+
+.skipbadge:hover::after,
+.skipbadge:hover::before {
+  opacity: 1;
+  visibility: visible;
+}
+
+.cal-onb-legend {
+  display: flex;
+  gap: 16px;
+  margin: 10px 0 2px;
+  font-size: 13px;
+  color: #555;
+}
+
+.cal-onb-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cal-onb-sw {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.cal-onb-sw.range {
+  background: #2c7be5;
+  color: #fff;
+}
+
+.cal-onb-sw.skip {
+  background: #fbe9e7;
+  color: #c0392b;
+  text-decoration: line-through;
+}
