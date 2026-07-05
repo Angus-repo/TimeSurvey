@@ -50,6 +50,9 @@
   .ptag .note { color: #999; margin-left: 2px; }
   .ptag .x { color: #999; font-weight: 700; line-height: 1; cursor: pointer; }
   .ptag .x:hover { color: #e74c3c; }
+  /* Entra ID 組織目錄檢查：查無此人／同名未指定的名牌以警示色呈現 */
+  .ptag.warn { background: #fdecea; border-color: #f0b6ae; }
+  .ptag.warn:hover { border-color: #e74c3c; }
   .ptags input { border: none; outline: none; flex: 1; min-width: 160px; font-size: 14px; padding: 4px; }
   .modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
   .modal-actions .muted { font-size: 13px; color: #999; }
@@ -89,12 +92,30 @@
           display: flex; flex-direction: column; gap: 4px; min-width: 58px; background: #fbfcfc;
           transition: border-color .15s, background .15s; }
   .hbox.full { border-color: #00a884; background: #f2fbf8; }
-  .slot { border: 1px solid #ccc; border-radius: 4px; padding: 6px 4px; font-size: 13px; text-align: center;
+  .slot { position: relative; border: 1px solid #ccc; border-radius: 4px; padding: 6px 4px; font-size: 13px; text-align: center;
           cursor: pointer; user-select: none; background: #fff; white-space: nowrap;
           transition: background .15s, border-color .15s, box-shadow .15s, transform .1s; }
   .slot:hover { border-color: #00a884; background: #eef6f3; box-shadow: 0 1px 4px rgba(0,168,132,.25); }
+  /* 行事曆帶入的忙碌時段：灰色呈現（與白色可選、綠色已選區別），滑鼠移過顯示會議明細 */
+  .slot.busy { background: #e3e6ea; border-color: #c8cdd4; color: #697280; }
+  .slot.busy:hover { background: #d8dce2; border-color: #aab2bd; box-shadow: 0 1px 4px rgba(90,100,112,.3); }
   .slot.on { background: #00a884; border-color: #00a884; color: #fff; }
   .slot.on:hover { background: #009675; border-color: #009675; box-shadow: 0 1px 6px rgba(0,168,132,.4); }
+  /* 已勾選優先於忙碌：仍以綠色顯示（右上角會議數量徽章仍保留） */
+  .slot.busy.on { background: #00a884; border-color: #00a884; color: #fff; }
+  .slot.busy.on:hover { background: #009675; border-color: #009675; }
+  /* 同一時段有多個會議：右上角的數量徽章 */
+  .slot .bzn { position: absolute; top: -7px; right: -7px; min-width: 17px; height: 17px; border-radius: 9px;
+               background: #e67e22; color: #fff; font-size: 11px; font-weight: 700; line-height: 17px;
+               padding: 0 4px; box-shadow: 0 1px 3px rgba(0,0,0,.3); pointer-events: none; }
+  /* 忙碌時段的會議明細提示框（跟著滑鼠所在的時段顯示） */
+  .cal-tip { position: fixed; z-index: 6000; max-width: 340px; background: #2c3e50; color: #fff;
+             font-size: 12.5px; line-height: 1.7; padding: 10px 14px; border-radius: 8px;
+             box-shadow: 0 4px 14px rgba(0,0,0,.35); pointer-events: none; display: none; }
+  .cal-tip .ct-head { font-weight: 700; color: #ffd591; margin-bottom: 4px; }
+  .cal-tip .ct-item + .ct-item { border-top: 1px solid rgba(255,255,255,.22); margin-top: 6px; padding-top: 6px; }
+  .cal-tip .ct-sub { font-weight: 700; }
+  .cal-tip .ct-org { color: #cdd7e1; font-size: 12px; }
   /* 外框右上角的圓形勾勾徽章：勾起＝該小時兩格全選 */
   .chk { position: absolute; top: -9px; right: -9px; width: 22px; height: 22px; border-radius: 50%;
          display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2;
@@ -229,6 +250,8 @@
   <div class="card topbar" id="actionBar" style="display:none">
     <button id="btnInvite" class="topbtn" onclick="openInviteModal()" style="display:none">➕ 邀請其他人加入</button>
     <button id="btnSwap" class="topbtn alt" onclick="openSwapModal()" style="display:none">🔄 換成其他人</button>
+    <button id="btnCal" class="topbtn" onclick="loadMyCalendar()" style="display:none; background:#0a7d57"
+            title="同意讀取您的行事曆後，會把調查期間已有的會議以灰色顯示在下方時段表，方便對照填寫">📅 同意讀取我的行事曆</button>
   </div>
   <div class="grid-outer" id="gridOuter">
     <div class="card gridwrap" id="gridCard"></div>
@@ -267,12 +290,13 @@
   <button id="submitBtn" onclick="submitResponse()">送出我的可出席時間</button>
 </div>
 <div class="toast" id="toast"></div>
+<div class="cal-tip" id="calTip"></div>
 <div class="modal-mask" id="inviteMask" style="display:none" onclick="closeInviteModal()"></div>
 <div class="card modal-card" id="inviteModal" style="display:none">
   <h3>➕ 邀請其他人加入</h3>
   <p class="modal-hint">輸入姓名按 Enter，或直接貼上整串名單（可用分號、逗號、換行等分隔）</p>
   <div class="ptags" id="inviteTags">
-    <input id="inviteInput" placeholder="輸入姓名後按 Enter，或貼上「王大明;陳小明;李中明」這類名單">
+    <input id="inviteInput" placeholder="輸入姓名後按 Enter（姓名可含空白），或貼上「王大明;陳小明;Angus Luo」這類名單">
   </div>
   <div class="modal-actions">
     <span class="muted" id="inviteCount">共 0 人</span>
@@ -287,7 +311,7 @@
   <h3>🔄 換成其他人</h3>
   <p class="modal-hint" id="swapHint">輸入新的姓名按 Enter，可輸入一位或多位</p>
   <div class="ptags" id="swapTags">
-    <input id="swapInput" placeholder="輸入新的姓名後按 Enter，或貼上「陳大文;林小美」這類名單">
+    <input id="swapInput" placeholder="輸入新的姓名後按 Enter（姓名可含空白），或貼上「陳大文;林小美」這類名單">
   </div>
   <div class="modal-actions">
     <span class="muted" id="swapCount">共 0 人</span>
@@ -311,6 +335,7 @@
   </div>
 </div>
 
+<script src="/entra.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const surveyId = location.pathname.split('/')[2];
@@ -416,6 +441,13 @@ async function init() {
     $('btnInvite').style.display = showInvite ? '' : 'none';
     $('btnSwap').style.display = showSwap ? '' : 'none';
   }
+  // 已啟用 Entra ID 登入時：顯示「同意讀取我的行事曆」按鈕（調查已結束僅供查看，不需帶入）
+  if (window.Entra) Entra.ready.then(on => {
+    if (on && !readOnly) {
+      $('actionBar').style.display = '';
+      $('btnCal').style.display = '';
+    }
+  });
   if (readOnly) {
     $('submitBtn').style.display = 'none';
     $('roNote').style.display = '';
@@ -669,6 +701,146 @@ async function loadMyResponse() {
   refreshCopyButtons();
 }
 
+/* ---------- Entra ID：帶入我的行事曆 ---------- */
+let busyMap = {};   // "yyyy-MM-ddTHH:mm" -> [{ subject, organizer }]，同意讀取行事曆後填入
+
+/* 「同意讀取我的行事曆」：首次點擊會請求 Calendars.Read 權限同意，之後可點擊重新整理。
+   讀到的會議會覆蓋到調查期間的時段表：忙碌時段以灰色顯示、同一時段多個會議註明數量 */
+async function loadMyCalendar() {
+  const btn = $('btnCal');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '📅 讀取行事曆中…';
+  try {
+    const events = await Entra.myCalendar(survey.startDate + 'T00:00:00', survey.endDate + 'T23:59:59');
+    busyMap = {};
+    const dates = dateList(survey.startDate, survey.endDate, survey.excludedDates);
+    for (const ev of events) {
+      // Graph 回傳的時間已指定為台北時區；截去 7 位小數秒讓 Date 可正確解析
+      const es = new Date(String(ev.start.dateTime).slice(0, 19));
+      const ee = new Date(String(ev.end.dateTime).slice(0, 19));
+      const item = {
+        subject: ev.subject || '（未命名會議）',
+        organizer: (ev.organizer && ev.organizer.emailAddress &&
+                    (ev.organizer.emailAddress.name || ev.organizer.emailAddress.address)) || '（不明）'
+      };
+      // 與各 30 分鐘時段做重疊判斷（含跨多時段、全天的會議）
+      for (const d of dates) {
+        for (const t of times) {
+          const ss = new Date(d + 'T' + t + ':00');
+          const se = new Date(ss.getTime() + 30 * 60000);
+          if (es < se && ee > ss) (busyMap[d + 'T' + t] = busyMap[d + 'T' + t] || []).push(item);
+        }
+      }
+    }
+    applyBusy();
+    btn.textContent = '📅 已帶入行事曆（' + events.length + ' 筆會議，可點擊重新整理）';
+    toast(events.length > 0
+        ? '已帶入您的行事曆：灰色時段表示已有會議，滑鼠移過可查看會議名稱與邀請人'
+        : '已讀取您的行事曆：調查期間沒有既有的會議');
+  } catch (e) {
+    btn.textContent = orig;
+    toast('讀取行事曆失敗：' + (e.message || '請稍後再試'));
+  }
+  btn.disabled = false;
+}
+
+/* 把 busyMap 套到時段表：忙碌時段加上灰色樣式，同一時段多個會議在右上角註明數量 */
+function applyBusy() {
+  document.querySelectorAll('.slot').forEach(el => {
+    const list = busyMap[el.dataset.slot];
+    el.classList.toggle('busy', !!list);
+    const old = el.querySelector('.bzn');
+    if (old) old.remove();
+    if (list && list.length > 1) {
+      const b = document.createElement('span');
+      b.className = 'bzn';
+      b.textContent = list.length;
+      el.appendChild(b);
+    }
+  });
+}
+
+/* 滑鼠移過忙碌時段：顯示該時段全部會議的完整名稱與邀請人（多個會議逐筆列出） */
+document.addEventListener('mouseover', e => {
+  const tip = $('calTip');
+  const slot = e.target.closest ? e.target.closest('.slot.busy') : null;
+  const list = slot && busyMap[slot.dataset.slot];
+  if (!list) { tip.style.display = 'none'; return; }
+  tip.innerHTML = '';
+  if (list.length > 1) {
+    const h = document.createElement('div');
+    h.className = 'ct-head';
+    h.textContent = '📅 此時段有 ' + list.length + ' 個會議';
+    tip.appendChild(h);
+  }
+  for (const m of list) {
+    const it = document.createElement('div');
+    it.className = 'ct-item';
+    const s = document.createElement('div');
+    s.className = 'ct-sub';
+    s.textContent = m.subject;
+    const o = document.createElement('div');
+    o.className = 'ct-org';
+    o.textContent = '邀請人：' + m.organizer;
+    it.append(s, o);
+    tip.appendChild(it);
+  }
+  tip.style.display = 'block';
+  // 提示框置於時段上方置中並夾在視窗內；上方放不下改放下方
+  const r = slot.getBoundingClientRect();
+  const left = Math.max(8, Math.min(r.left + r.width / 2 - tip.offsetWidth / 2, window.innerWidth - tip.offsetWidth - 8));
+  let top = r.top - tip.offsetHeight - 8;
+  if (top < 8) top = r.bottom + 8;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+});
+
+/* ---------- Entra ID：邀請／換員輸入的組織目錄檢查 ---------- */
+/* 逐一檢查剛輸入的姓名是否存在公司組織（僅啟用 Entra ID 登入時）：
+   查無此人 → 提示使用者；同名同姓多筆 → 彈出選擇視窗（列出部門、email）讓使用者指定。
+   list 為名單陣列、verify 為姓名→檢查結果的物件、rerender 為重繪名牌的函式 */
+async function verifyEntraNames(names, list, verify, rerender) {
+  if (!window.Entra || !(await Entra.ready)) return;
+  for (const name of names) {
+    if (!list.includes(name) || verify[name]) continue;   // 已被移除或已檢查過
+    verify[name] = { status: 'checking' };
+    rerender();
+    try {
+      const r = await Entra.verifyName(name);
+      if (r.status === 'disabled') { delete verify[name]; return; }
+      verify[name] = r;
+      if (r.status === 'notfound') toast('「' + name + '」不在公司組織中，請確認姓名是否正確');
+    } catch (e) {
+      delete verify[name];   // 查詢失敗（網路、權限等）不擋操作，僅不顯示檢查結果
+    }
+    rerender();
+  }
+}
+
+/* 名牌上的組織目錄檢查結果：查得到顯示部門（滑上看 email），查無此人／同名未指定則以警示色標示 */
+function entraVerifyNoteEl(tag, name, verify) {
+  const v = verify[name];
+  if (!v) return null;
+  const el = document.createElement('span');
+  el.className = 'note';
+  if (v.status === 'checking') {
+    el.textContent = '（查詢組織中…）';
+  } else if (v.status === 'notfound') {
+    el.textContent = '（⚠ 查無此人）';
+    tag.classList.add('warn');
+    tag.title = '「' + name + '」不在公司組織中，請確認姓名是否正確';
+  } else if (v.status === 'cancelled') {
+    el.textContent = '（⚠ 同名多人，未指定）';
+    tag.classList.add('warn');
+    tag.title = '組織中有多位「' + name + '」，尚未指定是哪一位';
+  } else if (v.status === 'ok' && v.user) {
+    el.textContent = '（' + (v.user.department || v.user.jobTitle || '已確認') + '）';
+    tag.title = v.user.mail || v.user.userPrincipalName || '';
+  }
+  return el;
+}
+
 /* ---------- 邀請他人加入 / 換成其他人 ---------- */
 /* 自訂下拉選單：原生 <select><option> 無法讓文字分段上色，改用清單項目呈現，
    姓名維持一般顏色，「（由 X 邀請加入／換員轉入）」等來源說明則以灰色顯示 */
@@ -728,18 +900,22 @@ function rebuildWhoOptions() {
   refreshWhoTrigger();
 }
 
-/* 把輸入的整串文字拆成多位姓名：支援分號、逗號、換行、頓號、全形標點與空白分隔 */
+/* 把輸入的整串文字拆成多位姓名：支援分號、逗號、換行、Tab、頓號與全形標點分隔。
+   空白「不是」分隔符——英文姓名（如 Angus Luo）中間可含空白，連續空白會正規化為一個 */
 function splitNames(text) {
-  return [...new Set(String(text).split(/[\n\r,;，；、\s]+/).map(s => s.trim()).filter(Boolean))];
+  return [...new Set(String(text).split(/[\n\r\t,;，；、]+/)
+      .map(s => s.trim().replace(/\s+/g, ' ')).filter(Boolean))];
 }
 
 /* ---------- 邀請他人加入：彈窗內以姓名標籤輸入多人，樣式與操作方式比照後台維護頁的「受調查人員」欄位 ---------- */
-let inviteList = [];   // 彈窗中已加入的待邀請姓名（尚未送出）
+let inviteList = [];     // 彈窗中已加入的待邀請姓名（尚未送出）
+let inviteVerify = {};   // 姓名 -> 組織目錄檢查結果（僅啟用 Entra ID 時使用）
 
 function openInviteModal() {
   const inviter = whoValue;
   if (!inviter) return toast('請先選擇您的姓名，再邀請其他人加入');
   inviteList = [];
+  inviteVerify = {};
   $('inviteInput').value = '';
   renderInviteTags();
   $('inviteMask').style.display = '';
@@ -761,6 +937,8 @@ function renderInviteTags() {
     tag.className = 'ptag';
     const label = document.createElement('span');
     label.textContent = name;
+    const vEl = entraVerifyNoteEl(tag, name, inviteVerify);
+    if (vEl) label.appendChild(vEl);
     const x = document.createElement('span');
     x.className = 'x';
     x.textContent = '×';
@@ -768,6 +946,7 @@ function renderInviteTags() {
     x.onclick = e => {
       e.stopPropagation();
       inviteList.splice(i, 1);
+      delete inviteVerify[name];
       renderInviteTags();
     };
     tag.append(label, x);
@@ -781,11 +960,14 @@ function renderInviteTags() {
 function addInviteNames(text, silent) {
   const dupNames = [];
   const existingNames = [];
+  const added = [];
   for (const name of splitNames(text)) {
     if (inviteList.includes(name)) { dupNames.push(name); continue; }
     if (survey.participants.includes(name)) { existingNames.push(name); continue; }
     inviteList.push(name);
+    added.push(name);
   }
+  if (added.length > 0) verifyEntraNames(added, inviteList, inviteVerify, renderInviteTags);   // 背景檢查組織目錄
   if (!silent) {
     if (existingNames.length > 0) {
       let msg = '「' + existingNames.join('、') + '」已在受調查人員名單中，無法重複邀請，已略過';
@@ -826,6 +1008,22 @@ $('inviteInput').addEventListener('paste', e => {
 });
 $('inviteTags').addEventListener('click', e => {
   if (e.target === $('inviteTags')) $('inviteInput').focus();
+});
+// 啟用 Entra ID 時：邀請／換員輸入 2 個字以上帶出組織目錄的人名建議，點選即加入名單
+if (window.Entra) Entra.ready.then(on => {
+  if (!on) return;
+  Entra.attachSuggest($('inviteInput'), u => {
+    inviteVerify[u.displayName] = { status: 'ok', user: u };   // 建議來自組織目錄，免再查一次
+    $('inviteInput').value = '';
+    addInviteNames(u.displayName);
+    $('inviteInput').focus();
+  });
+  Entra.attachSuggest($('swapInput'), u => {
+    swapVerify[u.displayName] = { status: 'ok', user: u };
+    $('swapInput').value = '';
+    addSwapNames(u.displayName);
+    $('swapInput').focus();
+  });
 });
 
 /* 確認邀請：需先選擇自己的姓名，新加入的人名會註明是由誰邀請加入；逐一送出名單中的姓名。
@@ -879,12 +1077,14 @@ async function confirmInvite() {
 
 /* ---------- 換成其他人：彈窗內以姓名標籤輸入，樣式與操作方式比照「邀請他人加入」／後台維護頁的人員欄位；
    可輸入一位或多位新姓名（第一位頂替原本的位置，其餘視為一併加入的新人員） ---------- */
-let swapList = [];   // 彈窗中輸入的新姓名（尚未送出）
+let swapList = [];     // 彈窗中輸入的新姓名（尚未送出）
+let swapVerify = {};   // 姓名 -> 組織目錄檢查結果（僅啟用 Entra ID 時使用）
 
 function openSwapModal() {
   const current = whoValue;
   if (!current) return toast('請先選擇您的姓名，再進行換員');
   swapList = [];
+  swapVerify = {};
   $('swapInput').value = '';
   $('swapHint').textContent = '要把「' + current + '」換成誰？可輸入一或多位新的姓名';
   renderSwapTags();
@@ -907,6 +1107,8 @@ function renderSwapTags() {
     tag.className = 'ptag';
     const label = document.createElement('span');
     label.textContent = name;
+    const vEl = entraVerifyNoteEl(tag, name, swapVerify);
+    if (vEl) label.appendChild(vEl);
     const x = document.createElement('span');
     x.className = 'x';
     x.title = '移除 ' + name;
@@ -914,6 +1116,7 @@ function renderSwapTags() {
     x.onclick = e => {
       e.stopPropagation();
       swapList.splice(i, 1);
+      delete swapVerify[name];
       renderSwapTags();
     };
     tag.append(label, x);
@@ -927,11 +1130,14 @@ function renderSwapTags() {
 function addSwapNames(text, silent) {
   const dupNames = [];
   const existingNames = [];
+  const added = [];
   for (const name of splitNames(text)) {
     if (swapList.includes(name)) { dupNames.push(name); continue; }
     if (survey.participants.includes(name)) { existingNames.push(name); continue; }
     swapList.push(name);
+    added.push(name);
   }
+  if (added.length > 0) verifyEntraNames(added, swapList, swapVerify, renderSwapTags);   // 背景檢查組織目錄
   if (!silent) {
     if (existingNames.length > 0) {
       let msg = '「' + existingNames.join('、') + '」已在受調查人員名單中，無法換成同一人，已略過';

@@ -104,6 +104,9 @@
   .ptag .note { color: #999; margin-left: 2px; }
   .ptag .x { color: #999; font-weight: 700; line-height: 1; cursor: pointer; }
   .ptag .x:hover { color: #e74c3c; }
+  /* Entra ID 組織目錄檢查：查無此人／同名未指定的名牌以粉紅底警示 */
+  .ptag.warn { background: #ffdbe6; border-color: #f5a8c0; }
+  .ptag.warn:hover { border-color: #e75480; }
   .ptags input { border: none; outline: none; flex: 1; min-width: 240px; font-size: 14px; padding: 4px; width: auto; }
   .pbar { display: flex; justify-content: flex-start; align-items: center; gap: 14px; margin-top: 8px; font-size: 13px; }
   .pbar a { color: #2c7be5; text-decoration: none; }
@@ -392,7 +395,7 @@
       <div>
         <label>受調查人員（輸入姓名按 Enter，或直接貼上整串名單）</label>
         <div class="ptags" id="pTags">
-          <input id="pInput" placeholder="輸入姓名後按 Enter，或貼上「王大明;陳小明;李中明」這類名單">
+          <input id="pInput" placeholder="輸入姓名後按 Enter（姓名可含空白），或貼上「王大明;陳小明;Angus Luo」這類名單">
         </div>
         <div class="pbar">
           <span class="muted" id="pCount">共 0 人</span>
@@ -478,6 +481,7 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="/entra.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 
@@ -913,6 +917,52 @@ function setDefaultDates() {
 /* ---------- 受調查人員：名牌式輸入 ---------- */
 let plist = [];   // 人員名單
 let pNotes = {};  // 名單中每位人員的來源說明（例如「由 X 邀請加入」），只讀，由後端經邀請/換員紀錄
+let pVerify = {}; // 姓名 -> { status: 'checking'|'ok'|'notfound'|'cancelled', user }（僅啟用 Entra ID 時使用）
+
+/* 名牌上的組織目錄檢查結果：姓名正確維持原本顏色且不顯示文字（滑上可看 email），
+   查無此人／同名未指定則以粉紅底警示 */
+function verifyNoteEl(tag, name) {
+  const v = pVerify[name];
+  if (!v) return null;
+  if (v.status === 'ok') {
+    if (v.user) tag.title = v.user.mail || v.user.userPrincipalName || '';
+    return null;
+  }
+  const el = document.createElement('span');
+  el.className = 'note';
+  if (v.status === 'checking') {
+    el.textContent = '（查詢組織中…）';
+  } else if (v.status === 'notfound') {
+    el.textContent = '（⚠ 查無此人）';
+    tag.classList.add('warn');
+    tag.title = '「' + name + '」不在公司組織中，請確認姓名是否正確';
+  } else if (v.status === 'cancelled') {
+    el.textContent = '（⚠ 同名多人，未指定）';
+    tag.classList.add('warn');
+    tag.title = '組織中有多位「' + name + '」，尚未指定是哪一位';
+  }
+  return el;
+}
+
+/* 逐一檢查剛輸入的姓名是否存在公司組織（僅啟用 Entra ID 登入時）：
+   查無此人 → 提示使用者；同名同姓多筆 → 彈出選擇視窗（列出部門、email）讓使用者指定 */
+async function verifyNames(names) {
+  if (!window.Entra || !(await Entra.ready)) return;
+  for (const name of names) {
+    if (!plist.includes(name) || pVerify[name]) continue;   // 已被移除或已檢查過
+    pVerify[name] = { status: 'checking' };
+    renderTags();
+    try {
+      const r = await Entra.verifyName(name);
+      if (r.status === 'disabled') { delete pVerify[name]; return; }
+      pVerify[name] = r;
+      if (r.status === 'notfound') toast('「' + name + '」不在公司組織中，請確認姓名是否正確');
+    } catch (e) {
+      delete pVerify[name];   // 查詢失敗（網路、權限等）不擋操作，僅不顯示檢查結果
+    }
+    renderTags();
+  }
+}
 
 function renderTags() {
   const box = $('pTags');
@@ -930,6 +980,8 @@ function renderTags() {
       noteEl.textContent = '（' + note + '）';
       label.appendChild(noteEl);
     }
+    const vEl = verifyNoteEl(tag, name);
+    if (vEl) label.appendChild(vEl);
     const x = document.createElement('span');
     x.className = 'x';
     x.textContent = '×';
@@ -937,6 +989,7 @@ function renderTags() {
     x.onclick = e => {
       e.stopPropagation();
       plist.splice(i, 1);
+      delete pVerify[name];
       renderTags();
     };
     tag.append(label, x);
@@ -945,17 +998,21 @@ function renderTags() {
   $('pCount').textContent = '共 ' + plist.length + ' 人';
 }
 
-/* 把整串文字拆成多位人名：支援換行、逗號、分號、頓號、全形標點與空白 */
+/* 把整串文字拆成多位人名：支援換行、Tab、逗號、分號、頓號與全形標點分隔。
+   空白「不是」分隔符——英文姓名（如 Angus Luo）中間可含空白，連續空白會正規化為一個 */
 function addNames(text) {
   let dup = 0;
-  for (const n of String(text).split(/[\n\r,;，；、\s]+/)) {
-    const name = n.trim();
+  const added = [];
+  for (const n of String(text).split(/[\n\r\t,;，；、]+/)) {
+    const name = n.trim().replace(/\s+/g, ' ');
     if (!name) continue;
     if (plist.includes(name)) { dup++; continue; }
     plist.push(name);
+    added.push(name);
   }
   if (dup > 0) toast('已略過 ' + dup + ' 個重複姓名');
   renderTags();
+  if (added.length > 0) verifyNames(added);   // 背景檢查是否存在公司組織（未啟用 Entra ID 時不動作）
 }
 
 function commitPInput() {
@@ -995,6 +1052,16 @@ $('pInput').addEventListener('paste', e => {
   e.preventDefault();
   addNames((e.clipboardData || window.clipboardData).getData('text'));
 });
+// 啟用 Entra ID 時：輸入 2 個字以上帶出組織目錄的人名建議，點選即加入名單
+if (window.Entra) Entra.ready.then(on => {
+  if (!on) return;
+  Entra.attachSuggest($('pInput'), u => {
+    pVerify[u.displayName] = { status: 'ok', user: u };   // 建議來自組織目錄，免再查一次
+    addNames(u.displayName);
+    $('pInput').value = '';
+    $('pInput').focus();
+  });
+});
 $('pTags').addEventListener('click', e => {
   if (e.target === $('pTags')) $('pInput').focus();
 });
@@ -1025,6 +1092,22 @@ async function saveSurvey() {
   if (body.participants.length < 2) return toast('受調查人員至少需要兩位');
   // 超過 30 人僅提示、不阻擋（人數過多較難喬出共同時間召開會議）
   if (body.participants.length > 30) toast('提醒：受調查人員已超過 30 人，人數過多較難喬出共同時間召開會議');
+
+  // 已登入 Entra ID 時：受調查人員需通過組織目錄檢查才能送出
+  //（未啟用或未登入時完全不套用此條件，維持免登入的原行為）
+  if (window.Entra && Entra.enabled() && Entra.account()) {
+    const st = n => (pVerify[n] || {}).status;
+    const notfound = body.participants.filter(n => st(n) === 'notfound');
+    const unpicked = body.participants.filter(n => st(n) === 'cancelled');
+    const checking = body.participants.filter(n => st(n) === 'checking');
+    if (notfound.length > 0 || unpicked.length > 0) {
+      const parts = [];
+      if (notfound.length > 0) parts.push('「' + notfound.join('、') + '」不在公司組織中');
+      if (unpicked.length > 0) parts.push('「' + unpicked.join('、') + '」同名多人尚未指定是哪一位');
+      return toast(parts.join('；') + '，請修正後再送出');
+    }
+    if (checking.length > 0) return toast('正在檢查姓名是否存在公司組織，請稍候再試');
+  }
 
   const editId = $('editId').value;
   try {
@@ -1064,6 +1147,7 @@ function editSurvey(id) {
   setCalRange(s.startDate, s.endDate, s.excludedDates || []);
   plist = [...s.participants];
   pNotes = { ...(s.participantNotes || {}) };
+  pVerify = {};   // 既有名單視為已確認過，不重查組織
   renderTags();
   $('fAllowAdd').checked = !!s.allowAddParticipant;
   $('fAllowSwap').checked = !!s.allowReplaceParticipant;
@@ -1081,6 +1165,7 @@ function duplicateSurvey(id) {
   $('fName').value = s.name;
   plist = [...s.participants];
   pNotes = {};   // 複製為全新的調查，不承繼原調查的邀請/換員紀錄
+  pVerify = {};
   renderTags();
   $('fAllowAdd').checked = !!s.allowAddParticipant;
   $('fAllowSwap').checked = !!s.allowReplaceParticipant;
@@ -1095,6 +1180,7 @@ function resetForm() {
   setDefaultDates();
   plist = [];
   pNotes = {};
+  pVerify = {};
   $('pInput').value = '';
   renderTags();
   $('fAllowAdd').checked = true;

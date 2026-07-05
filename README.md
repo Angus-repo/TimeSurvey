@@ -38,6 +38,42 @@ feedback.subject=[TimeSurvey] 意見回饋
 
 修改此檔後，重新啟動應用程式即會生效（設定值於啟動時載入，執行中修改不會即時反映）。
 
+## Entra ID 登入設定（可選）
+
+各網頁（後台維護頁 `/`、調查填寫頁 `/s/{id}`、統計頁 `/stats`）預設**免登入**。
+若要啟用 Microsoft Entra ID（Azure AD）登入，請建立 `./data/entra.properties`
+（範例見同目錄的 `entra.properties.example`，已 `.gitignore`，不進版控）：
+
+```properties
+# 必填：Azure 應用程式註冊的 Application (client) ID，未填此項則不啟用登入
+entra.client-id=11111111-2222-3333-4444-555555555555
+# 必填：用戶端密碼（憑證及祕密 > 用戶端密碼的「值」），後端以此向微軟換取 token
+entra.client-secret=你的用戶端密碼
+# 選填：Directory (tenant) ID，未填則採用預設值 common（公司帳號與個人 Microsoft 帳戶皆可）；
+# 公司正式使用建議填自家租戶 ID。注意 organizations 會擋掉個人帳戶（選了帳號會被退回
+# 帳戶選擇頁、形成無限循環），個人帳戶測試時請留空（common）
+entra.tenant-id=
+```
+
+登入採**後端授權碼流程**：首次登入後 refresh token 由後端保存在資料庫
+（`entra_token` 資料表），之後每次都由後端以 refresh token 換取 access token
+呼叫 Microsoft Graph，前端不接觸任何 token。啟用後除了強制以公司帳號登入，
+還會開啟兩項整合功能：
+
+- **受調查人員的組織目錄檢查**：在後台輸入受調查人員、或於填寫頁邀請／換員時，
+  以 Microsoft Graph 檢查該姓名是否存在公司組織；查無此人會提示使用者，
+  同名同姓多筆時彈出選擇視窗（列出部門、email）讓使用者指定是哪一位。
+- **填寫頁帶入我的行事曆**：填寫頁新增「同意讀取我的行事曆」按鈕，同意後把
+  調查期間已有的會議帶入時段表，忙碌時段以**灰色**顯示（與白色可選、綠色已選區別）；
+  同一時段有多個會議會在右上角註明數量，滑鼠移過可看每個會議的完整名稱與邀請人。
+
+Azure 應用程式註冊需求：**Web** 平台重新導向 URI 填本站的回呼端點
+（如 `http://localhost:8080/api/entra/callback`），並建立一個用戶端密碼；
+Microsoft Graph 委派權限：`User.Read`（登入）、`User.ReadBasic.All`（組織目錄檢查）、
+`Calendars.Read`（帶入行事曆）、`offline_access`（取得 refresh token）。
+未建立 `entra.properties`（或 CLIENT_ID / CLIENT_SECRET 留空）時，
+以上功能全部不啟用，網站維持原本的免登入行為。
+
 ## 執行方式
 
 啟動前需先設定 Jasypt 主金鑰環境變數（見下方「資料庫密碼」一節）：

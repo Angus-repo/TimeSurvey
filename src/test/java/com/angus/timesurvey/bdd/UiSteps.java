@@ -540,6 +540,11 @@ public class UiSteps {
         assertThat(page.locator("#closedBanner")).containsText("已結束");
     }
 
+    @Then("填寫頁不應顯示帶入行事曆按鈕")
+    public void calendarButtonHidden() {
+        assertThat(page.locator("#btnCal")).isHidden();
+    }
+
     /* ---------- 後台維護頁 ---------- */
 
     @When("開啟後台維護頁")
@@ -676,6 +681,24 @@ public class UiSteps {
         for (String p : people.split(",")) {
             page.fill("#pInput", p);
             page.keyboard().press("Enter");   // 名牌式輸入：每位按 Enter 成為一顆名牌
+        }
+    }
+
+    @When("在受調查人員欄位貼上 {string}")
+    public void pasteParticipants(String text) {
+        // 觸發輸入框的 paste 事件（頁面攔截剪貼簿內容自行拆名，不能用 fill 模擬）
+        page.evaluate("t => { const dt = new DataTransfer(); dt.setData('text', t);"
+                + " document.getElementById('pInput').dispatchEvent("
+                + "new ClipboardEvent('paste', { clipboardData: dt })); }", text);
+    }
+
+    @Then("受調查人員名牌應依序為 {string}")
+    public void participantTagsAre(String expected) {
+        String[] names = expected.split(",");
+        var tags = page.locator("#pTags .ptag");
+        assertThat(tags).hasCount(names.length);
+        for (int i = 0; i < names.length; i++) {
+            assertThat(tags.nth(i)).containsText(names[i]);
         }
     }
 

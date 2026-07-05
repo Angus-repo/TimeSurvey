@@ -1,0 +1,40 @@
+# Microsoft Entra ID（Azure AD）登入功能設定範例。
+#
+# 登入採「後端授權碼流程」：使用者首次登入後，refresh token 由後端保存在資料庫，
+# 之後每次都由後端以 refresh token 換取 access token 呼叫 Microsoft Graph
+#（查詢組織使用者、讀取行事曆），前端不接觸任何 token。
+#
+# 使用方式：
+#   1. 先到 Azure Portal > Microsoft Entra ID > 應用程式註冊，註冊一個應用程式：
+#      - 平台設定：新增「Web」平台，重新導向 URI 填入本站的回呼端點，例如
+#          http://localhost:8080/api/entra/callback
+#        （正式環境請改填正式網址，路徑固定為 /api/entra/callback）
+#      - 憑證及祕密：新增一個「用戶端密碼（client secret）」，把「值」填到下方
+#        entra.client-secret（注意離開頁面後就看不到值，請當場複製）
+#      - API 權限（Microsoft Graph，委派權限）：
+#          User.Read            登入者基本資料（登入必要）
+#          User.ReadBasic.All   查詢公司組織中的使用者（受調查人員姓名檢查）
+#          Calendars.Read       讀取登入者行事曆（調查填寫頁帶入行事曆）
+#          offline_access       取得 refresh token（後端保存、換發 access token 必要）
+#   2. 複製本檔為同目錄下的 entra.properties（去掉 .example 副檔名）。
+#   3. 填入下方的 CLIENT_ID 與 CLIENT_SECRET（皆必填），租戶識別碼可選填。
+#   4. 重新啟動應用程式，各網頁（後台維護頁、調查填寫頁、統計頁）即會啟用 Entra ID 登入。
+#
+# entra.properties 本身位於 .gitignore 的 data/ 目錄內，不會進版控；
+# 若完全不建立 entra.properties（或 CLIENT_ID / CLIENT_SECRET 留空），
+# 各網頁就不啟用 Entra ID 登入。
+
+# 必填：應用程式（用戶端）識別碼，即 Azure 應用程式註冊頁的「Application (client) ID」
+entra.client-id=
+
+# 必填：用戶端密碼（憑證及祕密 > 用戶端密碼的「值」）。
+# 後端以此密碼向微軟換取 token；密碼有效期限到期前記得到 Azure Portal 換新
+entra.client-secret=
+
+# 選填：目錄（租戶）識別碼「Directory (tenant) ID」。
+# 未填則採用預設值 common（公司／學校帳號與個人 Microsoft 帳戶皆可登入，
+# 需搭配應用程式註冊的「支援的帳戶類型」包含個人帳戶）。
+# 正式供公司使用時，建議填入自家租戶識別碼，限制僅限公司帳號登入；
+# 注意 organizations 會擋掉個人 Microsoft 帳戶（如 @gmail.com、@outlook.com 註冊的帳戶），
+# 個人帳戶在微軟登入頁選了帳號會被退回帳戶選擇頁、看起來像無限循環。
+entra.tenant-id=

@@ -50,6 +50,7 @@ src/
 | `ui_admin_page.feature` | 後台維護頁 UI |
 | `ui_survey_page.feature` | 調查填寫頁 UI |
 | `ui_stats_page.feature` | 統計頁 UI |
+| `entra_login.feature` | Entra ID 登入設定（`data/entra.properties`，未設定則不啟用） |
 
 修改功能時，先在上表找到對應 feature；若新功能不屬於任何現有 feature，請新增一個。
 

@@ -1,3 +1,4 @@
 org.springframework.boot.env.EnvironmentPostProcessor=\
 com.angus.timesurvey.config.DbPasswordEnvironmentPostProcessor,\
-com.angus.timesurvey.config.FeedbackEnvironmentPostProcessor
+com.angus.timesurvey.config.FeedbackEnvironmentPostProcessor,\
+com.angus.timesurvey.config.EntraEnvironmentPostProcessor

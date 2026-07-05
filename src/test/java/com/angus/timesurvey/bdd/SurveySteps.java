@@ -336,6 +336,29 @@ public class SurveySteps {
                 HttpMethod.POST, new HttpEntity<>(headers(owner)), String.class);
     }
 
+    /* ---------- Entra ID 登入設定 ---------- */
+
+    @When("查詢 Entra ID 登入設定")
+    public void queryEntraConfig() {
+        last = rest.getForEntity("/api/entra-config", String.class);
+    }
+
+    @When("未登入時查詢組織使用者")
+    public void queryEntraUsersWithoutLogin() {
+        last = rest.getForEntity("/api/entra/users?name=王小明", String.class);
+    }
+
+    @When("未登入時讀取我的行事曆")
+    public void queryEntraCalendarWithoutLogin() {
+        last = rest.getForEntity(
+                "/api/entra/calendar?start=2026-07-06T00:00:00&end=2026-07-07T00:00:00", String.class);
+    }
+
+    @When("未登入時查詢姓名建議")
+    public void queryEntraSuggestWithoutLogin() {
+        last = rest.getForEntity("/api/entra/suggest?name=an", String.class);
+    }
+
     /* ---------- 共用斷言 ---------- */
 
     @Then("回應狀態碼應為 {int}")
