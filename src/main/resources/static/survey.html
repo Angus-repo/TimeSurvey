@@ -141,17 +141,20 @@
   .splitbtn { position: relative; display: inline-flex; }
   .splitbtn .topbtn { background: #3bc9db; }
   .splitbtn .topbtn:hover { background: #22b8cf; }
-  .splitbtn .topbtn.main { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .splitbtn .topbtn.main { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+                            border-top-right-radius: 0; border-bottom-right-radius: 0; }
   .splitbtn .topbtn.caret { padding: 8px 10px; font-size: 11px; border-top-left-radius: 0;
                             border-bottom-left-radius: 0; border-left: 1px solid rgba(255,255,255,.4); }
   .member-menu { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 1100;
                  background: #fff; border: 1px solid #e4e8ec; border-radius: 8px; padding: 4px;
                  min-width: 180px; box-shadow: 0 6px 20px rgba(0,0,0,.16); }
   .member-menu.open { display: block; }
-  .member-menu button { display: block; width: 100%; padding: 9px 12px; background: none; border: none;
+  .member-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; background: none; border: none;
                         border-radius: 6px; font-size: 14px; color: #333; cursor: pointer; text-align: left;
                         font-family: inherit; white-space: nowrap; }
   .member-menu button:hover { background: #e3fafc; color: #0c8599; }
+  .btn-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.15em; flex: none; line-height: 1; }
+  .btn-text { line-height: 1.25; }
   table.grid { border-collapse: separate; border-spacing: 3px; width: 100%; }
   table.grid thead th { font-size: 13px; color: #777; font-weight: 600; padding: 4px 2px; }
   .datecell { background: #f7f9f8; border: 1px solid #e2e8e5; border-radius: 6px; padding: 8px 10px;
@@ -254,9 +257,23 @@
 
   .submit-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; box-shadow: 0 -2px 8px rgba(0,0,0,.1);
                 padding: 10px 16px; text-align: center; z-index: 50; }
-  .submit-bar button { background: #2c7be5; color: #fff; border: none; border-radius: 6px;
-                       padding: 10px 40px; font-size: 16px; cursor: pointer; font-family: inherit; }
-  .submit-bar button:hover { background: #1a68d1; }
+  .submit-actions { position: relative; display: inline-flex; vertical-align: middle; }
+  .submit-bar .submit-main,
+  .submit-bar .submit-caret { background: #2c7be5; color: #fff; border: none; font-size: 16px; cursor: pointer; font-family: inherit; }
+  .submit-bar .submit-main { display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+                             border-radius: 6px 0 0 6px; padding: 10px 34px 10px 40px; }
+  .submit-bar .submit-caret { border-radius: 0 6px 6px 0; border-left: 1px solid rgba(255,255,255,.4);
+                              padding: 10px 12px; font-size: 12px; }
+  .submit-bar .submit-main:hover,
+  .submit-bar .submit-caret:hover { background: #1a68d1; }
+  .submit-menu { display: none; position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 1100;
+                 background: #fff; border: 1px solid #e4e8ec; border-radius: 8px; padding: 4px;
+                 min-width: 220px; box-shadow: 0 6px 20px rgba(0,0,0,.16); }
+  .submit-menu.open { display: block; }
+  .submit-bar .submit-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px; background: none; border: none;
+                                    border-radius: 6px; font-size: 14px; color: #333; cursor: pointer; text-align: left;
+                                    font-family: inherit; white-space: nowrap; }
+  .submit-bar .submit-menu button:hover { background: #eaf2fd; color: #1a68d1; }
   .submit-bar .count { font-size: 13px; color: #777; margin-right: 16px; }
   /* z-index 必須高於所有彈窗（modal-mask 1150 / modal-card 1200），
      否則邀請、換員彈窗開啟時的提示（例如重複姓名已略過）會被遮罩壓住看不到 */
@@ -365,9 +382,15 @@
       <button id="btnMemberCaret" class="topbtn caret" onclick="toggleMemberMenu(event)"
               title="更多成員操作" aria-label="更多成員操作" style="display:none">▼</button>
       <div class="member-menu" id="memberMenu">
-        <button id="miInvite" onclick="closeMemberMenu(); openInviteModal()">➕ 邀請其他人加入</button>
-        <button id="miSwap" onclick="closeMemberMenu(); openSwapModal()">🔄 換成其他人</button>
-        <button id="miDecline" onclick="closeMemberMenu(); openDeclineModal()">🚫 不參加此會議</button>
+        <button id="miInvite" onclick="closeMemberMenu(); openInviteModal()">
+          <span class="btn-icon" aria-hidden="true">➕</span><span class="btn-text">邀請其他人加入</span>
+        </button>
+        <button id="miSwap" onclick="closeMemberMenu(); openSwapModal()">
+          <span class="btn-icon" aria-hidden="true">🔄</span><span class="btn-text">換成其他人</span>
+        </button>
+        <button id="miDecline" onclick="closeMemberMenu(); openDeclineModal()">
+          <span class="btn-icon" aria-hidden="true">🚫</span><span class="btn-text">不參加此會議</span>
+        </button>
       </div>
     </div>
     <button id="btnCal" class="topbtn" onclick="loadMyCalendar()" style="display:none; background:#0a7d57"
@@ -407,7 +430,19 @@
 <div class="submit-bar" id="bar" style="display:none">
   <span class="count" id="count">已勾選 0 個時段</span>
   <span class="hint" id="roNote" style="display:none">📋 調查已結束，僅能查看，無法修改</span>
-  <button id="submitBtn" onclick="submitResponse()">送出我的可出席時間</button>
+  <span class="submit-actions" id="submitSplit">
+    <button id="submitBtn" class="submit-main" onclick="submitResponse()">
+      <span class="btn-icon" aria-hidden="true">🕒</span><span class="btn-text">送出我的可出席時間</span>
+    </button>
+    <button id="submitMenuBtn" class="submit-caret" onclick="toggleSubmitMenu(event)"
+            title="更多送出選項" aria-label="更多送出選項" aria-haspopup="menu" aria-expanded="false">▼</button>
+    <span class="submit-menu" id="submitMenu" role="menu">
+      <button id="miNoTime" type="button" role="menuitem"
+              onclick="closeSubmitMenu(); submitNoTimeChoice()">
+        <span class="btn-icon" aria-hidden="true">🚫</span><span class="btn-text">沒有我可以出席的時間</span>
+      </button>
+    </span>
+  </span>
 </div>
 <div class="toast" id="toast"></div>
 <div class="cal-tip" id="calTip"></div>
@@ -670,13 +705,13 @@ async function init() {
     // 主按鈕依序取「邀請其他人加入」→「換成其他人」→「不參加此會議」
     if (showInvite) {
       memberMainAction = openInviteModal;
-      $('btnMemberMain').textContent = '➕ 邀請其他人加入';
+      setIconButton('btnMemberMain', '➕', '邀請其他人加入');
     } else if (showSwap) {
       memberMainAction = openSwapModal;
-      $('btnMemberMain').textContent = '🔄 換成其他人';
+      setIconButton('btnMemberMain', '🔄', '換成其他人');
     } else {
       memberMainAction = openDeclineModal;
-      $('btnMemberMain').textContent = '🚫 不參加此會議';
+      setIconButton('btnMemberMain', '🚫', '不參加此會議');
     }
     // 選單只列出「非主按鈕」的其他操作；有其他操作時才需要右側箭頭
     $('miInvite').style.display = 'none';
@@ -700,7 +735,7 @@ async function init() {
     maybeStartOnboarding();
   }
   if (readOnly) {
-    $('submitBtn').style.display = 'none';
+    $('submitSplit').style.display = 'none';
     $('roNote').style.display = '';
     $('closedBanner').style.display = '';
     toast('📋 本調查已結束，僅能查看，無法修改');
@@ -1163,9 +1198,39 @@ function closeMemberMenu() {
   $('memberMenu').classList.remove('open');
 }
 
+function setIconButton(id, icon, text) {
+  $(id).innerHTML = '<span class="btn-icon" aria-hidden="true">' + icon + '</span>' +
+                   '<span class="btn-text">' + text + '</span>';
+}
+
 document.addEventListener('click', e => {
   if (!$('memberSplit').contains(e.target)) closeMemberMenu();
 });
+
+/* ---------- 送出複合按鈕（送出可出席時間 / 完全沒有可出席時間） ---------- */
+function toggleSubmitMenu(e) {
+  e.stopPropagation();
+  if (readOnly) return;
+  const menu = $('submitMenu');
+  const willOpen = !menu.classList.contains('open');
+  menu.classList.toggle('open', willOpen);
+  $('submitMenuBtn').setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+}
+
+function closeSubmitMenu() {
+  $('submitMenu').classList.remove('open');
+  $('submitMenuBtn').setAttribute('aria-expanded', 'false');
+}
+
+document.addEventListener('click', e => {
+  if (!$('submitSplit').contains(e.target)) closeSubmitMenu();
+});
+
+function submitNoTimeChoice() {
+  if (readOnly) return toast('調查已結束，無法再送出');
+  if (!whoValue) return toast(entraLocked ? '您不是本次調查的邀請對象，無法送出' : '請先選擇您的姓名');
+  openNoTimeModal();
+}
 
 /* ---------- 邀請他人加入 / 換成其他人 ---------- */
 /* 自訂下拉選單：原生 <select><option> 無法讓文字分段上色，改用清單項目呈現，
@@ -1877,8 +1942,9 @@ async function submitResponse() {
   if (readOnly) return toast('調查已結束，無法再送出');
   const name = whoValue;
   if (!name) return toast(entraLocked ? '您不是本次調查的邀請對象，無法送出' : '請先選擇您的姓名');
-  // 未勾選任何時段：視為完全無符合的時段（可能因請假、出差等），請說明原因並建議會議日期區間
-  if (selected.size === 0) return openNoTimeModal();
+  if (selected.size === 0) {
+    return toast('請先勾選至少一個可出席時段；若沒有可出席時間，請從右側選單選擇「沒有我可以出席的時間」');
+  }
   const res = await fetch('/api/surveys/' + surveyId + '/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

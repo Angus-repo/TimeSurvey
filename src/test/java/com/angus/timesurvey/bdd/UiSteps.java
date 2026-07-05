@@ -454,13 +454,25 @@ public class UiSteps {
 
     @When("按下送出")
     public void clickSubmit() {
-        page.click("#bar button");
+        page.click("#submitBtn");
+    }
+
+    @When("選擇沒有我可以出席的時間")
+    public void chooseNoAvailableTimeSubmitOption() {
+        page.click("#submitMenuBtn");
+        assertThat(page.locator("#submitMenu")).isVisible();
+        page.click("#miNoTime");
     }
 
     @Then("應顯示完全沒有可出席時段視窗")
     public void noTimeModalShown() {
         assertThat(page.locator("#noTimeModal")).isVisible();
         assertThat(page.locator("#noTimeModal")).containsText("完全沒有可出席的時段");
+    }
+
+    @Then("完全沒有可出席時段視窗不應顯示")
+    public void noTimeModalHidden() {
+        assertThat(page.locator("#noTimeModal")).isHidden();
     }
 
     @Then("建議日期區間應使用大日曆選擇器")
@@ -638,6 +650,22 @@ public class UiSteps {
     @Then("填寫頁不應顯示帶入行事曆按鈕")
     public void calendarButtonHidden() {
         assertThat(page.locator("#btnCal")).isHidden();
+    }
+
+    @Then("送出與成員操作複合按鈕文字前方應顯示圖示")
+    public void splitButtonsShowLeadingIcons() {
+        assertLeadingIconBeforeText("#btnMemberMain", "🚫", "不參加此會議");
+        assertLeadingIconBeforeText("#submitBtn", "🕒", "送出我的可出席時間");
+    }
+
+    private void assertLeadingIconBeforeText(String buttonSelector, String icon, String text) {
+        assertThat(page.locator(buttonSelector + " .btn-icon")).isVisible();
+        assertThat(page.locator(buttonSelector + " .btn-icon")).hasText(icon);
+        assertThat(page.locator(buttonSelector + " .btn-text")).hasText(text);
+        var iconBox = page.locator(buttonSelector + " .btn-icon").boundingBox();
+        var textBox = page.locator(buttonSelector + " .btn-text").boundingBox();
+        org.junit.jupiter.api.Assertions.assertTrue(iconBox.x < textBox.x,
+                "圖示應位於文字前方：" + buttonSelector);
     }
 
     /* ---------- Entra ID 登入模擬 ---------- */
