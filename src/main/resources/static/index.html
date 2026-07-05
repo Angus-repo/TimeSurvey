@@ -111,6 +111,20 @@
   .pbar { display: flex; justify-content: flex-start; align-items: center; gap: 14px; margin-top: 8px; font-size: 13px; }
   .pbar a { color: #2c7be5; text-decoration: none; }
   .pbar a:hover { text-decoration: underline; }
+  /* 允許成員加入／換員：開關樣式的切換鈕 */
+  .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;
+            font-size: 13px; font-weight: 600; color: #8a94a0; user-select: none;
+            transition: color .15s; }
+  .toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; padding: 0; }
+  .toggle .track { position: relative; flex: none; width: 40px; height: 22px; border-radius: 11px;
+                   background: #cbd2db; transition: background .2s, box-shadow .15s; }
+  .toggle .thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+                   background: #fff; box-shadow: 0 1px 3px rgba(16,24,40,.28); transition: transform .2s; }
+  .toggle:hover .track { box-shadow: 0 0 0 4px rgba(0,168,132,.1); }
+  .toggle input:checked + .track { background: #00a884; }
+  .toggle input:checked + .track .thumb { transform: translateX(18px); }
+  .toggle input:checked ~ .tgl-text { color: #1f2733; }
+  .toggle input:focus-visible + .track { box-shadow: 0 0 0 4px rgba(0,168,132,.32); }
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { border-bottom: 1px solid #eef1f5; padding: 13px 10px; text-align: left; vertical-align: top; }
   th { background: #f7f9fb; color: #6b7682; font-weight: 600; font-size: 12.5px; letter-spacing: .04em;
@@ -401,13 +415,17 @@
           <span class="muted" id="pCount">共 0 人</span>
           <a href="javascript:void(0)" onclick="copyParticipants()">📋 複製全部人名</a>
           <div style="margin-left:auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap">
-            <label style="display:inline-flex;align-items:center;gap:5px;font-weight:400;cursor:pointer"
+            <label class="toggle"
                    title="開啟後，參與者在填寫頁可自行邀請其它需要參與會議的人加入這份調查">
-              <input type="checkbox" id="fAllowAdd" checked style="width:auto"> 允許成員加寄
+              <input type="checkbox" id="fAllowAdd" checked>
+              <span class="track"><span class="thumb"></span></span>
+              <span class="tgl-text">允許成員轉寄</span>
             </label>
-            <label style="display:inline-flex;align-items:center;gap:5px;font-weight:400;cursor:pointer"
+            <label class="toggle"
                    title="開啟後，參與者在填寫頁可將自己的名字換成其它還不在名單中的人">
-              <input type="checkbox" id="fAllowSwap" checked style="width:auto"> 允許換員
+              <input type="checkbox" id="fAllowSwap" checked>
+              <span class="track"><span class="thumb"></span></span>
+              <span class="tgl-text">允許成員更換</span>
             </label>
             <div style="display:flex; gap:10px; flex-wrap:wrap">
               <button class="btn-cancel" onclick="resetForm()" id="cancelBtn" style="display:none">取消修改</button>

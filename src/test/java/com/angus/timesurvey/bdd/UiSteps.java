@@ -486,7 +486,8 @@ public class UiSteps {
 
     @When("開啟邀請他人加入視窗")
     public void openInviteModal() {
-        page.click("#btnInvite");
+        // 邀請鈕已改為成員操作複合按鈕：只開放邀請時主按鈕即為「邀請其他人加入」
+        page.click("#btnMemberMain");
         assertThat(page.locator("#inviteModal")).isVisible();
     }
 
@@ -543,6 +544,35 @@ public class UiSteps {
     @Then("填寫頁不應顯示帶入行事曆按鈕")
     public void calendarButtonHidden() {
         assertThat(page.locator("#btnCal")).isHidden();
+    }
+
+    /* ---------- Entra ID 登入模擬 ---------- */
+
+    /** 以 route 攔截模擬「已啟用 Entra ID 且已登入」：不需真的 Azure 設定即可驗證前端行為 */
+    @Given("模擬已啟用 Entra ID 登入且登入者為 {string}")
+    public void mockEntraSignedIn(String name) {
+        ctx.route("**/api/entra-config", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+                .setStatus(200).setContentType("application/json")
+                .setBody("{\"loginPath\":\"/api/entra/login\"}")));
+        ctx.route("**/api/entra/me", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+                .setStatus(200).setContentType("application/json")
+                .setBody("{\"displayName\":\"" + name + "\",\"username\":\"" + name + "@test.local\"}")));
+        ctx.route("**/api/entra/photo", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+                .setStatus(404)));
+    }
+
+    @Then("姓名應自動帶入 {string} 且不開放自行選擇")
+    public void whoAutoFilledAndLocked(String name) {
+        assertThat(page.locator("#whoTriggerText")).hasText(name);
+        assertThat(page.locator("#whoTrigger")).isDisabled();
+        assertThat(page.locator("#whoMenu")).isHidden();
+    }
+
+    @Then("應顯示非邀請對象的提示")
+    public void notInviteeAlertShown() {
+        assertThat(page.locator("#whoAlert")).isVisible();
+        assertThat(page.locator("#whoAlert")).containsText("不是本次調查的邀請對象");
+        assertThat(page.locator("#whoTrigger")).isDisabled();
     }
 
     /* ---------- 後台維護頁 ---------- */

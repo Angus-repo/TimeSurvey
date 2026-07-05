@@ -20,6 +20,9 @@
     <properties>
         <java.version>21</java.version>
         <cucumber.version>7.20.1</cucumber.version>
+        <!-- Spring Boot 3.4.5 預設的 surefire 3.5.3 不會把 Cucumber 情境計入測試結果
+             （Tests run: 0），情境失敗時 mvn test 仍會 BUILD SUCCESS；3.5.6 已修復 -->
+        <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
     </properties>
 
     <dependencyManagement>

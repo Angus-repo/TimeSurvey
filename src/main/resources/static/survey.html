@@ -32,6 +32,11 @@
   .who-item { padding: 8px 12px; font-size: 14px; cursor: pointer; white-space: nowrap; }
   .who-item:hover, .who-item.active { background: #eef6f3; }
   .who-item .who-note { color: #999; margin-left: 4px; }
+  /* 啟用 Entra ID 登入時姓名由登入者身分帶入，不開放下拉自選 */
+  .who-trigger:disabled { background: #f5f7f6; color: #333; cursor: default; }
+  .who-trigger:disabled:hover { border-color: #ccc; }
+  .who-alert { margin-top: 10px; background: #fdecea; border: 1px solid #f0b6ae; color: #c0392b;
+               border-radius: 6px; padding: 10px 14px; font-size: 14px; line-height: 1.7; }
 
   /* 邀請他人加入的彈窗：姓名標籤輸入，樣式與後台維護頁的「受調查人員」輸入一致 */
   .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1150; }
@@ -76,6 +81,21 @@
   .topbtn:hover { background: #1a68d1; }
   .topbtn.alt { background: #8e44ad; }
   .topbtn.alt:hover { background: #71368a; }
+  /* 成員操作複合按鈕：左邊主要動作（邀請他人加入）＋ 右邊小箭頭展開其他成員操作（換成其他人） */
+  .splitbtn { position: relative; display: inline-flex; }
+  .splitbtn .topbtn { background: #3bc9db; }
+  .splitbtn .topbtn:hover { background: #22b8cf; }
+  .splitbtn .topbtn.main { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .splitbtn .topbtn.caret { padding: 8px 10px; font-size: 11px; border-top-left-radius: 0;
+                            border-bottom-left-radius: 0; border-left: 1px solid rgba(255,255,255,.4); }
+  .member-menu { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 1100;
+                 background: #fff; border: 1px solid #e4e8ec; border-radius: 8px; padding: 4px;
+                 min-width: 180px; box-shadow: 0 6px 20px rgba(0,0,0,.16); }
+  .member-menu.open { display: block; }
+  .member-menu button { display: block; width: 100%; padding: 9px 12px; background: none; border: none;
+                        border-radius: 6px; font-size: 14px; color: #333; cursor: pointer; text-align: left;
+                        font-family: inherit; white-space: nowrap; }
+  .member-menu button:hover { background: #e3fafc; color: #0c8599; }
   table.grid { border-collapse: separate; border-spacing: 3px; width: 100%; }
   table.grid thead th { font-size: 13px; color: #777; font-weight: 600; padding: 4px 2px; }
   .datecell { background: #f7f9f8; border: 1px solid #e2e8e5; border-radius: 6px; padding: 8px 10px;
@@ -240,7 +260,8 @@
       </button>
       <div class="who-menu" id="whoMenu" style="display:none"></div>
     </div>
-    <span class="hint">選擇後請勾選您可以出席的時間（可點全天、上午、下午快速鈕、各小時框右上角的勾勾整時選取，或個別 30 分鐘時段）</span>
+    <span class="hint" id="whoHint">選擇後請勾選您可以出席的時間（可點全天、上午、下午快速鈕、各小時框右上角的勾勾整時選取，或個別 30 分鐘時段）</span>
+    <div class="who-alert" id="whoAlert" style="display:none"></div>
     <div class="onb-pop" id="onbPop" style="display:none">
       👋 歡迎！<b>請先在這裡選擇您的姓名</b><br>
       選好之後，下方的時段表格才會開放，點選您可以出席的時間再送出即可。
@@ -248,8 +269,15 @@
     </div>
   </div>
   <div class="card topbar" id="actionBar" style="display:none">
-    <button id="btnInvite" class="topbtn" onclick="openInviteModal()" style="display:none">➕ 邀請其他人加入</button>
-    <button id="btnSwap" class="topbtn alt" onclick="openSwapModal()" style="display:none">🔄 換成其他人</button>
+    <div class="splitbtn" id="memberSplit" style="display:none">
+      <button id="btnMemberMain" class="topbtn main" onclick="memberMainAction()"></button>
+      <button id="btnMemberCaret" class="topbtn caret" onclick="toggleMemberMenu(event)"
+              title="更多成員操作" aria-label="更多成員操作" style="display:none">▼</button>
+      <div class="member-menu" id="memberMenu">
+        <button id="miInvite" onclick="closeMemberMenu(); openInviteModal()">➕ 邀請其他人加入</button>
+        <button id="miSwap" onclick="closeMemberMenu(); openSwapModal()">🔄 換成其他人</button>
+      </div>
+    </div>
     <button id="btnCal" class="topbtn" onclick="loadMyCalendar()" style="display:none; background:#0a7d57"
             title="同意讀取您的行事曆後，會把調查期間已有的會議以灰色顯示在下方時段表，方便對照填寫">📅 同意讀取我的行事曆</button>
   </div>
@@ -346,6 +374,7 @@ let times = [], amTimes = [], pmTimes = [], hours = [];
 let copySource = null;     // 正在複製的來源日期（null 表示未進入複製狀態）
 let readOnly = false;      // 調查已結束：只能查看已填時段，不可再修改
 let whoValue = '';         // 目前選擇的姓名（乾淨值，不含「（由 X 邀請加入）」等來源說明文字）
+let entraLocked = false;   // 啟用 Entra ID 登入：姓名以登入者身分帶入，不開放下拉自選
 
 /* 複製 / 貼上 / 取消的線條式圖示（stroke 用 currentColor，顏色跟隨按鈕狀態） */
 const ICON = {
@@ -438,28 +467,49 @@ async function init() {
   const showSwap = !readOnly && survey.allowReplaceParticipant;
   if (showInvite || showSwap) {
     $('actionBar').style.display = '';
-    $('btnInvite').style.display = showInvite ? '' : 'none';
-    $('btnSwap').style.display = showSwap ? '' : 'none';
-  }
-  // 已啟用 Entra ID 登入時：顯示「同意讀取我的行事曆」按鈕（調查已結束僅供查看，不需帶入）
-  if (window.Entra) Entra.ready.then(on => {
-    if (on && !readOnly) {
-      $('actionBar').style.display = '';
-      $('btnCal').style.display = '';
+    $('memberSplit').style.display = '';
+    // 主按鈕預設為「邀請其他人加入」；若只開放換員，則主按鈕改為「換成其他人」
+    if (showInvite) {
+      memberMainAction = openInviteModal;
+      $('btnMemberMain').textContent = '➕ 邀請其他人加入';
+    } else {
+      memberMainAction = openSwapModal;
+      $('btnMemberMain').textContent = '🔄 換成其他人';
     }
-  });
+    // 兩者皆開放時才需要右側箭頭與展開選單；選單只列出「非主按鈕」的另一個操作
+    const bothOn = showInvite && showSwap;
+    $('btnMemberCaret').style.display = bothOn ? '' : 'none';
+    $('miInvite').style.display = 'none';
+    $('miSwap').style.display = bothOn ? '' : 'none';
+  }
+  // 已啟用 Entra ID 登入時：顯示「同意讀取我的行事曆」按鈕（調查已結束僅供查看，不需帶入），
+  // 並以登入者身分決定填寫者（不開放下拉自選姓名）；「先選姓名」的新手引導只在免登入模式才需要
+  if (window.Entra) {
+    Entra.ready.then(on => {
+      if (on && !readOnly) {
+        $('actionBar').style.display = '';
+        $('btnCal').style.display = '';
+      }
+      if (on) applyEntraIdentity();
+      else maybeStartOnboarding();
+    });
+  } else {
+    maybeStartOnboarding();
+  }
   if (readOnly) {
     $('submitBtn').style.display = 'none';
     $('roNote').style.display = '';
     $('closedBanner').style.display = '';
     toast('📋 本調查已結束，僅能查看，無法修改');
   }
-
-  // 首次開啟：以新手引導提示先選擇姓名（看過一次就不再出現）；已結束的調查不需再引導填寫
-  if (!readOnly && !localStorage.getItem('surveyOnboarded')) startOnboarding();
 }
 
 /* ---------- 新手引導 ---------- */
+/* 首次開啟：以新手引導提示先選擇姓名（看過一次就不再出現）；已結束的調查不需再引導填寫 */
+function maybeStartOnboarding() {
+  if (!readOnly && !localStorage.getItem('surveyOnboarded')) startOnboarding();
+}
+
 function startOnboarding() {
   $('onbMask').style.display = '';
   $('onbPop').style.display = '';
@@ -513,7 +563,7 @@ function requireName() {
     return false;
   }
   if (!whoValue) {
-    toast('請先選擇您的姓名，再勾選時段');
+    toast(entraLocked ? '您不是本次調查的邀請對象，無法填寫時段' : '請先選擇您的姓名，再勾選時段');
     return false;
   }
   return true;
@@ -701,6 +751,41 @@ async function loadMyResponse() {
   refreshCopyButtons();
 }
 
+/* ---------- Entra ID：以登入者身分決定填寫者 ---------- */
+/* 啟用 Entra ID 登入時，填寫者身分以 Microsoft 登入者為準，不開放下拉自選姓名：
+   登入者在受調查名單中 → 自動帶入並載入其先前填寫的內容；
+   不在名單中 → 提示「非本次調查的邀請對象」，格線維持鎖定不可填寫 */
+function applyEntraIdentity() {
+  entraLocked = true;
+  const acct = Entra.account() || {};
+  // 比對時忽略大小寫並把連續空白正規化為一個（英文姓名如 Angus Luo）
+  const norm = s => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const loginName = String(acct.displayName || acct.username || '').trim().replace(/\s+/g, ' ');
+  const matched = survey.participants.find(p => norm(p) === norm(loginName));
+
+  const trigger = $('whoTrigger');
+  trigger.disabled = true;
+  trigger.querySelector('.who-arrow').style.display = 'none';
+
+  if (matched) {
+    trigger.title = '已依您的 Microsoft 登入身分自動帶入，無法選擇其他人';
+    $('whoHint').textContent = '已依您的登入身分自動帶入姓名，請勾選您可以出席的時間' +
+        '（可點全天、上午、下午快速鈕、各小時框右上角的勾勾整時選取，或個別 30 分鐘時段）';
+    selectWho(matched);
+  } else {
+    whoValue = '';
+    refreshWhoTrigger();
+    loadMyResponse();   // 清空先前選取並鎖定格線
+    trigger.querySelector('#whoTriggerText').textContent = loginName || '（無法取得登入者名稱）';
+    trigger.classList.remove('placeholder');
+    trigger.title = '您的 Microsoft 登入身分不在本次調查的受邀名單中';
+    $('whoHint').style.display = 'none';
+    $('whoAlert').textContent = '⚠ 您（' + (loginName || '無法取得登入者名稱') +
+        '）不是本次調查的邀請對象，無法填寫時段。若您應在受邀名單中，請聯絡調查發起人確認名單上的姓名與您的帳號顯示名稱一致。';
+    $('whoAlert').style.display = '';
+  }
+}
+
 /* ---------- Entra ID：帶入我的行事曆 ---------- */
 let busyMap = {};   // "yyyy-MM-ddTHH:mm" -> [{ subject, organizer }]，同意讀取行事曆後填入
 
@@ -841,6 +926,23 @@ function entraVerifyNoteEl(tag, name, verify) {
   return el;
 }
 
+/* ---------- 成員操作複合按鈕（邀請他人加入 / 換成其他人） ---------- */
+/* 主按鈕實際執行的動作，於初始化時依調查設定指定為邀請或換員 */
+let memberMainAction = function () {};
+
+function toggleMemberMenu(e) {
+  e.stopPropagation();
+  $('memberMenu').classList.toggle('open');
+}
+
+function closeMemberMenu() {
+  $('memberMenu').classList.remove('open');
+}
+
+document.addEventListener('click', e => {
+  if (!$('memberSplit').contains(e.target)) closeMemberMenu();
+});
+
 /* ---------- 邀請他人加入 / 換成其他人 ---------- */
 /* 自訂下拉選單：原生 <select><option> 無法讓文字分段上色，改用清單項目呈現，
    姓名維持一般顏色，「（由 X 邀請加入／換員轉入）」等來源說明則以灰色顯示 */
@@ -869,6 +971,7 @@ function refreshWhoTrigger() {
 
 function toggleWhoMenu(e) {
   e.stopPropagation();
+  if (entraLocked) return;   // 姓名由登入者身分帶入，不開放下拉自選
   const menu = $('whoMenu');
   if (menu.style.display === 'none') {
     buildWhoMenu();
@@ -913,7 +1016,8 @@ let inviteVerify = {};   // 姓名 -> 組織目錄檢查結果（僅啟用 Entra
 
 function openInviteModal() {
   const inviter = whoValue;
-  if (!inviter) return toast('請先選擇您的姓名，再邀請其他人加入');
+  if (!inviter) return toast(entraLocked ? '您不是本次調查的邀請對象，無法邀請其他人加入'
+                                         : '請先選擇您的姓名，再邀請其他人加入');
   inviteList = [];
   inviteVerify = {};
   $('inviteInput').value = '';
@@ -1082,7 +1186,8 @@ let swapVerify = {};   // 姓名 -> 組織目錄檢查結果（僅啟用 Entra I
 
 function openSwapModal() {
   const current = whoValue;
-  if (!current) return toast('請先選擇您的姓名，再進行換員');
+  if (!current) return toast(entraLocked ? '您不是本次調查的邀請對象，無法進行換員'
+                                         : '請先選擇您的姓名，再進行換員');
   swapList = [];
   swapVerify = {};
   $('swapInput').value = '';
@@ -1202,9 +1307,16 @@ async function confirmSwap() {
   });
   if (res.ok) {
     survey = await res.json();
-    whoValue = newNames[0];
-    rebuildWhoOptions();
-    await loadMyResponse();
+    if (entraLocked) {
+      // Entra ID 模式：填寫者身分仍以登入者為準，自己換出名單後改顯示「非邀請對象」提示
+      whoValue = '';
+      rebuildWhoOptions();
+      applyEntraIdentity();
+    } else {
+      whoValue = newNames[0];
+      rebuildWhoOptions();
+      await loadMyResponse();
+    }
     closeSwapModal();
     const parts = ['已將「' + current + '」換成「' + newNames.join('、') + '」（名單中會註明此為換員紀錄）'];
     if (pending.existingNames.length > 0) parts.push('「' + pending.existingNames.join('、') + '」已在受調查人員名單中，無法換成同一人，已略過');
@@ -1246,7 +1358,7 @@ function copySurveyLink() {
 async function submitResponse() {
   if (readOnly) return toast('調查已結束，無法再送出');
   const name = whoValue;
-  if (!name) return toast('請先選擇您的姓名');
+  if (!name) return toast(entraLocked ? '您不是本次調查的邀請對象，無法送出' : '請先選擇您的姓名');
   const res = await fetch('/api/surveys/' + surveyId + '/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
