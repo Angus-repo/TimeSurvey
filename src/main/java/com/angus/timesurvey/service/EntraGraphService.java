@@ -321,8 +321,15 @@ public class EntraGraphService {
             }
             JsonNode json = readJson(res.body());
             if (res.statusCode() >= 400) {
-                throw new GraphException("Graph API 呼叫失敗（" + res.statusCode() + "）："
-                        + json.path("error").path("message").asText("(無錯誤訊息)"));
+                String message = json.path("error").path("message").asText("");
+                if (message.isEmpty()) {
+                    // Outlook 系端點（行事曆、信箱）對沒有 Exchange Online 信箱的帳號
+                    // （如未指派授權或外部帳號）會回空 body 的 401，與權限設定無關
+                    message = res.statusCode() == 401
+                            ? "此帳號可能沒有 Exchange Online 信箱（行事曆），請改用具備 Microsoft 365 授權的帳號登入"
+                            : "(無錯誤訊息)";
+                }
+                throw new GraphException("Graph API 呼叫失敗（" + res.statusCode() + "）：" + message);
             }
             return json;
         }

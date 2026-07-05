@@ -35,6 +35,7 @@ class EntraGraphServiceTest {
     private volatile int tokenStatus = 200;
     private volatile String tokenResponse = "{}";
     private volatile String graphResponse = "{}";
+    private volatile int graphStatus = 200;                              // 200 以外時回空 body（模擬 Outlook 端點）
     private final List<String> graphPaths = new ArrayList<>();          // Graph 端點收到的路徑
     private final List<String> graphConsistency = new ArrayList<>();    // 各請求的 ConsistencyLevel 標頭
     private volatile boolean searchUnsupported = false;                 // 模擬 $search 不支援
@@ -58,6 +59,12 @@ class EntraGraphServiceTest {
             graphConsistency.add(ex.getRequestHeaders().getFirst("ConsistencyLevel"));
             byte[] body;
             int status;
+            if (graphStatus != 200) {
+                // 模擬 Outlook 系端點對沒有信箱的帳號回空 body 的錯誤
+                ex.sendResponseHeaders(graphStatus, -1);
+                ex.close();
+                return;
+            }
             if (searchUnsupported && uri.contains("$search=")) {
                 // 模擬租戶不支援進階查詢
                 status = 400;
@@ -199,6 +206,19 @@ class EntraGraphServiceTest {
         service.suggestUsers("oid-1", "lu");
         assertEquals(3, graphPaths.size(), "之後不再嘗試 $search");
         assertTrue(graphPaths.get(2).contains("startswith"));
+    }
+
+    @Test
+    void Graph回空body的401時提示帳號可能沒有信箱() {
+        when(repo.findById("oid-1")).thenReturn(Optional.of(row("oid-1", "rt-1")));
+        tokenResponse = "{\"access_token\":\"at-1\",\"expires_in\":3600}";
+        graphStatus = 401;
+
+        var e = assertThrows(EntraGraphService.GraphException.class,
+                () -> service.calendarView("oid-1", "2026-07-05T00:00:00", "2026-07-11T23:59:59"));
+
+        assertTrue(e.getMessage().contains("Exchange Online"), "應提示可能沒有信箱：" + e.getMessage());
+        assertEquals(2, graphPaths.size(), "401 應先換新 token 重試一次");
     }
 
     @Test
