@@ -111,6 +111,9 @@ public class UiSteps {
                 String time = "截圖時間:" + LocalDateTime.now()
                         .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
                 page.evaluate("([no, title, status, time, color]) => {" +
+                        // 先凍結 hover 狀態：插入橫幅會使版面下移，Chromium 會對滑鼠所在位置
+                        // 重新派發 mouseover，導致 hover 顯示的 UI（如行事曆會議提示框）在截圖前被關掉
+                        "document.addEventListener('mouseover', e => e.stopImmediatePropagation(), true);" +
                         "const b = document.createElement('div');" +
                         "b.style.cssText = 'display:flex;align-items:center;gap:14px;background:' + color + ';" +
                         "color:#fff;padding:14px 20px;font-family:sans-serif;';" +
@@ -123,7 +126,12 @@ public class UiSteps {
                         "s.style.cssText = 'font-size:16px;font-weight:700;white-space:nowrap;';" +
                         "const c = document.createElement('span'); c.textContent = time;" +
                         "c.style.cssText = 'font-size:13px;opacity:.9;white-space:nowrap;';" +
-                        "b.append(n, t, s, c); document.body.prepend(b); }",
+                        "b.append(n, t, s, c); document.body.prepend(b);" +
+                        // 行事曆提示框以 fixed 座標貼齊所在時段：版面被橫幅推下後把它一起下移，截圖才對得上
+                        "const tip = document.getElementById('calTip');" +
+                        "if (tip && tip.style.display === 'block') {" +
+                        "  tip.style.top = (parseFloat(tip.style.top) + b.offsetHeight) + 'px';" +
+                        "} }",
                         Arrays.asList(String.valueOf(caseNo), scenario.getName(),
                                 scenario.isFailed() ? "✘ 失敗" : "✔ 通過", time,
                                 hex(caseColor(caseNo, scenario.isFailed()))));
@@ -573,6 +581,140 @@ public class UiSteps {
         assertThat(page.locator("#whoAlert")).isVisible();
         assertThat(page.locator("#whoAlert")).containsText("不是本次調查的邀請對象");
         assertThat(page.locator("#whoTrigger")).isDisabled();
+    }
+
+    /* ---------- Entra ID 行事曆模擬 ---------- */
+
+    /** 以 route 攔截模擬 /api/entra/calendar 回傳指定會議：欄位格式比照 Microsoft Graph
+     *  calendarView 的真實回應（台北時區、7 位小數秒的 dateTime、巢狀的 organizer），
+     *  才能驗證前端解析與時段覆蓋的完整流程。表格時間形如 "2026-06-15T09:00" */
+    @Given("模擬行事曆包含以下會議：")
+    public void mockCalendarEvents(io.cucumber.datatable.DataTable table) {
+        StringBuilder sb = new StringBuilder("[");
+        for (Map<String, String> row : table.asMaps()) {
+            if (sb.length() > 1) sb.append(',');
+            sb.append("{\"subject\":\"").append(row.get("會議名稱")).append("\",")
+              .append("\"organizer\":{\"emailAddress\":{\"name\":\"").append(row.get("邀請人"))
+              .append("\",\"address\":\"meet@test.local\"}},")
+              .append("\"start\":{\"dateTime\":\"").append(row.get("開始"))
+              .append(":00.0000000\",\"timeZone\":\"Taipei Standard Time\"},")
+              .append("\"end\":{\"dateTime\":\"").append(row.get("結束"))
+              .append(":00.0000000\",\"timeZone\":\"Taipei Standard Time\"},")
+              .append("\"isAllDay\":false}");
+        }
+        mockCalendarBody(sb.append(']').toString());
+    }
+
+    @Given("模擬行事曆沒有任何會議")
+    public void mockCalendarEmpty() {
+        mockCalendarBody("[]");
+    }
+
+    private void mockCalendarBody(String json) {
+        ctx.route("**/api/entra/calendar**", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+                .setStatus(200).setContentType("application/json").setBody(json)));
+    }
+
+    @When("按下同意讀取我的行事曆")
+    public void clickCalendarButton() {
+        page.click("#btnCal");
+    }
+
+    @Then("帶入行事曆按鈕應顯示 {string}")
+    public void calendarButtonShows(String text) {
+        assertThat(page.locator("#btnCal")).containsText(text);
+    }
+
+    @Then("時段 {string} 應顯示為忙碌")
+    public void slotBusy(String slot) {
+        assertThat(page.locator(".slot.busy[data-slot='" + slot + "']")).isVisible();
+    }
+
+    @Then("時段 {string} 不應顯示為忙碌")
+    public void slotNotBusy(String slot) {
+        assertThat(page.locator(".slot[data-slot='" + slot + "']")).isVisible();
+        assertThat(page.locator(".slot.busy[data-slot='" + slot + "']")).hasCount(0);
+    }
+
+    @Then("時段 {string} 應顯示會議數量角標 {string}")
+    public void slotBusyBadge(String slot, String count) {
+        assertThat(page.locator(".slot[data-slot='" + slot + "'] .bzn")).hasText(count);
+    }
+
+    /** 2 個以上會議的時段以再深一階的灰色呈現（multi 樣式） */
+    @Then("時段 {string} 應以多會議的較深底色呈現")
+    public void slotMultiBusy(String slot) {
+        assertThat(page.locator(".slot.busy.multi[data-slot='" + slot + "']")).isVisible();
+    }
+
+    @Then("時段 {string} 不應以多會議的較深底色呈現")
+    public void slotNotMultiBusy(String slot) {
+        assertThat(page.locator(".slot.busy[data-slot='" + slot + "']")).isVisible();
+        assertThat(page.locator(".slot.busy.multi[data-slot='" + slot + "']")).hasCount(0);
+    }
+
+    /** 數量角標改置於時段右緣：驗證整個角標都落在時段框內，不再與小時外框的勾勾重疊 */
+    @Then("時段 {string} 的會議數量角標應完整位於時段框內")
+    public void badgeInsideSlot(String slot) {
+        var s = page.locator(".slot[data-slot='" + slot + "']").boundingBox();
+        var b = page.locator(".slot[data-slot='" + slot + "'] .bzn").boundingBox();
+        org.junit.jupiter.api.Assertions.assertTrue(
+                b.x >= s.x && b.x + b.width <= s.x + s.width + 0.5 &&
+                b.y >= s.y && b.y + b.height <= s.y + s.height + 0.5,
+                "數量角標應完整位於時段框內：slot=" + s.x + "," + s.y + "," + s.width + "," + s.height +
+                        " badge=" + b.x + "," + b.y + "," + b.width + "," + b.height);
+    }
+
+    /** 忙碌時段（格內兩行會議名稱）不應撐大格子：與一般時段等高 */
+    @Then("時段 {string} 的框高應與時段 {string} 相同")
+    public void slotHeightsEqual(String slotA, String slotB) {
+        double a = page.locator(".slot[data-slot='" + slotA + "']").boundingBox().height;
+        double b = page.locator(".slot[data-slot='" + slotB + "']").boundingBox().height;
+        org.junit.jupiter.api.Assertions.assertEquals(b, a, 1.0,
+                "忙碌時段不應撐大格子：" + slotA + "=" + a + "px、" + slotB + "=" + b + "px");
+    }
+
+    /** 忙碌時段（格內會議名稱）不應撐寬欄位：與其它小時欄的時段等寬（需跨小時欄比較，
+     *  同一小時框內的上下兩格必然等寬，比較不出撐寬問題） */
+    @Then("時段 {string} 的框寬應與時段 {string} 相同")
+    public void slotWidthsEqual(String slotA, String slotB) {
+        double a = page.locator(".slot[data-slot='" + slotA + "']").boundingBox().width;
+        double b = page.locator(".slot[data-slot='" + slotB + "']").boundingBox().width;
+        org.junit.jupiter.api.Assertions.assertEquals(b, a, 1.0,
+                "忙碌時段不應撐寬欄位：" + slotA + "=" + a + "px、" + slotB + "=" + b + "px");
+    }
+
+    /** 忙碌時段格內改列會議名稱（前 8 字、超過加 …，最多 2 行），不再顯示時段時間。
+     *  expected 為逗號分隔的各行文字，依序比對 */
+    @Then("時段 {string} 格內應依序顯示會議名稱 {string} 而非時段時間")
+    public void slotShowsMeetingNames(String slot, String expected) {
+        assertThat(page.locator(".slot[data-slot='" + slot + "'] .bsub")).hasText(expected.split(","));
+        String time = slot.substring(slot.indexOf('T') + 1);   // 如 "09:00"
+        org.junit.jupiter.api.Assertions.assertFalse(
+                page.locator(".slot[data-slot='" + slot + "']").innerText().contains(time),
+                "已有會議的時段不應再顯示時段時間 " + time);
+    }
+
+    @Then("時段 {string} 不應顯示會議數量角標")
+    public void slotNoBusyBadge(String slot) {
+        assertThat(page.locator(".slot[data-slot='" + slot + "'] .bzn")).hasCount(0);
+    }
+
+    @When("滑鼠移到時段 {string}")
+    public void hoverSlot(String slot) {
+        page.hover(".slot[data-slot='" + slot + "']");
+    }
+
+    @Then("行事曆提示應顯示 {string}")
+    public void calendarTipShows(String text) {
+        assertThat(page.locator("#calTip")).isVisible();
+        assertThat(page.locator("#calTip")).containsText(text);
+    }
+
+    /** 忙碌樣式僅供對照，不影響勾選：時段可同時帶有 busy 與 on 兩種狀態 */
+    @Then("時段 {string} 應同時為忙碌且選取狀態")
+    public void slotBusyAndSelected(String slot) {
+        assertThat(page.locator(".slot.busy.on[data-slot='" + slot + "']")).isVisible();
     }
 
     /* ---------- 後台維護頁 ---------- */

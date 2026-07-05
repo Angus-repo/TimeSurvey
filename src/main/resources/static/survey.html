@@ -112,22 +112,34 @@
           display: flex; flex-direction: column; gap: 4px; min-width: 58px; background: #fbfcfc;
           transition: border-color .15s, background .15s; }
   .hbox.full { border-color: #00a884; background: #f2fbf8; }
-  .slot { position: relative; border: 1px solid #ccc; border-radius: 4px; padding: 6px 4px; font-size: 13px; text-align: center;
+  /* 固定高度並以 flex 置中：忙碌時段格內改列會議名稱（最多兩行）時也不撐大格子 */
+  .slot { position: relative; box-sizing: border-box; height: 30px; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; border: 1px solid #ccc; border-radius: 4px;
+          padding: 0 4px; font-size: 13px; text-align: center;
           cursor: pointer; user-select: none; background: #fff; white-space: nowrap;
           transition: background .15s, border-color .15s, box-shadow .15s, transform .1s; }
   .slot:hover { border-color: #00a884; background: #eef6f3; box-shadow: 0 1px 4px rgba(0,168,132,.25); }
-  /* 行事曆帶入的忙碌時段：灰色呈現（與白色可選、綠色已選區別），滑鼠移過顯示會議明細 */
-  .slot.busy { background: #e3e6ea; border-color: #c8cdd4; color: #697280; }
-  .slot.busy:hover { background: #d8dce2; border-color: #aab2bd; box-shadow: 0 1px 4px rgba(90,100,112,.3); }
+  /* 行事曆帶入的忙碌時段：深灰底色呈現（與白色可選、綠色已選區別），格內改列會議名稱 */
+  .slot.busy { background: #cdd3da; border-color: #a9b1bc; color: #3d4753; }
+  .slot.busy:hover { background: #c1c8d1; border-color: #939dab; box-shadow: 0 1px 4px rgba(90,100,112,.3); }
+  /* 同一時段 2 個以上會議：再深一階的灰色，右緣留空間給數量徽章 */
+  .slot.busy.multi { background: #b7bfc9; border-color: #939dab; padding-right: 22px; }
+  .slot.busy.multi:hover { background: #abb4bf; border-color: #7f8a99; }
   .slot.on { background: #00a884; border-color: #00a884; color: #fff; }
   .slot.on:hover { background: #009675; border-color: #009675; box-shadow: 0 1px 6px rgba(0,168,132,.4); }
-  /* 已勾選優先於忙碌：仍以綠色顯示（右上角會議數量徽章仍保留） */
+  /* 已勾選優先於忙碌：仍以綠色顯示（會議數量徽章仍保留） */
   .slot.busy.on { background: #00a884; border-color: #00a884; color: #fff; }
   .slot.busy.on:hover { background: #009675; border-color: #009675; }
-  /* 同一時段有多個會議：右上角的數量徽章 */
-  .slot .bzn { position: absolute; top: -7px; right: -7px; min-width: 17px; height: 17px; border-radius: 9px;
+  /* 同一時段有多個會議：數量徽章置於時段格內的右緣垂直置中
+     （不放右上角：會與小時外框的勾勾重疊而看不清） */
+  .slot .bzn { position: absolute; top: 50%; right: 3px; transform: translateY(-50%);
+               min-width: 17px; height: 17px; border-radius: 9px;
                background: #e67e22; color: #fff; font-size: 11px; font-weight: 700; line-height: 17px;
                padding: 0 4px; box-shadow: 0 1px 3px rgba(0,0,0,.3); pointer-events: none; }
+  /* 忙碌時段格內的會議名稱（取代時段時間）：最多兩行，行高收緊以塞進固定高度的格子；
+     width:0 + min-width:100% 讓名稱不撐寬欄位（維持與無會議欄位同寬），過長以 … 截斷 */
+  .slot .bsub { font-size: 11px; line-height: 13px; width: 0; min-width: 100%;
+                overflow: hidden; text-overflow: ellipsis; }
   /* 忙碌時段的會議明細提示框（跟著滑鼠所在的時段顯示） */
   .cal-tip { position: fixed; z-index: 6000; max-width: 340px; background: #2c3e50; color: #fff;
              font-size: 12.5px; line-height: 1.7; padding: 10px 14px; border-radius: 8px;
@@ -830,14 +842,25 @@ async function loadMyCalendar() {
   btn.disabled = false;
 }
 
-/* 把 busyMap 套到時段表：忙碌時段加上灰色樣式，同一時段多個會議在右上角註明數量 */
+/* 把 busyMap 套到時段表：忙碌時段以深灰底色顯示（2 個以上會議再深一階），
+   格內改列會議名稱（取前 8 個字、超過加 …，最多 2 場上下排列；欄寬固定，放不下由 CSS 以 … 收尾），
+   同一時段多個會議在格內右緣註明數量 */
 function applyBusy() {
   document.querySelectorAll('.slot').forEach(el => {
     const list = busyMap[el.dataset.slot];
     el.classList.toggle('busy', !!list);
-    const old = el.querySelector('.bzn');
-    if (old) old.remove();
-    if (list && list.length > 1) {
+    el.classList.toggle('multi', !!list && list.length > 1);
+    el.textContent = el.dataset.slot.slice(11);   // 先還原時段時間（重新整理後會議可能已移除）
+    if (!list) return;
+    el.textContent = '';
+    for (const m of list.slice(0, 2)) {
+      const line = document.createElement('div');
+      line.className = 'bsub';
+      const s = String(m.subject);
+      line.textContent = s.length > 8 ? s.slice(0, 8) + '…' : s;
+      el.appendChild(line);
+    }
+    if (list.length > 1) {
       const b = document.createElement('span');
       b.className = 'bzn';
       b.textContent = list.length;
