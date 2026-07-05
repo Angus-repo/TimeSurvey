@@ -164,6 +164,10 @@
   #resultArea td.yes { background: #d2f4e8; color: #0a7d57; font-weight: 700; }
   #resultArea td.no { color: #ddd; }
   #resultArea td.nr { background: #f5f5f5; color: #bbb; }
+  /* 不參加此會議：明細表整欄以淡紅色標示，欄名下註明並可滑上看原因 */
+  #resultArea td.decl { background: #fdf0ef; color: #e0aaa4; }
+  #resultArea .pnote.decl { color: #c0392b; font-weight: 600; }
+  #resultArea .pnote.notime { color: #b26a00; font-weight: 600; }
   #resultArea tr.hourtop th.tcell, #resultArea tr.hourtop td { border-top: 2px solid #bbb; }
   /* 符合會議時間的區塊：整塊一個綠色大框（用四邊框線拼出外框） */
   #resultArea .okt { border-top: 3px solid #28a745 !important; }
@@ -265,6 +269,9 @@
   .concl .ctitle { font-size: 15px; font-weight: 700; color: #1d7a35; margin-bottom: 8px; }
   .concl .cnote { font-size: 13px; color: #888; margin-top: 6px; }
   .concl .cnote .highlight { color: #e0433c; font-weight: 700; }
+  /* 調查結論裡的「不參加」與「完全無可出席時段」提示 */
+  .concl .cnote.decl { color: #c0392b; }
+  .concl .cnote.notime { color: #b26a00; }
   .concl .cday { margin: 5px 0; font-size: 14px; }
   .concl .dlabel { display: inline-block; min-width: 110px; font-weight: 600; color: #2c3e50; }
   .concl .none { color: #c0c6c3; font-size: 13px; }
@@ -1444,9 +1451,8 @@ $('meetHours').addEventListener('input', () => {
 });
 
 /* 找出每一天「每個人都有空」的最大連續區塊（午休 12:00~13:00 會中斷連續性）。
-   回傳 [{ date, slots: ['09:00', ...] }] */
-function computeCommonRuns(survey, sets, dates, times) {
-  const ps = survey.participants;
+   ps 為列入計算的參與者（已排除表明不參加的人）。回傳 [{ date, slots: ['09:00', ...] }] */
+function computeCommonRuns(ps, sets, dates, times) {
   const everyoneFree = slot => ps.length > 0 && ps.every(p => sets[p] && sets[p].has(slot));
   const toMin = t => (+t.slice(0,2)) * 60 + (+t.slice(3,5));
   const runs = [];
@@ -1469,9 +1475,9 @@ function computeCommonRuns(survey, sets, dates, times) {
 /* 沒有「全員都有空」時段時，改找出「最多人可參與」、且長度足夠（need 格）的會議時段。
    每個視窗需為時間連續的 need 個格子（午休 12:00~13:00 會中斷連續性），
    參與人數取所有視窗的最大值，回傳達到最大值的所有視窗。
+   ps 為列入計算的參與者（已排除表明不參加的人）。
    回傳 [{ date, from, to, attendees: [..], absentees: [..] }] */
-function computeBestPartialWindows(survey, sets, dates, times, need) {
-  const ps = survey.participants;
+function computeBestPartialWindows(ps, sets, dates, times, need) {
   const toMin = t => (+t.slice(0,2)) * 60 + (+t.slice(3,5));
   let best = [];
   let bestCount = 0;
@@ -1516,18 +1522,21 @@ function meetingRange(el) {
   return { date, from, end };
 }
 
-/* 「📅」按鈕：在 Outlook 網頁版開啟預填好的新會議（需登入 Microsoft 帳號） */
+/* 「📅」按鈕：在 Outlook 網頁版開啟預填好的新會議（需登入 Microsoft 帳號）。
+   已表明不參加此會議的人不列入與會人員 */
 function openOutlookWeb(el) {
   if (!resultState) return;
   const survey = resultState.survey;
+  const declinedSet = new Set(resultState.responses.filter(r => r.declineReason).map(r => r.participantName));
+  const invitees = survey.participants.filter(p => !declinedSet.has(p));
   const { date, from, end } = meetingRange(el);
   const url = 'https://outlook.office.com/calendar/deeplink/compose?path=/calendar/action/compose&rru=addevent' +
       '&subject=' + encodeURIComponent(survey.name) +
       '&startdt=' + date + 'T' + from + ':00' +
       '&enddt=' + date + 'T' + end + ':00' +
-      '&to=' + encodeURIComponent(survey.participants.join(';')) +
+      '&to=' + encodeURIComponent(invitees.join(';')) +
       '&online=true' +   // 開啟「Teams 會議」開關，送出時由 Outlook 產生 Teams 連結
-      '&body=' + encodeURIComponent('與會人員：' + survey.participants.join('、') + '（由時間調查產生）');
+      '&body=' + encodeURIComponent('與會人員：' + invitees.join('、') + '（由時間調查產生）');
   window.open(url, '_blank');
 }
 
@@ -1538,17 +1547,25 @@ function renderResult() {
   const times = timeSlots(survey.startTime, survey.endTime);
   const ps = survey.participants;
 
-  // 每人勾選的時段集合
+  // 每人勾選的時段集合；另收集「不參加此會議」與「完全無可出席時段」的回覆
   const sets = {};
+  const declined = {};   // 姓名 -> 不參加的原因
+  const noTime = {};     // 姓名 -> { reason, from, to }：完全無可出席時段的原因與建議日期區間
   for (const r of responses) {
     sets[r.participantName] = new Set((r.slots || '').split(',').filter(x => x));
+    if (r.declineReason) declined[r.participantName] = r.declineReason;
+    else if (r.noTimeReason) noTime[r.participantName] =
+        { reason: r.noTimeReason, from: r.suggestedStartDate, to: r.suggestedEndDate };
   }
   const respondedSet = new Set(responses.map(r => r.participantName));
   const notAnswered = ps.filter(p => !respondedSet.has(p));
+  const declinedNames = ps.filter(p => p in declined);
+  const noTimeNames = ps.filter(p => p in noTime);
+  const activePs = ps.filter(p => !(p in declined));   // 不參加者不列入共同時段計算
 
   const meetHours = parseFloat($('meetHours').value) || 1;
   const need = Math.max(1, Math.round(meetHours * 2));   // 30 分鐘為一格
-  const runs = computeCommonRuns(survey, sets, dates, times);
+  const runs = computeCommonRuns(activePs, sets, dates, times);
   // 長度足以容納會議的區塊，在主表以綠色大框標示
   const okFrames = new Map();
   for (const r of runs) {
@@ -1559,16 +1576,31 @@ function renderResult() {
 
   /* ---- 調查結論：視覺化顯示所有人共同有空的時段 ---- */
   let html = '<div class="concl"><div class="ctitle">📊 調查結論：每個人都有空的時段</div>';
+  // 不參加此會議的人：列出姓名與原因，並排除於共同時段計算之外
+  if (declinedNames.length) {
+    html += '<div class="cnote decl">🚫 <b>不參加此會議</b>（不列入共同時段計算）：' +
+            declinedNames.map(p => esc(p) + '（原因：' + esc(declined[p]) + '）').join('、') + '</div>';
+  }
+  // 完全無可出席時段的人：列出原因與建議的會議日期區間，供發起人調整調查日期參考
+  for (const p of noTimeNames) {
+    const nt = noTime[p];
+    html += '<div class="cnote notime">😥 <b>' + esc(p) + '</b> 表示調查期間完全沒有可出席的時段' +
+            '（原因：' + esc(nt.reason) + '）' +
+            (nt.from && nt.to ? '，建議的會議日期區間：<b>' + fmtMd(nt.from) + ' ~ ' + fmtMd(nt.to) + '</b>' : '') +
+            '</div>';
+  }
   if (notAnswered.length) {
     html += '<div class="cnote">⚠ ' + esc(notAnswered.join('、')) + ' 尚未填寫，目前無法得出共同時段。</div>';
+  } else if (activePs.length === 0) {
+    html += '<div class="cnote">🚫 所有受調查人員皆表明不參加，無法安排此會議。</div>';
   } else if (runs.length === 0) {
     // 沒有全員都有空的時段：改列出「最多人可參與」的會議時段，滑上看名單、仍可發會通
-    const { best, bestCount } = computeBestPartialWindows(survey, sets, dates, times, need);
+    const { best, bestCount } = computeBestPartialWindows(activePs, sets, dates, times, need);
     if (best.length === 0) {
       html += '<div class="cnote">目前沒有任何可容納 ' + meetHours + ' 小時會議的時段。</div>';
     } else {
       html += '<div class="cnote">⚠ 「<span class="highlight">沒有全員都有空</span>」的時段。以下為<b>最多人可參與</b>（' +
-              bestCount + '／' + ps.length + ' 人）的 ' + meetHours +
+              bestCount + '／' + activePs.length + ' 人）的 ' + meetHours +
               ' 小時時段，滑鼠移上去可看可／無法參與名單，仍可擇一發出會議通知：</div>';
       const byDate = {};
       for (const w of best) (byDate[w.date] = byDate[w.date] || []).push(w);
@@ -1654,7 +1686,10 @@ function renderResult() {
   html += '<table><thead><tr><th>日期</th><th>時間</th>';
   for (const p of ps) {
     const note = survey.participantNotes && survey.participantNotes[p];
-    html += '<th>' + esc(p) + (note ? '<div class="pnote">' + esc(note) + '</div>' : '') + '</th>';
+    html += '<th>' + esc(p) + (note ? '<div class="pnote">' + esc(note) + '</div>' : '') +
+            (p in declined ? '<div class="pnote decl" title="原因：' + esc(declined[p]) + '">🚫 不參加此會議</div>' : '') +
+            (p in noTime ? '<div class="pnote notime" title="原因：' + esc(noTime[p].reason) + '">😥 無可出席時段</div>' : '') +
+            '</th>';
   }
   html += '</tr></thead><tbody>';
 
@@ -1671,11 +1706,14 @@ function renderResult() {
       html += '<th class="tcell' + (f ? ' okl' : '') + edge + '">' + t + '</th>';
       ps.forEach((p, pi) => {
         let cls;
-        if (!respondedSet.has(p)) cls = 'nr';
+        if (p in declined) cls = 'decl';
+        else if (!respondedSet.has(p)) cls = 'nr';
         else if (sets[p].has(slot)) cls = 'yes';
         else cls = 'no';
         cls += edge + (f && pi === ps.length - 1 ? ' okr' : '');
-        if (!respondedSet.has(p)) {
+        if (p in declined) {
+          html += '<td class="' + cls + '" title="' + esc(p) + ' 不參加此會議（原因：' + esc(declined[p]) + '）">✕</td>';
+        } else if (!respondedSet.has(p)) {
           html += '<td class="' + cls + '" title="' + esc(p) + ' 尚未填寫">—</td>';
         } else {
           html += '<td class="' + cls + '">' + (sets[p].has(slot) ? '✓' : '') + '</td>';
@@ -1685,7 +1723,8 @@ function renderResult() {
     });
   }
   html += '</tbody></table>';
-  html += '<p class="muted">✓＝可出席；—＝尚未填寫；綠色大框＝每個人都有空、且可容納 ' + meetHours + ' 小時會議的連續時段區塊。</p>';
+  html += '<p class="muted">✓＝可出席；—＝尚未填寫；✕＝不參加此會議（不列入共同時段計算）；' +
+          '綠色大框＝每個人都有空、且可容納 ' + meetHours + ' 小時會議的連續時段區塊。</p>';
   html += '</div>';
   $('resultArea').innerHTML = html;
   initTimeBars();

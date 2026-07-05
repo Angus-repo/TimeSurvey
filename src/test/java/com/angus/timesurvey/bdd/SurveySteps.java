@@ -266,6 +266,57 @@ public class SurveySteps {
         fail("找不到參與者「" + participant + "」的回覆");
     }
 
+    @When("參與者 {string} 在調查 {string} 表明不參加，原因 {string}")
+    public void submitDecline(String participant, String surveyName, String reason) {
+        Map<String, String> body = Map.of("participantName", participant, "slots", "", "declineReason", reason);
+        last = rest.exchange("/api/surveys/" + surveyId(surveyName) + "/responses",
+                HttpMethod.POST, new HttpEntity<>(body, headers(null)), String.class);
+    }
+
+    @When("參與者 {string} 在調查 {string} 回覆無可出席時段，原因 {string}，建議 {string} 到 {string}")
+    public void submitNoTime(String participant, String surveyName, String reason, String from, String to) {
+        Map<String, String> body = new HashMap<>();
+        body.put("participantName", participant);
+        body.put("slots", "");
+        body.put("noTimeReason", reason);
+        if (!from.isBlank()) body.put("suggestedStartDate", from);
+        if (!to.isBlank()) body.put("suggestedEndDate", to);
+        last = rest.exchange("/api/surveys/" + surveyId(surveyName) + "/responses",
+                HttpMethod.POST, new HttpEntity<>(body, headers(null)), String.class);
+    }
+
+    @Then("{string} 在調查 {string} 的不參加原因應為 {string}")
+    public void declineReasonIs(String participant, String surveyName, String expected) {
+        JsonNode r = responseOf(participant, surveyName);
+        assertEquals(expected, r.get("declineReason").asText());
+        assertEquals("", r.get("slots").asText(), "表明不參加後不應留有已勾選的時段");
+    }
+
+    @Then("{string} 在調查 {string} 應無不參加原因")
+    public void noDeclineReason(String participant, String surveyName) {
+        JsonNode r = responseOf(participant, surveyName);
+        assertTrue(r.get("declineReason").isNull(), "不參加原因應已被清除：" + r);
+    }
+
+    @Then("{string} 在調查 {string} 的無可出席原因應為 {string} 且建議區間為 {string} 到 {string}")
+    public void noTimeReasonIs(String participant, String surveyName, String reason, String from, String to) {
+        JsonNode r = responseOf(participant, surveyName);
+        assertEquals(reason, r.get("noTimeReason").asText());
+        assertEquals(from, r.get("suggestedStartDate").asText());
+        assertEquals(to, r.get("suggestedEndDate").asText());
+        assertEquals("", r.get("slots").asText(), "回覆無可出席時段後不應留有已勾選的時段");
+    }
+
+    /** 取得某參與者在調查中的回覆，找不到則測試失敗 */
+    private JsonNode responseOf(String participant, String surveyName) {
+        JsonNode list = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName) + "/responses", String.class).getBody());
+        for (JsonNode r : list) {
+            if (r.get("participantName").asText().equals(participant)) return r;
+        }
+        fail("找不到參與者「" + participant + "」的回覆");
+        return null;
+    }
+
     @Then("查詢調查 {string} 的結果應成功")
     public void resultsOk(String surveyName) {
         ResponseEntity<String> res = rest.getForEntity("/api/surveys/" + surveyId(surveyName) + "/responses", String.class);

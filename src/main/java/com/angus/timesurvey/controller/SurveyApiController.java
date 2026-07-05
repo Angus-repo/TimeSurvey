@@ -75,6 +75,7 @@ public class SurveyApiController {
         List<String> ids = surveys.stream().map(Survey::getId).toList();
         // 一次撈出所有相關回覆後在記憶體分組，避免逐筆查詢資料庫
         Map<String, Map<String, Set<String>>> slotsBySurvey = new HashMap<>();
+        Map<String, Set<String>> declinedBySurvey = new HashMap<>();   // 已表明不參加的人，不列入共同時段計算
         for (SurveyResponse r : responseRepo.findBySurveyIdIn(ids)) {
             Set<String> slots = new HashSet<>();
             if (r.getSlots() != null && !r.getSlots().isBlank()) {
@@ -84,16 +85,22 @@ public class SurveyApiController {
             }
             slotsBySurvey.computeIfAbsent(r.getSurveyId(), k -> new HashMap<>())
                     .put(r.getParticipantName(), slots);
+            if (r.getDeclineReason() != null && !r.getDeclineReason().isBlank()) {
+                declinedBySurvey.computeIfAbsent(r.getSurveyId(), k -> new HashSet<>())
+                        .add(r.getParticipantName());
+            }
         }
         Map<String, Map<String, Object>> result = new HashMap<>();
         for (Survey s : surveys) {
             Map<String, Set<String>> slotsByParticipant = slotsBySurvey.getOrDefault(s.getId(), Map.of());
+            Set<String> declined = declinedBySurvey.getOrDefault(s.getId(), Set.of());
             List<String> participants = s.getParticipants();
             long done = participants.stream().filter(slotsByParticipant::containsKey).count();
             Boolean hasCommonSlot = null;
             if (!participants.isEmpty() && done == participants.size()) {
                 Set<String> common = null;
                 for (String p : participants) {
+                    if (declined.contains(p)) continue;   // 不參加者不影響其他人的共同時段
                     Set<String> slots = slotsByParticipant.get(p);
                     if (common == null) {
                         common = new HashSet<>(slots);
@@ -101,6 +108,7 @@ public class SurveyApiController {
                         common.retainAll(slots);
                     }
                 }
+                // 全員都不參加時視為沒有共同時段
                 hasCommonSlot = common != null && !common.isEmpty();
             }
             Map<String, Object> row = new HashMap<>();
@@ -307,7 +315,32 @@ public class SurveyApiController {
                     r.setParticipantName(name);
                     return r;
                 });
-        resp.setSlots(body.getOrDefault("slots", ""));
+        // 三種互斥的回覆型態：不參加此會議 / 完全無可出席時段（附建議日期區間）/ 一般勾選時段
+        String declineReason = body.getOrDefault("declineReason", "").trim();
+        String noTimeReason = body.getOrDefault("noTimeReason", "").trim();
+        resp.setDeclineReason(null);
+        resp.setNoTimeReason(null);
+        resp.setSuggestedStartDate(null);
+        resp.setSuggestedEndDate(null);
+        if (!declineReason.isEmpty()) {
+            resp.setSlots("");
+            resp.setDeclineReason(declineReason);
+        } else if (!noTimeReason.isEmpty()) {
+            LocalDate from = parseDate(body.get("suggestedStartDate"));
+            LocalDate to = parseDate(body.get("suggestedEndDate"));
+            if (from == null || to == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "請提供建議的會議日期區間");
+            }
+            if (to.isBefore(from)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "建議的結束日期不可早於開始日期");
+            }
+            resp.setSlots("");
+            resp.setNoTimeReason(noTimeReason);
+            resp.setSuggestedStartDate(from);
+            resp.setSuggestedEndDate(to);
+        } else {
+            resp.setSlots(body.getOrDefault("slots", ""));
+        }
         resp.setUpdatedAt(LocalDateTime.now());
         SurveyResponse saved = responseRepo.save(resp);
 
@@ -338,6 +371,16 @@ public class SurveyApiController {
             }
         }
         return saved;
+    }
+
+    /** "yyyy-MM-dd" -> LocalDate；空值回傳 null，格式錯誤回 400 */
+    private LocalDate parseDate(String s) {
+        if (s == null || s.isBlank()) return null;
+        try {
+            return LocalDate.parse(s.trim());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "建議日期格式不正確");
+        }
     }
 
     private void validate(Survey s) {

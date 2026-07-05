@@ -2,6 +2,7 @@ package com.angus.timesurvey.model;
 
 import jakarta.persistence.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /** 一位參與者對一份調查的勾選結果 */
@@ -24,6 +25,18 @@ public class SurveyResponse {
     @Column(length = 100000)
     private String slots;
 
+    /** 不參加此會議的原因（有值表示此人已表明不參加，slots 必為空） */
+    @Column(length = 500)
+    private String declineReason;
+
+    /** 調查期間完全沒有可出席時段的原因（請假、出差等，slots 必為空） */
+    @Column(length = 500)
+    private String noTimeReason;
+
+    /** 完全沒有可出席時段時，建議改開會議的日期區間 */
+    private LocalDate suggestedStartDate;
+    private LocalDate suggestedEndDate;
+
     private LocalDateTime updatedAt;
 
     public Long getId() { return id; }
@@ -37,6 +50,18 @@ public class SurveyResponse {
 
     public String getSlots() { return slots; }
     public void setSlots(String slots) { this.slots = slots; }
+
+    public String getDeclineReason() { return declineReason; }
+    public void setDeclineReason(String declineReason) { this.declineReason = declineReason; }
+
+    public String getNoTimeReason() { return noTimeReason; }
+    public void setNoTimeReason(String noTimeReason) { this.noTimeReason = noTimeReason; }
+
+    public LocalDate getSuggestedStartDate() { return suggestedStartDate; }
+    public void setSuggestedStartDate(LocalDate suggestedStartDate) { this.suggestedStartDate = suggestedStartDate; }
+
+    public LocalDate getSuggestedEndDate() { return suggestedEndDate; }
+    public void setSuggestedEndDate(LocalDate suggestedEndDate) { this.suggestedEndDate = suggestedEndDate; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }

@@ -60,6 +60,17 @@
   .ptag.warn:hover { border-color: #e74c3c; }
   .ptags input { border: none; outline: none; flex: 1; min-width: 160px; font-size: 14px; padding: 4px; }
   .modal-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+  /* 不參加此會議／完全無可出席時段彈窗：原因輸入與建議日期區間 */
+  .modal-card textarea { width: 100%; min-height: 72px; padding: 9px; border: 1px solid #d4d9e0; border-radius: 7px;
+                         font-size: 14px; font-family: inherit; resize: vertical; }
+  .modal-card textarea:focus { outline: none; border-color: #00a884; box-shadow: 0 0 0 3px rgba(0,168,132,.14); }
+  .modal-field { margin-top: 10px; font-size: 14px; color: #555; }
+  .modal-field .flabel { display: block; margin-bottom: 4px; font-weight: 600; color: #2c3e50; }
+  .modal-field input[type=date] { padding: 7px 9px; border: 1px solid #d4d9e0; border-radius: 7px;
+                                  font-size: 14px; font-family: inherit; }
+  .btn-danger { background: #e74c3c; color: #fff; border: none; border-radius: 6px; padding: 9px 20px;
+                font-size: 14px; cursor: pointer; font-family: inherit; }
+  .btn-danger:hover { background: #c0392b; }
   .modal-actions .muted { font-size: 13px; color: #999; }
   .modal-btns { display: flex; gap: 8px; }
   .btn-cancel { background: #95a5a6; color: #fff; border: none; border-radius: 6px; padding: 9px 20px;
@@ -288,6 +299,7 @@
       <div class="member-menu" id="memberMenu">
         <button id="miInvite" onclick="closeMemberMenu(); openInviteModal()">➕ 邀請其他人加入</button>
         <button id="miSwap" onclick="closeMemberMenu(); openSwapModal()">🔄 換成其他人</button>
+        <button id="miDecline" onclick="closeMemberMenu(); openDeclineModal()">🚫 不參加此會議</button>
       </div>
     </div>
     <button id="btnCal" class="topbtn" onclick="loadMyCalendar()" style="display:none; background:#0a7d57"
@@ -314,7 +326,7 @@
 <div class="container" id="done" style="display:none">
   <div class="card">
     <h2>✅ 已送出！感謝您的填寫</h2>
-    <p><b id="doneName"></b>，以下是您勾選的可出席時間：</p>
+    <p><b id="doneName"></b><span id="doneLead">，以下是您勾選的可出席時間：</span></p>
     <div id="doneList"></div>
     <button class="btn-edit" onclick="backToEdit()">修改填寫內容</button>
     <hr>
@@ -374,6 +386,35 @@
     <button class="btn-cancel" onclick="closeLinkPrompt()">知道了</button>
   </div>
 </div>
+<div class="modal-mask" id="declineMask" style="display:none" onclick="closeDeclineModal()"></div>
+<div class="card modal-card" id="declineModal" style="display:none">
+  <h3>🚫 不參加此會議</h3>
+  <p class="modal-hint">表明不參加後，您不需要填寫時段；調查發起人會在結果頁看到您的姓名與原因</p>
+  <textarea id="declineReason" placeholder="請說明不參加的原因（必填），例如：此議題與我的業務無關、已指派代理人出席"></textarea>
+  <div class="modal-actions" style="justify-content:flex-end">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeDeclineModal()">取消</button>
+      <button class="btn-danger" onclick="confirmDecline()">確認不參加</button>
+    </div>
+  </div>
+</div>
+<div class="modal-mask" id="noTimeMask" style="display:none" onclick="closeNoTimeModal()"></div>
+<div class="card modal-card" id="noTimeModal" style="display:none">
+  <h3>😥 完全沒有可出席的時段</h3>
+  <p class="modal-hint">您沒有勾選任何時段。若調查期間完全無法出席（可能因請假、出差等），
+    請說明原因並建議可行的會議日期區間，讓發起人參考調整；若只是漏勾，請按「返回勾選」。</p>
+  <textarea id="noTimeReason" placeholder="請說明原因（必填），例如：7/6~7/17 出差美國、整週請假"></textarea>
+  <div class="modal-field">
+    <span class="flabel">建議的會議日期區間（必填）：</span>
+    <input type="date" id="suggestStart"> ~ <input type="date" id="suggestEnd">
+  </div>
+  <div class="modal-actions" style="justify-content:flex-end">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeNoTimeModal()">返回勾選</button>
+      <button class="topbtn" onclick="confirmNoTime()">送出</button>
+    </div>
+  </div>
+</div>
 
 <script src="/entra.js"></script>
 <script>
@@ -387,6 +428,8 @@ let copySource = null;     // 正在複製的來源日期（null 表示未進入
 let readOnly = false;      // 調查已結束：只能查看已填時段，不可再修改
 let whoValue = '';         // 目前選擇的姓名（乾淨值，不含「（由 X 邀請加入）」等來源說明文字）
 let entraLocked = false;   // 啟用 Entra ID 登入：姓名以登入者身分帶入，不開放下拉自選
+let myDecline = null;      // 目前選擇的人先前表明「不參加此會議」的原因（null 表示未表明）
+let myNoTime = null;       // 先前回覆「完全無可出席時段」：{ reason, from, to }（null 表示無此回覆）
 
 /* 複製 / 貼上 / 取消的線條式圖示（stroke 用 currentColor，顏色跟隨按鈕狀態） */
 const ICON = {
@@ -474,25 +517,30 @@ async function init() {
   $('main').style.display = '';
   $('bar').style.display = '';
 
-  // 頂部功能鈕：邀請他人加入 / 換成其他人，依調查設定與是否唯讀決定顯示
+  // 頂部功能鈕：邀請他人加入 / 換成其他人依調查設定決定；「不參加此會議」則所有未結束的調查皆可用
   const showInvite = !readOnly && survey.allowAddParticipant;
   const showSwap = !readOnly && survey.allowReplaceParticipant;
-  if (showInvite || showSwap) {
+  const showDecline = !readOnly;
+  if (showInvite || showSwap || showDecline) {
     $('actionBar').style.display = '';
     $('memberSplit').style.display = '';
-    // 主按鈕預設為「邀請其他人加入」；若只開放換員，則主按鈕改為「換成其他人」
+    // 主按鈕依序取「邀請其他人加入」→「換成其他人」→「不參加此會議」
     if (showInvite) {
       memberMainAction = openInviteModal;
       $('btnMemberMain').textContent = '➕ 邀請其他人加入';
-    } else {
+    } else if (showSwap) {
       memberMainAction = openSwapModal;
       $('btnMemberMain').textContent = '🔄 換成其他人';
+    } else {
+      memberMainAction = openDeclineModal;
+      $('btnMemberMain').textContent = '🚫 不參加此會議';
     }
-    // 兩者皆開放時才需要右側箭頭與展開選單；選單只列出「非主按鈕」的另一個操作
-    const bothOn = showInvite && showSwap;
-    $('btnMemberCaret').style.display = bothOn ? '' : 'none';
+    // 選單只列出「非主按鈕」的其他操作；有其他操作時才需要右側箭頭
     $('miInvite').style.display = 'none';
-    $('miSwap').style.display = bothOn ? '' : 'none';
+    $('miSwap').style.display = (showSwap && showInvite) ? '' : 'none';
+    $('miDecline').style.display = (showDecline && (showInvite || showSwap)) ? '' : 'none';
+    const hasMenu = (showSwap && showInvite) || (showDecline && (showInvite || showSwap));
+    $('btnMemberCaret').style.display = hasMenu ? '' : 'none';
   }
   // 已啟用 Entra ID 登入時：顯示「同意讀取我的行事曆」按鈕（調查已結束僅供查看，不需帶入），
   // 並以登入者身分決定填寫者（不開放下拉自選姓名）；「先選姓名」的新手引導只在免登入模式才需要
@@ -747,12 +795,22 @@ async function loadMyResponse() {
   $('gridCard').classList.toggle('locked', !name);
   copySource = null;          // 切換姓名會重載內容，複製狀態一併重置
   selected = new Set();
+  myDecline = null;
+  myNoTime = null;
   if (name) {
     const res = await fetch('/api/surveys/' + surveyId + '/responses');
     if (res.ok) {
       const list = await res.json();
       const mine = list.find(r => r.participantName === name);
-      if (mine && mine.slots) {
+      if (mine && mine.declineReason) {
+        myDecline = mine.declineReason;
+        toast(readOnly ? '您先前已表示不參加此會議（原因：' + myDecline + '）'
+                       : '您先前已表示不參加此會議（原因：' + myDecline + '）；若改為參加，勾選時段後重新送出即可');
+      } else if (mine && mine.noTimeReason) {
+        myNoTime = { reason: mine.noTimeReason, from: mine.suggestedStartDate, to: mine.suggestedEndDate };
+        toast(readOnly ? '您先前已回覆此期間沒有可出席的時段（原因：' + myNoTime.reason + '）'
+                       : '您先前已回覆此期間沒有可出席的時段；若情況有變，勾選時段後重新送出即可');
+      } else if (mine && mine.slots) {
         selected = new Set(mine.slots.split(',').filter(x => x));
         toast(readOnly ? '已顯示您先前填寫的時段（調查已結束，僅能查看）' : '已載入您先前填寫的內容，可直接修改後再送出');
       }
@@ -1378,16 +1436,110 @@ function copySurveyLink() {
   }
 }
 
+/* ---------- 不參加此會議：輸入原因（必填）後送出，發起人會在結果頁看到姓名與原因 ---------- */
+function openDeclineModal() {
+  if (readOnly) return toast('調查已結束，無法再表明不參加');
+  if (!whoValue) return toast(entraLocked ? '您不是本次調查的邀請對象，無法表明不參加'
+                                          : '請先選擇您的姓名，再表明不參加');
+  $('declineReason').value = myDecline || '';
+  $('declineMask').style.display = '';
+  $('declineModal').style.display = '';
+  $('declineReason').focus();
+}
+
+function closeDeclineModal() {
+  $('declineMask').style.display = 'none';
+  $('declineModal').style.display = 'none';
+}
+
+async function confirmDecline() {
+  const reason = $('declineReason').value.trim();
+  if (!reason) {
+    $('declineReason').focus();
+    return toast('請說明不參加的原因');
+  }
+  const res = await fetch('/api/surveys/' + surveyId + '/responses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ participantName: whoValue, slots: '', declineReason: reason })
+  });
+  if (res.ok) {
+    myDecline = reason;
+    myNoTime = null;
+    selected = new Set();
+    refreshAll();
+    closeDeclineModal();
+    showDone(whoValue, { decline: reason });
+  } else {
+    let msg = '送出失敗，請稍後再試';
+    try { msg = (await res.json()).message || msg; } catch (e) {}
+    toast(msg);
+  }
+}
+
+/* ---------- 完全沒有可出席的時段：未勾選任何時段就送出時，請說明原因並建議會議日期區間 ---------- */
+function openNoTimeModal() {
+  $('noTimeReason').value = myNoTime ? myNoTime.reason : '';
+  $('suggestStart').value = (myNoTime && myNoTime.from) || '';
+  $('suggestEnd').value = (myNoTime && myNoTime.to) || '';
+  // 建議區間應是之後可行的日期：最早可選「調查迄日的隔天」
+  const after = new Date(survey.endDate + 'T00:00:00');
+  after.setDate(after.getDate() + 1);
+  const min = after.getFullYear() + '-' + String(after.getMonth() + 1).padStart(2, '0') + '-' +
+              String(after.getDate()).padStart(2, '0');
+  $('suggestStart').min = min;
+  $('suggestEnd').min = min;
+  $('noTimeMask').style.display = '';
+  $('noTimeModal').style.display = '';
+  $('noTimeReason').focus();
+}
+
+function closeNoTimeModal() {
+  $('noTimeMask').style.display = 'none';
+  $('noTimeModal').style.display = 'none';
+}
+
+async function confirmNoTime() {
+  const reason = $('noTimeReason').value.trim();
+  if (!reason) {
+    $('noTimeReason').focus();
+    return toast('請說明完全沒有可出席時段的原因（例如請假、出差）');
+  }
+  const from = $('suggestStart').value, to = $('suggestEnd').value;
+  if (!from || !to) return toast('請選擇建議的會議日期區間');
+  if (to < from) return toast('建議的結束日期不可早於開始日期');
+  const res = await fetch('/api/surveys/' + surveyId + '/responses', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ participantName: whoValue, slots: '',
+                           noTimeReason: reason, suggestedStartDate: from, suggestedEndDate: to })
+  });
+  if (res.ok) {
+    myNoTime = { reason, from, to };
+    myDecline = null;
+    closeNoTimeModal();
+    showDone(whoValue, { noTime: { reason, from, to } });
+  } else {
+    let msg = '送出失敗，請稍後再試';
+    try { msg = (await res.json()).message || msg; } catch (e) {}
+    toast(msg);
+  }
+}
+
 async function submitResponse() {
   if (readOnly) return toast('調查已結束，無法再送出');
   const name = whoValue;
   if (!name) return toast(entraLocked ? '您不是本次調查的邀請對象，無法送出' : '請先選擇您的姓名');
+  // 未勾選任何時段：視為完全無符合的時段（可能因請假、出差等），請說明原因並建議會議日期區間
+  if (selected.size === 0) return openNoTimeModal();
   const res = await fetch('/api/surveys/' + surveyId + '/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ participantName: name, slots: [...selected].sort().join(',') })
   });
   if (res.ok) {
+    myDecline = null;
+    myNoTime = null;
     showDone(name);
   } else {
     let msg = '送出失敗，請稍後再試';
@@ -1406,8 +1558,14 @@ function plus30(t) {
   return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
 }
 
-/* 隱藏填寫表單，改顯示這次送出的內容摘要（連續時段合併為區間） */
-function showDone(name) {
+/* 簡易 HTML 逸出：原因等自由輸入的文字要放進 innerHTML 前先處理 */
+function escHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+/* 隱藏填寫表單，改顯示這次送出的內容摘要（連續時段合併為區間）；
+   extra.decline＝不參加此會議的原因、extra.noTime＝完全無可出席時段的原因與建議日期區間 */
+function showDone(name, extra) {
   const byDate = {};
   for (const s of [...selected].sort()) {
     const [d, t] = s.split('T');
@@ -1415,7 +1573,16 @@ function showDone(name) {
   }
   const dates = Object.keys(byDate).sort();
   let html = '';
-  if (dates.length === 0) {
+  if (extra && extra.decline) {
+    html = '<p>🚫 您已表明<b>不參加此會議</b>，不需要填寫時段。</p>' +
+           '<p>原因：' + escHtml(extra.decline) + '</p>' +
+           '<p class="muted">調查發起人會在結果頁看到您的姓名與原因；若改為參加，可點「修改填寫內容」勾選時段後重新送出。</p>';
+  } else if (extra && extra.noTime) {
+    html = '<p>😥 您已回覆：調查期間<b>完全沒有可出席的時段</b>。</p>' +
+           '<p>原因：' + escHtml(extra.noTime.reason) + '</p>' +
+           '<p>建議的會議日期區間：' + fmtMd(extra.noTime.from) + ' ~ ' + fmtMd(extra.noTime.to) + '</p>' +
+           '<p class="muted">調查發起人會在結果頁看到您的原因與建議區間；若情況有變，可點「修改填寫內容」勾選時段後重新送出。</p>';
+  } else if (dates.length === 0) {
     html = '<p class="muted">您沒有勾選任何時段（表示這段期間都無法出席）。</p>';
   } else {
     for (const d of dates) {
@@ -1434,6 +1601,7 @@ function showDone(name) {
     }
   }
   $('doneName').textContent = name;
+  $('doneLead').textContent = extra ? '，已收到您的回覆：' : '，以下是您勾選的可出席時間：';
   $('doneList').innerHTML = html;
   $('main').style.display = 'none';
   $('bar').style.display = 'none';

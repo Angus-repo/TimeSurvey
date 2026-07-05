@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "timesurvey",
+      "runtimeExecutable": "mvn",
+      "runtimeArgs": [
+        "spring-boot:run",
+        "-Dspring-boot.run.arguments=--spring.datasource.url=jdbc:h2:mem:preview;DB_CLOSE_DELAY=-1 --spring.datasource.password= --spring.jpa.hibernate.ddl-auto=create-drop --entra.file=./data-test-nonexistent/entra.properties"
+      ],
+      "port": 8080
+    }
+  ]
+}
