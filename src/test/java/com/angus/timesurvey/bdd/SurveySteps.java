@@ -285,6 +285,19 @@ public class SurveySteps {
                 HttpMethod.POST, new HttpEntity<>(body, headers(null)), String.class);
     }
 
+    @When("參與者 {string} 在調查 {string} 回覆無可出席時段，原因 {string}，建議 {string} 到 {string}，挖空 {string}")
+    public void submitNoTimeWithExcluded(String participant, String surveyName, String reason, String from, String to, String excluded) {
+        Map<String, String> body = new HashMap<>();
+        body.put("participantName", participant);
+        body.put("slots", "");
+        body.put("noTimeReason", reason);
+        body.put("suggestedStartDate", from);
+        body.put("suggestedEndDate", to);
+        body.put("suggestedExcludedDates", excluded);
+        last = rest.exchange("/api/surveys/" + surveyId(surveyName) + "/responses",
+                HttpMethod.POST, new HttpEntity<>(body, headers(null)), String.class);
+    }
+
     @Then("{string} 在調查 {string} 的不參加原因應為 {string}")
     public void declineReasonIs(String participant, String surveyName, String expected) {
         JsonNode r = responseOf(participant, surveyName);
@@ -305,6 +318,16 @@ public class SurveySteps {
         assertEquals(from, r.get("suggestedStartDate").asText());
         assertEquals(to, r.get("suggestedEndDate").asText());
         assertEquals("", r.get("slots").asText(), "回覆無可出席時段後不應留有已勾選的時段");
+    }
+
+    @Then("{string} 在調查 {string} 的建議挖空日期應包含 {string}")
+    public void suggestedExcludedContains(String participant, String surveyName, String date) {
+        JsonNode r = responseOf(participant, surveyName);
+        boolean found = false;
+        for (JsonNode n : r.get("suggestedExcludedDates")) {
+            if (n.asText().equals(date)) found = true;
+        }
+        assertTrue(found, "建議挖空日期應包含 " + date + "，實際：" + r.get("suggestedExcludedDates"));
     }
 
     /** 取得某參與者在調查中的回覆，找不到則測試失敗 */

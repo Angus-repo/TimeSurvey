@@ -18,6 +18,8 @@
 
   /* 自訂「您的姓名」下拉：原生 <select> 的 <option> 無法讓文字分段上色，
      改用按鈕＋浮動清單，讓「（由 X 邀請加入／換員轉入）」等來源說明能以灰色呈現 */
+  .who-main { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .who-main label { font-weight: 700; color: #3b4652; }
   .who-combo { position: relative; display: inline-block; vertical-align: middle; }
   .who-trigger { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px;
                  min-width: 220px; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px;
@@ -35,6 +37,15 @@
   /* 啟用 Entra ID 登入時姓名由登入者身分帶入，不開放下拉自選 */
   .who-trigger:disabled { background: #f5f7f6; color: #333; cursor: default; }
   .who-trigger:disabled:hover { border-color: #ccc; }
+  .who-help { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 12px;
+              padding: 10px 12px; border: 1px solid #d7e9e2; border-radius: 8px; background: #f6fbf8;
+              color: #3d5750; line-height: 1.55; }
+  .who-help-icon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+                   border-radius: 50%; background: #00a884; color: #fff; font-size: 12px; font-weight: 700; flex: none; }
+  .who-help-main { flex: 1 1 300px; min-width: 220px; font-size: 13.5px; font-weight: 600; }
+  .who-help-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .who-help-chip { padding: 3px 8px; border-radius: 8px; background: #fff; border: 1px solid #d6e5e0;
+                   color: #52645f; font-size: 12.5px; white-space: nowrap; }
   .who-alert { margin-top: 10px; background: #fdecea; border: 1px solid #f0b6ae; color: #c0392b;
                border-radius: 6px; padding: 10px 14px; font-size: 14px; line-height: 1.7; }
 
@@ -68,6 +79,40 @@
   .modal-field .flabel { display: block; margin-bottom: 4px; font-weight: 600; color: #2c3e50; }
   .modal-field input[type=date] { padding: 7px 9px; border: 1px solid #d4d9e0; border-radius: 7px;
                                   font-size: 14px; font-family: inherit; }
+  .suggest-cal-wrap { position: relative; }
+  /* 與後台維護頁一致的大日曆日期範圍選擇器，用於建議可行的會議日期區間 */
+  .cal { border: 1px solid #ccc; border-radius: 8px; padding: 10px 12px; background: #fff; max-width: 460px; }
+  .cal-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+                 width: 100%; padding: 10px 12px; border: 1px solid #d4d9e0; border-radius: 7px; background: #fff;
+                 cursor: pointer; font-size: 14px; color: #1f2733; user-select: none; transition: border-color .15s, box-shadow .15s; }
+  .cal-trigger:hover { border-color: #2c7be5; }
+  .cal-trigger.empty { color: #aab2bd; }
+  .cal-ic { width: 18px; height: 18px; stroke: #2c7be5; fill: none; stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .cal-pop { position: absolute; z-index: 1210; margin-top: 6px; left: 0; right: auto; }
+  .cal-pop .cal { width: 460px; max-width: 82vw; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cal-title { font-size: 15px; font-weight: 700; color: #2c3e50; }
+  .cal-hint { font-size: 12px; color: #99a2ad; }
+  .cal-scroll { max-height: 240px; overflow-y: auto; overscroll-behavior: contain; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px 0; }
+  .cal-month-divider { grid-column: 1 / -1; margin-top: 14px; padding: 8px 2px 4px; border-top: 1px dashed #dfe3e6;
+                        font-size: 12.5px; font-weight: 700; color: #2c7be5; letter-spacing: .02em; }
+  .cal-week span { text-align: center; font-size: 12px; color: #999; padding: 4px 0; }
+  .cal-day { position: relative; text-align: center; font-size: 14px; padding: 8px 0; border-radius: 6px;
+             cursor: pointer; user-select: none; color: #333; transition: background .12s, color .12s; }
+  .cal-day:hover:not(.cal-disabled):not(.cal-blank):not(.cal-start):not(.cal-end):not(.cal-single) { background: #eaf2fd; }
+  .cal-day.cal-blank { cursor: default; }
+  .cal-day.cal-disabled { color: #cbd2d8; cursor: not-allowed; }
+  .cal-day.cal-range { background: #e3f0ff; border-radius: 0; }
+  .cal-day.cal-start { background: #2c7be5; color: #fff; border-radius: 6px 0 0 6px; }
+  .cal-day.cal-end { background: #2c7be5; color: #fff; border-radius: 0 6px 6px 0; }
+  .cal-day.cal-single { background: #2c7be5; color: #fff; border-radius: 6px; }
+  .cal-day.cal-excluded { background: #fbe9e7; color: #c0392b; text-decoration: line-through; border-radius: 0; }
+  .cal-day.cal-disabled.cal-range, .cal-day.cal-disabled.cal-excluded { color: #9fb6cf; }
+  .cal-foot { margin-top: 8px; font-size: 12px; color: #888; min-height: 16px; }
+  .skipbadge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border-radius: 10px;
+               background: #fbe9e7; color: #c0392b; font-size: 12px; white-space: nowrap; }
   .btn-danger { background: #e74c3c; color: #fff; border: none; border-radius: 6px; padding: 9px 20px;
                 font-size: 14px; cursor: pointer; font-family: inherit; }
   .btn-danger:hover { background: #c0392b; }
@@ -248,6 +293,18 @@
   .onb-col + .onb-col { border-left: 1px dashed #cfd8d4; padding-left: 20px; }
   .onb-col-title { font-weight: 700; color: #00a884; margin-bottom: 6px; font-size: 15px; }
   .onb-col-desc { font-size: 13px; color: #555; line-height: 1.7; }
+  .modal-card.onb-modal-spot { z-index: 1241; }
+  .cal-pop.onb-cal-spot { z-index: 1242; }
+  #calOnbMask { z-index: 1240; }
+  #calOnbPop { position: fixed; top: auto; left: auto; z-index: 1243; }
+  #calOnbPop::before { bottom: auto; top: var(--arrow-top, 50%); left: 100%; transform: translateY(-50%);
+                       border-bottom-color: transparent; border-left-color: #fff; }
+  .cal-onb-legend { display: flex; gap: 16px; margin: 10px 0 2px; font-size: 13px; color: #555; }
+  .cal-onb-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .cal-onb-sw { width: 20px; height: 20px; border-radius: 5px; display: inline-flex; align-items: center;
+                justify-content: center; font-size: 12px; }
+  .cal-onb-sw.range { background: #2c7be5; color: #fff; }
+  .cal-onb-sw.skip { background: #fbe9e7; color: #c0392b; text-decoration: line-through; }
 
   /* 送出後的完成畫面 */
   #done .card { padding: 24px 28px; }
@@ -276,14 +333,25 @@
 <div class="container" id="main" style="display:none">
   <div class="closed-banner" id="closedBanner" style="display:none">📋 本調查已結束，您僅能查看先前填寫的時段，無法再修改。</div>
   <div class="card" id="whoCard">
-    <label>您的姓名：</label>
-    <div class="who-combo" id="whoCombo">
-      <button type="button" class="who-trigger placeholder" id="whoTrigger" onclick="toggleWhoMenu(event)">
-        <span id="whoTriggerText">-- 請選擇 --</span><span class="who-arrow">▾</span>
-      </button>
-      <div class="who-menu" id="whoMenu" style="display:none"></div>
+    <div class="who-main">
+      <label>您的姓名：</label>
+      <div class="who-combo" id="whoCombo">
+        <button type="button" class="who-trigger placeholder" id="whoTrigger" onclick="toggleWhoMenu(event)">
+          <span id="whoTriggerText">-- 請選擇 --</span><span class="who-arrow">▾</span>
+        </button>
+        <div class="who-menu" id="whoMenu" style="display:none"></div>
+      </div>
     </div>
-    <span class="hint" id="whoHint">選擇後請勾選您可以出席的時間（可點全天、上午、下午快速鈕、各小時框右上角的勾勾整時選取，或個別 30 分鐘時段）</span>
+    <div class="who-help" id="whoHint">
+      <span class="who-help-icon" aria-hidden="true">i</span>
+      <div class="who-help-main">選好姓名後，就可以標記可出席的時間。</div>
+      <div class="who-help-actions" aria-label="可用的快速操作">
+        <span class="who-help-chip">快速選整天</span>
+        <span class="who-help-chip">上午 / 下午</span>
+        <span class="who-help-chip">小時勾勾</span>
+        <span class="who-help-chip">30 分鐘格</span>
+      </div>
+    </div>
     <div class="who-alert" id="whoAlert" style="display:none"></div>
     <div class="onb-pop" id="onbPop" style="display:none">
       👋 歡迎！<b>請先在這裡選擇您的姓名</b><br>
@@ -406,7 +474,33 @@
   <textarea id="noTimeReason" placeholder="請說明原因（必填），例如：7/6~7/17 出差美國、整週請假"></textarea>
   <div class="modal-field">
     <span class="flabel">建議的會議日期區間（必填）：</span>
-    <input type="date" id="suggestStart"> ~ <input type="date" id="suggestEnd">
+    <div class="suggest-cal-wrap">
+      <input type="hidden" id="suggestStart">
+      <input type="hidden" id="suggestEnd">
+      <input type="hidden" id="suggestExcludedDates">
+      <button type="button" class="cal-trigger empty" id="suggestCalTrigger" onclick="toggleSuggestCal(event)">
+        <span id="suggestCalTriggerText">請選擇日期範圍</span>
+        <svg class="cal-ic" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+          <path d="M16 2v4M8 2v4M3 10h18"></path>
+        </svg>
+      </button>
+      <div class="cal-pop" id="suggestCalPop" style="display:none">
+        <div class="cal">
+          <div class="cal-head">
+            <div class="cal-title" id="suggestCalTitle"></div>
+            <div class="cal-hint">選起日與迄日</div>
+          </div>
+          <div class="cal-grid cal-week">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+          </div>
+          <div class="cal-scroll" id="suggestCalScroll">
+            <div class="cal-grid" id="suggestCalDays"></div>
+          </div>
+          <div class="cal-foot" id="suggestCalFoot"></div>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="modal-actions" style="justify-content:flex-end">
     <div class="modal-btns">
@@ -414,6 +508,16 @@
       <button class="topbtn" onclick="confirmNoTime()">送出</button>
     </div>
   </div>
+</div>
+<div class="modal-mask" id="calOnbMask" style="display:none" onclick="endSuggestCalOnb()"></div>
+<div class="onb-pop" id="calOnbPop" style="display:none">
+  📅 這裡可以用<b>大日曆</b>選擇建議的會議日期區間。<br>
+  先點起日，再點迄日；區間中的日期可點一下挖空、再點復原。
+  <div class="cal-onb-legend">
+    <span><i class="cal-onb-sw range">1</i>起日 / 迄日</span>
+    <span><i class="cal-onb-sw skip">2</i>挖空日</span>
+  </div>
+  <div><button onclick="endSuggestCalOnb(event)">知道了</button></div>
 </div>
 
 <script src="/entra.js"></script>
@@ -429,7 +533,7 @@ let readOnly = false;      // 調查已結束：只能查看已填時段，不�
 let whoValue = '';         // 目前選擇的姓名（乾淨值，不含「（由 X 邀請加入）」等來源說明文字）
 let entraLocked = false;   // 啟用 Entra ID 登入：姓名以登入者身分帶入，不開放下拉自選
 let myDecline = null;      // 目前選擇的人先前表明「不參加此會議」的原因（null 表示未表明）
-let myNoTime = null;       // 先前回覆「完全無可出席時段」：{ reason, from, to }（null 表示無此回覆）
+let myNoTime = null;       // 先前回覆「完全無可出席時段」：{ reason, from, to, excluded }（null 表示無此回覆）
 
 /* 複製 / 貼上 / 取消的線條式圖示（stroke 用 currentColor，顏色跟隨按鈕狀態） */
 const ICON = {
@@ -476,10 +580,49 @@ function timeSlots(startTime, endTime) {
 }
 
 const WEEK = ['日','一','二','三','四','五','六'];
+const WHO_HINT_ACTIONS = ['快速選整天', '上午 / 下午', '小時勾勾', '30 分鐘格'];
+
+function whoHintHtml(message) {
+  return '<span class="who-help-icon" aria-hidden="true">i</span>' +
+         '<div class="who-help-main">' + escHtml(message) + '</div>' +
+         '<div class="who-help-actions" aria-label="可用的快速操作">' +
+         WHO_HINT_ACTIONS.map(a => '<span class="who-help-chip">' + escHtml(a) + '</span>').join('') +
+         '</div>';
+}
+
+function setWhoHint(message) {
+  const hint = $('whoHint');
+  hint.innerHTML = whoHintHtml(message);
+  hint.style.display = '';
+}
+
 /* "2026-07-06" -> "7/6" */
 function fmtMd(d) {
   const [, m, dd] = d.split('-');
   return (+m) + '/' + (+dd);
+}
+
+/* Date -> "yyyy-MM-dd" */
+function ymd(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function todayYmd() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return ymd(d);
+}
+
+function isWeekend(s) {
+  const g = new Date(s + 'T00:00:00').getDay();
+  return g === 0 || g === 6;
+}
+
+function within1Month(a, b) {
+  const sd = new Date(a + 'T00:00:00');
+  const max = new Date(sd);
+  max.setMonth(max.getMonth() + 1);
+  return new Date(b + 'T00:00:00') <= max;
 }
 
 /* 該日期所屬週的週一作為分組鍵，用來判斷是否進入新的一週 */
@@ -807,7 +950,8 @@ async function loadMyResponse() {
         toast(readOnly ? '您先前已表示不參加此會議（原因：' + myDecline + '）'
                        : '您先前已表示不參加此會議（原因：' + myDecline + '）；若改為參加，勾選時段後重新送出即可');
       } else if (mine && mine.noTimeReason) {
-        myNoTime = { reason: mine.noTimeReason, from: mine.suggestedStartDate, to: mine.suggestedEndDate };
+        myNoTime = { reason: mine.noTimeReason, from: mine.suggestedStartDate, to: mine.suggestedEndDate,
+                     excluded: mine.suggestedExcludedDates || [] };
         toast(readOnly ? '您先前已回覆此期間沒有可出席的時段（原因：' + myNoTime.reason + '）'
                        : '您先前已回覆此期間沒有可出席的時段；若情況有變，勾選時段後重新送出即可');
       } else if (mine && mine.slots) {
@@ -839,8 +983,7 @@ function applyEntraIdentity() {
 
   if (matched) {
     trigger.title = '已依您的 Microsoft 登入身分自動帶入，無法選擇其他人';
-    $('whoHint').textContent = '已依您的登入身分自動帶入姓名，請勾選您可以出席的時間' +
-        '（可點全天、上午、下午快速鈕、各小時框右上角的勾勾整時選取，或個別 30 分鐘時段）';
+    setWhoHint('已用登入身分帶入姓名，接下來請標記可出席的時間。');
     selectWho(matched);
   } else {
     whoValue = '';
@@ -1477,24 +1620,226 @@ async function confirmDecline() {
   }
 }
 
+/* ---------- 建議日期區間的大日曆：與後台日期範圍選擇共用首次教學狀態 ---------- */
+let suggestCalStart = null, suggestCalEnd = null;
+let suggestCalExcluded = new Set();
+let suggestCalOnbOn = false;
+
+function syncSuggestCalInputs() {
+  $('suggestStart').value = suggestCalStart || '';
+  $('suggestEnd').value = suggestCalEnd || suggestCalStart || '';
+  $('suggestExcludedDates').value = [...suggestCalExcluded].sort().join(',');
+  updateSuggestCalTrigger();
+}
+
+function updateSuggestCalTrigger() {
+  const trigger = $('suggestCalTrigger');
+  const text = $('suggestCalTriggerText');
+  if (!trigger || !text) return;
+  if (!suggestCalStart) {
+    text.textContent = '請選擇日期範圍';
+    trigger.classList.add('empty');
+  } else {
+    const end = suggestCalEnd || suggestCalStart;
+    text.innerHTML = escHtml(fmtMd(suggestCalStart) + ' ~ ' + fmtMd(end)) + suggestedExcludedBadgeHtml();
+    trigger.classList.remove('empty');
+  }
+}
+
+function suggestedExcludedBadgeHtml() {
+  const ex = [...suggestCalExcluded].sort();
+  if (ex.length === 0) return '';
+  const list = ex.map(fmtMd).join('、');
+  return '<span class="skipbadge" title="已跳過 ' + ex.length + ' 天不建議：' + escHtml(list) + '">🚫' + ex.length + ' 天</span>';
+}
+
+function defaultSuggestRange() {
+  const start = new Date(survey.endDate + 'T00:00:00');
+  start.setDate(start.getDate() + 1);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  return { start: ymd(start), end: ymd(end) };
+}
+
+function setSuggestCalRange(start, end, excluded) {
+  suggestCalStart = start || null;
+  suggestCalEnd = end || null;
+  suggestCalExcluded = new Set(excluded || []);
+  syncSuggestCalInputs();
+  renderSuggestCalendar();
+  const pop = $('suggestCalPop');
+  if (pop && pop.style.display !== 'none') suggestCalScrollToSel();
+}
+
+function toggleSuggestCal(e) {
+  if (e) e.stopPropagation();
+  const pop = $('suggestCalPop');
+  if (pop.style.display === 'none') {
+    renderSuggestCalendar();
+    pop.style.display = '';
+    suggestCalScrollToSel();
+    if (!localStorage.getItem('dateRangeOnboarded')) setTimeout(startSuggestCalOnb, 60);
+  } else {
+    closeSuggestCal();
+  }
+}
+
+function closeSuggestCal() {
+  const pop = $('suggestCalPop');
+  if (pop) pop.style.display = 'none';
+}
+
+function suggestCalScrollToSel() {
+  const sc = $('suggestCalScroll');
+  const el = document.querySelector('#suggestCalDays [data-d="' + (suggestCalStart || todayYmd()) + '"]');
+  if (!sc || !el) return;
+  sc.scrollTop = Math.max(0, el.offsetTop - sc.offsetTop - 4);
+}
+
+function renderSuggestCalendar() {
+  const base = new Date((suggestCalStart || todayYmd()) + 'T00:00:00');
+  base.setDate(1);
+  base.setHours(0, 0, 0, 0);
+  const endM = new Date(base.getFullYear(), base.getMonth() + 2, 0);
+  $('suggestCalTitle').textContent = base.getFullYear() + '年 ' + (base.getMonth() + 1) + '月 ～ ' +
+      endM.getFullYear() + '年 ' + (endM.getMonth() + 1) + '月';
+  const today = todayYmd();
+
+  let html = '';
+  for (let i = 0; i < base.getDay(); i++) html += '<span class="cal-day cal-blank"></span>';
+  for (const d = new Date(base); d <= endM; d.setDate(d.getDate() + 1)) {
+    if (d.getDate() === 1 && d.getTime() !== base.getTime()) {
+      html += '<div class="cal-month-divider">' + (d.getMonth() + 1) + '月</div>';
+      for (let i = 0; i < d.getDay(); i++) html += '<span class="cal-day cal-blank"></span>';
+    }
+    const ds = ymd(d);
+    const cls = ['cal-day'];
+    const isEdge = (ds === suggestCalStart || ds === suggestCalEnd);
+    if (!isEdge && (ds < today || isWeekend(ds))) cls.push('cal-disabled');
+    if (suggestCalStart && suggestCalEnd) {
+      if (ds === suggestCalStart && ds === suggestCalEnd) cls.push('cal-single');
+      else if (ds === suggestCalStart) cls.push('cal-start');
+      else if (ds === suggestCalEnd) cls.push('cal-end');
+      else if (ds > suggestCalStart && ds < suggestCalEnd) cls.push(suggestCalExcluded.has(ds) ? 'cal-excluded' : 'cal-range');
+    } else if (suggestCalStart && ds === suggestCalStart) {
+      cls.push('cal-single');
+    }
+    html += '<span class="' + cls.join(' ') + '" data-d="' + ds + '">' + d.getDate() + '</span>';
+  }
+  $('suggestCalDays').innerHTML = html;
+
+  let foot = '';
+  if (!suggestCalStart) foot = '請點選建議區間的「起日」';
+  else if (!suggestCalEnd) foot = '起日：' + fmtMd(suggestCalStart) + '　請再點「迄日」（再點起日可取消）';
+  else {
+    foot = '建議區間：' + fmtMd(suggestCalStart) + ' ~ ' + fmtMd(suggestCalEnd);
+    if (suggestCalExcluded.size) foot += '　已挖空 ' + suggestCalExcluded.size + ' 天';
+  }
+  $('suggestCalFoot').textContent = foot;
+}
+
+function onSuggestCalDayClick(ds) {
+  if (ds !== suggestCalStart && ds !== suggestCalEnd && (ds < todayYmd() || isWeekend(ds))) return;
+  if (!suggestCalStart && !suggestCalEnd) {
+    suggestCalStart = ds;
+    suggestCalEnd = null;
+    suggestCalExcluded.clear();
+  } else if (suggestCalStart && !suggestCalEnd) {
+    if (ds === suggestCalStart) {
+      suggestCalStart = null;
+      suggestCalExcluded.clear();
+    } else {
+      let a = suggestCalStart, b = ds;
+      if (b < a) { const t = a; a = b; b = t; }
+      if (!within1Month(a, b)) return toast('日期範圍不可超過一個月');
+      suggestCalStart = a;
+      suggestCalEnd = b;
+      suggestCalExcluded.clear();
+    }
+  } else {
+    if (ds === suggestCalEnd) {
+      suggestCalEnd = null;
+      suggestCalExcluded.clear();
+    } else if (ds === suggestCalStart) {
+      suggestCalStart = suggestCalEnd;
+      suggestCalEnd = null;
+      suggestCalExcluded.clear();
+    } else if (ds > suggestCalStart && ds < suggestCalEnd) {
+      suggestCalExcluded.has(ds) ? suggestCalExcluded.delete(ds) : suggestCalExcluded.add(ds);
+    } else {
+      suggestCalStart = ds;
+      suggestCalEnd = null;
+      suggestCalExcluded.clear();
+    }
+  }
+  syncSuggestCalInputs();
+  renderSuggestCalendar();
+}
+
+function spotSuggestCalPop() {
+  const cal = document.querySelector('#suggestCalPop .cal');
+  if (!cal) return false;
+  $('noTimeModal').classList.add('onb-modal-spot');
+  $('suggestCalPop').classList.add('onb-cal-spot');
+  const r = cal.getBoundingClientRect();
+  const pop = $('calOnbPop');
+  pop.style.display = '';
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  const left = Math.max(12, r.left - pw - 14);
+  const top = Math.max(8, Math.min(r.top + r.height / 2 - ph / 2, window.innerHeight - ph - 8));
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+  pop.style.setProperty('--arrow-top', (r.top + r.height / 2 - top) + 'px');
+  return true;
+}
+
+function startSuggestCalOnb() {
+  if ($('suggestCalPop').style.display === 'none') return;
+  if (!spotSuggestCalPop()) return;
+  suggestCalOnbOn = true;
+  $('calOnbMask').style.display = '';
+}
+
+function endSuggestCalOnb(e) {
+  if (e) e.stopPropagation();
+  localStorage.setItem('dateRangeOnboarded', '1');
+  suggestCalOnbOn = false;
+  $('noTimeModal').classList.remove('onb-modal-spot');
+  $('suggestCalPop').classList.remove('onb-cal-spot');
+  $('calOnbMask').style.display = 'none';
+  $('calOnbPop').style.display = 'none';
+}
+
+$('suggestCalDays').addEventListener('click', e => {
+  const el = e.target.closest('.cal-day');
+  if (!el || el.classList.contains('cal-blank') || el.classList.contains('cal-disabled')) return;
+  onSuggestCalDayClick(el.dataset.d);
+});
+$('suggestCalPop').addEventListener('click', e => e.stopPropagation());
+document.addEventListener('click', e => {
+  const pop = $('suggestCalPop');
+  const trigger = $('suggestCalTrigger');
+  if (!pop || pop.style.display === 'none') return;
+  if (!pop.contains(e.target) && !trigger.contains(e.target)) closeSuggestCal();
+});
+['resize', 'scroll'].forEach(ev =>
+  window.addEventListener(ev, () => { if (suggestCalOnbOn) spotSuggestCalPop(); }, true));
+
 /* ---------- 完全沒有可出席的時段：未勾選任何時段就送出時，請說明原因並建議會議日期區間 ---------- */
 function openNoTimeModal() {
   $('noTimeReason').value = myNoTime ? myNoTime.reason : '';
-  $('suggestStart').value = (myNoTime && myNoTime.from) || '';
-  $('suggestEnd').value = (myNoTime && myNoTime.to) || '';
-  // 建議區間應是之後可行的日期：最早可選「調查迄日的隔天」
-  const after = new Date(survey.endDate + 'T00:00:00');
-  after.setDate(after.getDate() + 1);
-  const min = after.getFullYear() + '-' + String(after.getMonth() + 1).padStart(2, '0') + '-' +
-              String(after.getDate()).padStart(2, '0');
-  $('suggestStart').min = min;
-  $('suggestEnd').min = min;
+  const def = defaultSuggestRange();
+  setSuggestCalRange((myNoTime && myNoTime.from) || def.start,
+                     (myNoTime && myNoTime.to) || def.end,
+                     (myNoTime && myNoTime.excluded) || []);
   $('noTimeMask').style.display = '';
   $('noTimeModal').style.display = '';
   $('noTimeReason').focus();
 }
 
 function closeNoTimeModal() {
+  closeSuggestCal();
+  if (suggestCalOnbOn) endSuggestCalOnb();
   $('noTimeMask').style.display = 'none';
   $('noTimeModal').style.display = 'none';
 }
@@ -1508,17 +1853,19 @@ async function confirmNoTime() {
   const from = $('suggestStart').value, to = $('suggestEnd').value;
   if (!from || !to) return toast('請選擇建議的會議日期區間');
   if (to < from) return toast('建議的結束日期不可早於開始日期');
+  const excluded = $('suggestExcludedDates').value;
   const res = await fetch('/api/surveys/' + surveyId + '/responses', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ participantName: whoValue, slots: '',
-                           noTimeReason: reason, suggestedStartDate: from, suggestedEndDate: to })
+                           noTimeReason: reason, suggestedStartDate: from, suggestedEndDate: to,
+                           suggestedExcludedDates: excluded })
   });
   if (res.ok) {
-    myNoTime = { reason, from, to };
+    myNoTime = { reason, from, to, excluded: excluded ? excluded.split(',') : [] };
     myDecline = null;
     closeNoTimeModal();
-    showDone(whoValue, { noTime: { reason, from, to } });
+    showDone(whoValue, { noTime: { reason, from, to, excluded: myNoTime.excluded } });
   } else {
     let msg = '送出失敗，請稍後再試';
     try { msg = (await res.json()).message || msg; } catch (e) {}
@@ -1578,9 +1925,11 @@ function showDone(name, extra) {
            '<p>原因：' + escHtml(extra.decline) + '</p>' +
            '<p class="muted">調查發起人會在結果頁看到您的姓名與原因；若改為參加，可點「修改填寫內容」勾選時段後重新送出。</p>';
   } else if (extra && extra.noTime) {
+    const ex = extra.noTime.excluded || [];
+    const exText = ex.length ? '（已跳過：' + ex.map(fmtMd).join('、') + '）' : '';
     html = '<p>😥 您已回覆：調查期間<b>完全沒有可出席的時段</b>。</p>' +
            '<p>原因：' + escHtml(extra.noTime.reason) + '</p>' +
-           '<p>建議的會議日期區間：' + fmtMd(extra.noTime.from) + ' ~ ' + fmtMd(extra.noTime.to) + '</p>' +
+           '<p>建議的會議日期區間：' + fmtMd(extra.noTime.from) + ' ~ ' + fmtMd(extra.noTime.to) + exText + '</p>' +
            '<p class="muted">調查發起人會在結果頁看到您的原因與建議區間；若情況有變，可點「修改填寫內容」勾選時段後重新送出。</p>';
   } else if (dates.length === 0) {
     html = '<p class="muted">您沒有勾選任何時段（表示這段期間都無法出席）。</p>';

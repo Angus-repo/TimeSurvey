@@ -380,6 +380,23 @@ public class UiSteps {
         page.locator(".slot").first().waitFor();
     }
 
+    @When("以未使用過大日曆的身分開啟調查 {string} 的填寫頁")
+    public void openSurveyPageWithoutDateRangeOnboarding(String surveyName) {
+        // 只清掉 dateRangeOnboarded，模擬「index / survey 都沒用過大日曆」；
+        // 其他填寫頁教學維持已看過，避免遮罩干擾本場景。
+        ctx.close();
+        ctx = sharedBrowser().newContext();
+        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
+                "localStorage.setItem('surveyOnboarded', '1');" +
+                "localStorage.setItem('surveyGridOnboarded', '1');" +
+                "localStorage.setItem('meetHoursOnboarded', '1');" +
+                "localStorage.setItem('dragSlotOnboarded', '1');" +
+                "localStorage.setItem('copyLinkOnboarded', '1');");
+        page = ctx.newPage();
+        page.navigate(base() + "/s/" + surveyIds.get(surveyName));
+        page.locator(".slot").first().waitFor();
+    }
+
     @Then("應顯示選擇姓名的新手引導")
     public void onboardingShown() {
         assertThat(page.locator("#onbPop")).isVisible();
@@ -438,6 +455,75 @@ public class UiSteps {
     @When("按下送出")
     public void clickSubmit() {
         page.click("#bar button");
+    }
+
+    @Then("應顯示完全沒有可出席時段視窗")
+    public void noTimeModalShown() {
+        assertThat(page.locator("#noTimeModal")).isVisible();
+        assertThat(page.locator("#noTimeModal")).containsText("完全沒有可出席的時段");
+    }
+
+    @Then("建議日期區間應使用大日曆選擇器")
+    public void suggestedDatesUseCalendarPicker() {
+        assertThat(page.locator("#suggestCalTrigger")).isVisible();
+        assertThat(page.locator("#suggestCalPop")).isHidden();
+        assertThat(page.locator("#suggestStart")).hasAttribute("type", "hidden");
+        assertThat(page.locator("#suggestEnd")).hasAttribute("type", "hidden");
+        assertThat(page.locator("#suggestExcludedDates")).hasAttribute("type", "hidden");
+    }
+
+    @Then("建議日期區間應預設為 {string} 到 {string}")
+    public void suggestedDateRangeDefaultsTo(String from, String to) {
+        assertThat(page.locator("#suggestStart")).hasValue(from);
+        assertThat(page.locator("#suggestEnd")).hasValue(to);
+    }
+
+    @When("開啟建議日期區間日曆")
+    public void openSuggestedDateCalendar() {
+        page.click("#suggestCalTrigger");
+        assertThat(page.locator("#suggestCalPop")).isVisible();
+    }
+
+    @When("在建議日期大日曆選擇前兩個可選工作日")
+    public void chooseFirstTwoSuggestedCalendarDays() {
+        openSuggestedDateCalendar();
+        var days = page.locator("#suggestCalDays .cal-day:not(.cal-disabled):not(.cal-blank)");
+        org.junit.jupiter.api.Assertions.assertTrue(days.count() >= 2, "大日曆至少應有兩個可選工作日");
+        days.nth(0).click();
+        days = page.locator("#suggestCalDays .cal-day:not(.cal-disabled):not(.cal-blank)");
+        days.nth(1).click();
+    }
+
+    @When("在建議日期大日曆選擇前三個可選工作日並挖空中間日期")
+    public void chooseFirstThreeSuggestedCalendarDaysAndExcludeMiddle() {
+        openSuggestedDateCalendar();
+        var days = page.locator("#suggestCalDays .cal-day:not(.cal-disabled):not(.cal-blank):not(.cal-start):not(.cal-end):not(.cal-single)");
+        org.junit.jupiter.api.Assertions.assertTrue(days.count() >= 3, "大日曆至少應有三個可選工作日");
+        String start = days.nth(0).getAttribute("data-d");
+        String middle = days.nth(1).getAttribute("data-d");
+        String end = days.nth(2).getAttribute("data-d");
+        page.click("#suggestCalDays .cal-day[data-d='" + start + "']");
+        page.click("#suggestCalDays .cal-day[data-d='" + end + "']");
+        page.click("#suggestCalDays .cal-day[data-d='" + middle + "']");
+        assertThat(page.locator("#suggestCalDays .cal-day.cal-excluded[data-d='" + middle + "']")).isVisible();
+    }
+
+    @Then("建議日期區間應已填入起迄日")
+    public void suggestedDateRangeFilled() {
+        String from = (String) page.locator("#suggestStart").inputValue();
+        String to = (String) page.locator("#suggestEnd").inputValue();
+        org.junit.jupiter.api.Assertions.assertFalse(from.isBlank(), "建議起日應已填入");
+        org.junit.jupiter.api.Assertions.assertFalse(to.isBlank(), "建議迄日應已填入");
+        org.junit.jupiter.api.Assertions.assertTrue(to.compareTo(from) >= 0, "建議迄日不可早於起日");
+        assertThat(page.locator("#suggestCalTriggerText")).containsText("~");
+    }
+
+    @Then("建議日期區間應有 {int} 個挖空日期")
+    public void suggestedDateRangeHasExcludedDates(int count) {
+        String excluded = page.locator("#suggestExcludedDates").inputValue();
+        int actual = excluded.isBlank() ? 0 : excluded.split(",").length;
+        org.junit.jupiter.api.Assertions.assertEquals(count, actual, "建議日期區間的挖空日期數量不符：" + excluded);
+        assertThat(page.locator("#suggestCalTriggerText .skipbadge")).containsText(count + " 天");
     }
 
     @Then("時段 {string} 應為選取狀態")
@@ -574,6 +660,18 @@ public class UiSteps {
         assertThat(page.locator("#whoTriggerText")).hasText(name);
         assertThat(page.locator("#whoTrigger")).isDisabled();
         assertThat(page.locator("#whoMenu")).isHidden();
+    }
+
+    @Then("姓名提示應顯示登入帶入後的填寫說明")
+    public void whoHintShowsEntraAutofillGuidance() {
+        assertThat(page.locator("#whoHint")).isVisible();
+        assertThat(page.locator("#whoHint")).containsText("已用登入身分帶入姓名");
+        assertThat(page.locator("#whoHint")).containsText("標記可出席的時間");
+        assertThat(page.locator("#whoHint .who-help-chip")).hasCount(4);
+        assertThat(page.locator("#whoHint")).containsText("快速選整天");
+        assertThat(page.locator("#whoHint")).containsText("上午 / 下午");
+        assertThat(page.locator("#whoHint")).containsText("小時勾勾");
+        assertThat(page.locator("#whoHint")).containsText("30 分鐘格");
     }
 
     @Then("應顯示非邀請對象的提示")
@@ -793,7 +891,7 @@ public class UiSteps {
         assertThat(page.locator("#calOnbPop")).isVisible();
         assertThat(page.locator("#calOnbMask")).isVisible();
         // 引導進行時大日曆需抬到遮罩之上，使用者才能一邊看說明一邊操作
-        assertThat(page.locator("#calPop.onb-cal-spot")).isVisible();
+        assertThat(page.locator("#calPop.onb-cal-spot, #suggestCalPop.onb-cal-spot")).isVisible();
     }
 
     @When("點擊日期範圍引導的知道了")

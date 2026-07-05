@@ -1550,12 +1550,13 @@ function renderResult() {
   // 每人勾選的時段集合；另收集「不參加此會議」與「完全無可出席時段」的回覆
   const sets = {};
   const declined = {};   // 姓名 -> 不參加的原因
-  const noTime = {};     // 姓名 -> { reason, from, to }：完全無可出席時段的原因與建議日期區間
+  const noTime = {};     // 姓名 -> { reason, from, to, excluded }：完全無可出席時段的原因與建議日期區間
   for (const r of responses) {
     sets[r.participantName] = new Set((r.slots || '').split(',').filter(x => x));
     if (r.declineReason) declined[r.participantName] = r.declineReason;
     else if (r.noTimeReason) noTime[r.participantName] =
-        { reason: r.noTimeReason, from: r.suggestedStartDate, to: r.suggestedEndDate };
+        { reason: r.noTimeReason, from: r.suggestedStartDate, to: r.suggestedEndDate,
+          excluded: r.suggestedExcludedDates || [] };
   }
   const respondedSet = new Set(responses.map(r => r.participantName));
   const notAnswered = ps.filter(p => !respondedSet.has(p));
@@ -1586,7 +1587,8 @@ function renderResult() {
     const nt = noTime[p];
     html += '<div class="cnote notime">😥 <b>' + esc(p) + '</b> 表示調查期間完全沒有可出席的時段' +
             '（原因：' + esc(nt.reason) + '）' +
-            (nt.from && nt.to ? '，建議的會議日期區間：<b>' + fmtMd(nt.from) + ' ~ ' + fmtMd(nt.to) + '</b>' : '') +
+            (nt.from && nt.to ? '，建議的會議日期區間：<b>' + fmtMd(nt.from) + ' ~ ' + fmtMd(nt.to) +
+                '</b>' + excludedBadgeHtml(nt.excluded || []) : '') +
             '</div>';
   }
   if (notAnswered.length) {

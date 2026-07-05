@@ -322,22 +322,30 @@ public class SurveyApiController {
         resp.setNoTimeReason(null);
         resp.setSuggestedStartDate(null);
         resp.setSuggestedEndDate(null);
+        resp.setSuggestedExcludedDates(List.of());
         if (!declineReason.isEmpty()) {
             resp.setSlots("");
             resp.setDeclineReason(declineReason);
         } else if (!noTimeReason.isEmpty()) {
             LocalDate from = parseDate(body.get("suggestedStartDate"));
             LocalDate to = parseDate(body.get("suggestedEndDate"));
+            List<LocalDate> excluded = parseDateList(body.get("suggestedExcludedDates"));
             if (from == null || to == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "請提供建議的會議日期區間");
             }
             if (to.isBefore(from)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "建議的結束日期不可早於開始日期");
             }
+            for (LocalDate d : excluded) {
+                if (!d.isAfter(from) || !d.isBefore(to)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "建議挖空日期必須位於建議區間內");
+                }
+            }
             resp.setSlots("");
             resp.setNoTimeReason(noTimeReason);
             resp.setSuggestedStartDate(from);
             resp.setSuggestedEndDate(to);
+            resp.setSuggestedExcludedDates(excluded);
         } else {
             resp.setSlots(body.getOrDefault("slots", ""));
         }
@@ -381,6 +389,18 @@ public class SurveyApiController {
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "建議日期格式不正確");
         }
+    }
+
+    /** 逗號分隔 yyyy-MM-dd -> LocalDate 清單；空值回傳空清單 */
+    private List<LocalDate> parseDateList(String s) {
+        if (s == null || s.isBlank()) return List.of();
+        List<LocalDate> out = new ArrayList<>();
+        Set<LocalDate> seen = new HashSet<>();
+        for (String part : s.split(",")) {
+            LocalDate d = parseDate(part);
+            if (d != null && seen.add(d)) out.add(d);
+        }
+        return out;
     }
 
     private void validate(Survey s) {

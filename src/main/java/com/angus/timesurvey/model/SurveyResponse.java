@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /** 一位參與者對一份調查的勾選結果 */
 @Entity
@@ -37,6 +39,12 @@ public class SurveyResponse {
     private LocalDate suggestedStartDate;
     private LocalDate suggestedEndDate;
 
+    /** 建議日期區間內被挖空、不建議安排的日期 */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "survey_response_suggested_excluded_date", joinColumns = @JoinColumn(name = "response_id"))
+    @Column(name = "excluded_date")
+    private List<LocalDate> suggestedExcludedDates = new ArrayList<>();
+
     private LocalDateTime updatedAt;
 
     public Long getId() { return id; }
@@ -62,6 +70,11 @@ public class SurveyResponse {
 
     public LocalDate getSuggestedEndDate() { return suggestedEndDate; }
     public void setSuggestedEndDate(LocalDate suggestedEndDate) { this.suggestedEndDate = suggestedEndDate; }
+
+    public List<LocalDate> getSuggestedExcludedDates() { return suggestedExcludedDates; }
+    public void setSuggestedExcludedDates(List<LocalDate> suggestedExcludedDates) {
+        this.suggestedExcludedDates = suggestedExcludedDates == null ? new ArrayList<>() : new ArrayList<>(suggestedExcludedDates);
+    }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
