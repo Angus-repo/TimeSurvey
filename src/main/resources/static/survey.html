@@ -257,6 +257,10 @@
   #whoCard { position: relative; }
   .grid-outer { position: relative; }
   .onb-spot { position: relative; z-index: 1001; animation: onbpulse 1.6s ease-in-out infinite; }
+  /* 新手引導遮罩開啟時，成員操作鈕（邀請他人加入／換成其他人／不參加）仍浮在遮罩之上可見可按，
+     不因免登入模式的引導而看似消失（啟用 Entra ID 登入時不跑引導，故無此問題）；
+     指引泡泡會改排到操作鈕下方（見 startOnboarding），兩者不重疊 */
+  .onb-raise { position: relative; z-index: 1001; }
   @keyframes onbpulse {
     0%, 100% { box-shadow: 0 0 0 4px rgba(0,168,132,.95), 0 8px 30px rgba(0,0,0,.45); }
     50%      { box-shadow: 0 0 0 10px rgba(0,168,132,.35), 0 8px 30px rgba(0,0,0,.45); }
@@ -266,6 +270,8 @@
              box-shadow: 0 10px 30px rgba(0,0,0,.35); }
   .onb-pop::before { content: ''; position: absolute; bottom: 100%; left: 36px;
                      border: 9px solid transparent; border-bottom-color: #fff; }
+  /* 泡泡被改排到成員操作鈕下方時，向上的小箭頭會指到鈕而非姓名卡，故隱藏箭頭避免誤導 */
+  .onb-pop.detached::before { display: none; }
   .onb-pop b { color: #00a884; }
   .onb-pop button { margin-top: 10px; background: #00a884; color: #fff; border: none; border-radius: 6px;
                     padding: 7px 22px; font-size: 14px; cursor: pointer; font-family: inherit; }
@@ -413,7 +419,7 @@
   <h3>➕ 邀請其他人加入</h3>
   <p class="modal-hint">輸入姓名按 Enter，或直接貼上整串名單（可用分號、逗號、換行等分隔）</p>
   <div class="ptags" id="inviteTags">
-    <input id="inviteInput" placeholder="輸入姓名後按 Enter（姓名可含空白），或貼上「王大明;陳小明;Angus Luo」這類名單">
+    <input id="inviteInput" placeholder="輸入姓名後按;分號，或貼上「王大明;陳小明」這類名單">
   </div>
   <div class="modal-actions">
     <span class="muted" id="inviteCount">共 0 人</span>
@@ -715,6 +721,19 @@ function startOnboarding() {
   $('onbMask').style.display = '';
   $('onbPop').style.display = '';
   $('whoCard').classList.add('onb-spot');
+  $('actionBar').classList.add('onb-raise');   // 成員操作鈕維持可見可按，不被引導遮罩壓暗擋住
+  positionOnbPopBelowActions();
+}
+
+/* 指引泡泡預設緊貼姓名卡下方，但那裡正好是成員操作鈕（邀請／換員）的位置；
+   把泡泡改排到操作鈕下方，讓鈕露出可按、泡泡文字也不被蓋住 */
+function positionOnbPopBelowActions() {
+  const bar = $('actionBar');
+  if (getComputedStyle(bar).display === 'none') return;   // 無成員操作鈕時維持原本緊貼姓名卡
+  const wcTop = $('whoCard').getBoundingClientRect().top;
+  const barBottom = bar.getBoundingClientRect().bottom;
+  $('onbPop').style.top = (barBottom - wcTop + 14) + 'px';
+  $('onbPop').classList.add('detached');
 }
 
 function endOnboarding() {
@@ -722,6 +741,9 @@ function endOnboarding() {
   $('onbMask').style.display = 'none';
   $('onbPop').style.display = 'none';
   $('whoCard').classList.remove('onb-spot');
+  $('actionBar').classList.remove('onb-raise');
+  $('onbPop').style.top = '';
+  $('onbPop').classList.remove('detached');
   $('whoTrigger').focus();
 }
 
@@ -731,6 +753,7 @@ function maybeShowGridOnboarding() {
   $('onbMask').style.display = '';
   $('onbPopGrid').style.display = '';
   $('gridCard').classList.add('onb-spot');
+  $('actionBar').classList.add('onb-raise');   // 成員操作鈕維持可見可按，不被引導遮罩壓暗擋住
 }
 
 function endGridOnboarding() {
@@ -738,6 +761,7 @@ function endGridOnboarding() {
   $('onbMask').style.display = 'none';
   $('onbPopGrid').style.display = 'none';
   $('gridCard').classList.remove('onb-spot');
+  $('actionBar').classList.remove('onb-raise');
 }
 
 /* 點擊遮罩時，依目前顯示中的是哪一個引導泡泡決定要結束哪一個 */
@@ -1262,9 +1286,18 @@ function splitNames(text) {
       .map(s => s.trim().replace(/\s+/g, ' ')).filter(Boolean))];
 }
 
+/* 合併兩份「被略過的姓名」清單並去重（blur 靜默提交累積的 + 確認送出當下提交的） */
+function mergeSkipped(a, b) {
+  return {
+    dupNames: [...new Set([...a.dupNames, ...b.dupNames])],
+    existingNames: [...new Set([...a.existingNames, ...b.existingNames])]
+  };
+}
+
 /* ---------- 邀請他人加入：彈窗內以姓名標籤輸入多人，樣式與操作方式比照後台維護頁的「受調查人員」欄位 ---------- */
 let inviteList = [];     // 彈窗中已加入的待邀請姓名（尚未送出）
 let inviteVerify = {};   // 姓名 -> 組織目錄檢查結果（僅啟用 Entra ID 時使用）
+let inviteBlurSkipped = { dupNames: [], existingNames: [] };   // blur 靜默提交時被略過的姓名，留給「確認邀請」合併提示
 
 function openInviteModal() {
   const inviter = whoValue;
@@ -1272,6 +1305,7 @@ function openInviteModal() {
                                          : '請先選擇您的姓名，再邀請其他人加入');
   inviteList = [];
   inviteVerify = {};
+  inviteBlurSkipped = { dupNames: [], existingNames: [] };
   $('inviteInput').value = '';
   renderInviteTags();
   $('inviteMask').style.display = '';
@@ -1355,9 +1389,12 @@ $('inviteInput').addEventListener('keydown', e => {
     renderInviteTags();
   }
 });
-// 注意：刻意不在 blur 時自動提交輸入框文字並跳提示——因為點擊「確認邀請」鈕會先觸發輸入框失焦（blur），
+// blur 時把還沒按 Enter 的姓名「靜默」收成名牌，不跳提示——因為點擊「確認邀請」鈕會先觸發輸入框失焦（blur），
 // 若 blur 也跳一次提示，會緊接著確認邀請自己的合併提示一起跳出，兩則提示太快切換來不及看清楚。
-// 尚未確認的文字改由 Enter / 貼上即時提交，或交給「確認邀請」在送出時一併靜默處理、合併成單一提示。
+// 被略過的姓名先累積在 inviteBlurSkipped，由「確認邀請」合併成單一提示顯示。
+$('inviteInput').addEventListener('blur', () => {
+  inviteBlurSkipped = mergeSkipped(inviteBlurSkipped, commitInviteInput(true));
+});
 $('inviteInput').addEventListener('paste', e => {
   e.preventDefault();
   addInviteNames((e.clipboardData || window.clipboardData).getData('text'));
@@ -1385,7 +1422,9 @@ if (window.Entra) Entra.ready.then(on => {
 /* 確認邀請：需先選擇自己的姓名，新加入的人名會註明是由誰邀請加入；逐一送出名單中的姓名。
    所有結果（新增成功、被略過、失敗）合併成一則提示一次顯示，不連續跳出多則來不及看清楚 */
 async function confirmInvite() {
-  const pending = commitInviteInput(true);   // 還未確認的輸入框文字先静默處理，稍後與最終結果合併顯示
+  // 還未確認的輸入框文字先靜默處理，連同 blur 靜默提交時被略過的姓名，稍後與最終結果合併顯示
+  const pending = mergeSkipped(inviteBlurSkipped, commitInviteInput(true));
+  inviteBlurSkipped = { dupNames: [], existingNames: [] };
   if (inviteList.length === 0) {
     // 名單是空的也要把「輸入的姓名其實是重複而被略過」明確告訴使用者，
     // 不能只提示「請輸入至少一位姓名」讓人誤以為沒輸入過
@@ -1435,6 +1474,7 @@ async function confirmInvite() {
    可輸入一位或多位新姓名（第一位頂替原本的位置，其餘視為一併加入的新人員） ---------- */
 let swapList = [];     // 彈窗中輸入的新姓名（尚未送出）
 let swapVerify = {};   // 姓名 -> 組織目錄檢查結果（僅啟用 Entra ID 時使用）
+let swapBlurSkipped = { dupNames: [], existingNames: [] };   // blur 靜默提交時被略過的姓名，留給「確認換員」合併提示
 
 function openSwapModal() {
   const current = whoValue;
@@ -1442,6 +1482,7 @@ function openSwapModal() {
                                          : '請先選擇您的姓名，再進行換員');
   swapList = [];
   swapVerify = {};
+  swapBlurSkipped = { dupNames: [], existingNames: [] };
   $('swapInput').value = '';
   $('swapHint').textContent = '要把「' + current + '」換成誰？可輸入一或多位新的姓名';
   renderSwapTags();
@@ -1526,8 +1567,12 @@ $('swapInput').addEventListener('keydown', e => {
     renderSwapTags();
   }
 });
-// 注意：刻意不在 blur 時自動提交輸入框文字並跳提示，理由同「邀請他人加入」的輸入框
+// blur 時把還沒按 Enter 的姓名「靜默」收成名牌，不跳提示，理由同「邀請他人加入」的輸入框
 // （避免和點擊「確認換員」鈕自身的合併提示緊接著跳出、來不及看清楚）。
+// 被略過的姓名先累積在 swapBlurSkipped，由「確認換員」合併成單一提示顯示。
+$('swapInput').addEventListener('blur', () => {
+  swapBlurSkipped = mergeSkipped(swapBlurSkipped, commitSwapInput(true));
+});
 $('swapInput').addEventListener('paste', e => {
   e.preventDefault();
   addSwapNames((e.clipboardData || window.clipboardData).getData('text'));
@@ -1539,7 +1584,9 @@ $('swapTags').addEventListener('click', e => {
 /* 確認換員：把自己的名字換成一位或多位還不在名單中的人（換人後原本填寫的時段會被清除，需由新的人重新填寫）。
    所有結果合併成一則提示一次顯示，不連續跳出多則來不及看清楚 */
 async function confirmSwap() {
-  const pending = commitSwapInput(true);   // 還未確認的輸入框文字先静默處理，稍後與最終結果合併顯示
+  // 還未確認的輸入框文字先靜默處理，連同 blur 靜默提交時被略過的姓名，稍後與最終結果合併顯示
+  const pending = mergeSkipped(swapBlurSkipped, commitSwapInput(true));
+  swapBlurSkipped = { dupNames: [], existingNames: [] };
   const current = whoValue;
   if (!current) { closeSwapModal(); return toast('請先選擇您的姓名，再進行換員'); }
   if (swapList.length === 0) {
