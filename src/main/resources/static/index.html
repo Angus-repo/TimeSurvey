@@ -608,15 +608,27 @@ function surveyUrl(id) {
 }
 
 /* ---------- 複製連結／Teams 分享的複合按鈕 ---------- */
+/* Teams 分享需以 Entra ID 查組織目錄把姓名換成 email 收件人；未啟用時只提供複製連結 */
+function teamsAvailable() {
+  return !!(window.Entra && Entra.enabled());
+}
+
 /* 使用者最後一次選擇的分享方式（記在 localStorage）：'copy' 複製連結 / 'teams' Teams 分享 */
 function shareMode() {
+  if (!teamsAvailable()) return 'copy';
   return localStorage.getItem('shareMode') === 'teams' ? 'teams' : 'copy';
 }
 
-/* 清單「複製連結」欄位的複合按鈕：主按鈕執行上次選的分享方式，右側小箭頭展開選單切換 */
+/* 清單「複製連結」欄位的複合按鈕：主按鈕執行上次選的分享方式，右側小箭頭展開選單切換。
+   未啟用 Entra ID 登入時沒有 Teams 分享可選，只渲染單獨的複製連結按鈕 */
 function shareBtnHtml(s, closed) {
-  const teams = shareMode() === 'teams';
   const dis = closed ? 'disabled' : '';
+  if (!teamsAvailable()) {
+    return `<button class="btn-ic copy main" data-sid="${s.id}" onclick="copyLink('${s.id}')" ${dis}
+      data-tip="${closed ? '調查已結束，連結已停用' : '複製調查連結，傳給參與者即可填寫'}"
+      aria-label="複製調查連結">${ICONS.link}</button>`;
+  }
+  const teams = shareMode() === 'teams';
   const tip = closed ? '調查已結束，連結已停用'
             : teams  ? '在 Teams 分享調查連結給受調查人員'
                      : '複製調查連結，傳給參與者即可填寫';
@@ -672,19 +684,58 @@ function refreshShareBtns() {
     b.classList.toggle('active', b.dataset.mode === (teams ? 'teams' : 'copy')));
 }
 
-/* 開啟 Teams 聊天並預填收件人與訊息：受調查人員、調查名稱、調查連結（需登入 Teams） */
-function teamsShare(id) {
+/* Teams 分享時「姓名 → email」的解析快取（同名多筆經使用者指定後記住，避免重複彈窗） */
+const teamsMailCache = {};
+
+/* 把受調查人員姓名換成 email／UPN：Teams 深層連結的 users 參數只接受 email／UPN，
+   帶顯示名稱 Teams 無法解析、收件人會是空的。恰好一筆直接採用；同名多筆沿用
+   建立調查時的選擇視窗讓使用者指定；查無此人或取消選擇則歸入 missing 由使用者手動加入 */
+async function resolveTeamsMails(names) {
+  const found = await Promise.all(names.map(n =>
+      teamsMailCache[n] ? null : Entra.searchUsers(n).catch(() => [])));
+  const mails = [], missing = [];
+  for (let i = 0; i < names.length; i++) {
+    const name = names[i];
+    let mail = teamsMailCache[name];
+    if (!mail) {
+      const list = found[i];
+      if (list.length === 1) {
+        mail = list[0].mail || list[0].userPrincipalName;
+      } else if (list.length > 1) {
+        const r = await Entra.verifyName(name).catch(() => null);
+        if (r && r.status === 'ok') mail = r.user.mail || r.user.userPrincipalName;
+      }
+    }
+    if (mail) { teamsMailCache[name] = mail; mails.push(mail); }
+    else missing.push(name);
+  }
+  return { mails, missing };
+}
+
+/* 開啟 Teams 聊天並預填收件人與訊息：受調查人員、調查名稱、調查連結（需登入 Teams）。
+   啟用 Entra ID 登入時先把姓名換成 email 帶入收件人；未啟用時僅能預填訊息 */
+async function teamsShare(id) {
   if (linkOnbSid) endLinkOnb();   // 照著引導把連結分享出去，代表已學會，結束引導
   const s = surveys.find(x => x.id === id);
   if (!s) return;
   const msg = '【會議時間調查】' + s.name +
       '\n受調查人員：' + s.participants.join('、') +
       '\n請開啟連結填寫有空的時段：' + surveyUrl(id);
+  let users = s.participants.join(',');   // 未啟用 Entra ID 時維持原行為：帶姓名讓 Teams 嘗試解析
+  let missing = [];
+  if (window.Entra && (await Entra.ready)) {
+    toast('正在查詢收件人 email…');
+    const r = await resolveTeamsMails(s.participants);
+    users = r.mails.join(',');
+    missing = r.missing;
+  }
   const deeplink = 'https://teams.microsoft.com/l/chat/0/0' +
-      '?users=' + encodeURIComponent(s.participants.join(',')) +
-      '&message=' + encodeURIComponent(msg);
+      (users ? '?users=' + encodeURIComponent(users) + '&' : '?') +
+      'message=' + encodeURIComponent(msg);
   window.open(deeplink, '_blank');
-  toast('已開啟 Teams，請確認收件人後送出訊息');
+  toast(missing.length
+      ? '已開啟 Teams，但「' + missing.join('、') + '」無法對應 email，請在 Teams 手動加入收件人'
+      : '已開啟 Teams，收件人與訊息已帶入，請確認後送出');
 }
 
 function copyLink(id) {
@@ -1884,7 +1935,10 @@ function sendFeedback() {
 }
 
 setDefaultDates();
-loadSurveys().then(openResultFromUrl);
+// 分享按鈕的樣式取決於是否啟用 Entra ID 登入，等 Entra 初始化完成才首次渲染清單
+// （啟用但未登入時 ready 維持 pending，此時整頁被登入遮罩擋住，不渲染是預期行為）
+(window.Entra ? Entra.ready : Promise.resolve(false))
+    .then(() => loadSurveys().then(openResultFromUrl));
 updateNotifUi();
 connectWs();
 loadFeedbackConfig();

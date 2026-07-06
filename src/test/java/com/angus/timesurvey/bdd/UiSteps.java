@@ -1055,6 +1055,14 @@ public class UiSteps {
 
     /* ---------- 複製連結／Teams 分享的複合按鈕（split button） ---------- */
 
+    @Then("第一筆調查應只有複製連結按鈕且無分享方式小箭頭")
+    public void firstRowCopyOnlyNoCaret() {
+        var row = page.locator("#surveyList tr").first();
+        assertThat(row.locator(".btn-ic.copy.main")).isVisible();
+        assertThat(row.locator(".btn-ic.copy.caret")).hasCount(0);
+        assertThat(row.locator(".sharemenu")).hasCount(0);
+    }
+
     @When("點擊第一筆調查的分享方式小箭頭")
     public void clickFirstRowShareCaret() {
         page.locator("#surveyList tr").first().locator(".btn-ic.copy.caret").click();
@@ -1096,6 +1104,39 @@ public class UiSteps {
         }
         org.junit.jupiter.api.Assertions.assertTrue(decoded.contains("/s/"),
                 "訊息應包含調查連結（/s/調查ID）：" + decoded);
+    }
+
+    /** 模擬組織目錄（/api/entra/users 精確查詢）用的「姓名 → email」對照表 */
+    private final Map<String, String> entraDirectory = new HashMap<>();
+
+    @Given("模擬組織目錄中 {string} 的 email 為 {string}")
+    public void mockEntraDirectory(String name, String mail) {
+        if (entraDirectory.isEmpty()) {
+            // 首次呼叫才掛 route：依查詢參數 name 回傳對照表中的使用者，查無此人回空陣列
+            ctx.route("**/api/entra/users*", r -> {
+                String q = java.net.URLDecoder.decode(
+                        r.request().url().replaceAll(".*[?&]name=([^&]*).*", "$1"),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                String m = entraDirectory.get(q);
+                r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+                        .setStatus(200).setContentType("application/json")
+                        .setBody(m == null ? "[]"
+                                : "[{\"displayName\":\"" + q + "\",\"mail\":\"" + m + "\"}]"));
+            });
+        }
+        entraDirectory.put(name, mail);
+    }
+
+    @Then("應開啟 Teams 分享連結，收件人應為 {string}")
+    public void teamsShareRecipients(String expected) {
+        // 收件人要先向組織目錄查 email（非同步），等 window.open 真的被呼叫再驗證
+        page.waitForFunction("() => window.__openedUrl");
+        String url = (String) page.evaluate("window.__openedUrl");
+        String users = java.net.URLDecoder.decode(
+                url.replaceAll(".*[?&]users=([^&]*).*", "$1"),
+                java.nio.charset.StandardCharsets.UTF_8);
+        org.junit.jupiter.api.Assertions.assertEquals(expected, users,
+                "Teams 收件人應為受調查人員的 email：" + url);
     }
 
     @When("重新整理後台維護頁")
