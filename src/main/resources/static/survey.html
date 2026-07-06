@@ -8,9 +8,15 @@
 <style>
   * { box-sizing: border-box; }
   body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; margin: 0; background: #f0f2f5; color: #333; }
-  header { background: #00a884; color: #fff; padding: 16px 24px; }
+  header { background: #00a884; color: #fff; padding: 16px 24px; display: flex; align-items: center;
+           justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   header h1 { margin: 0; font-size: 20px; }
   header p { margin: 6px 0 0; font-size: 13px; opacity: .9; }
+  .hdr-btn { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.35);
+             border-radius: 20px; padding: 7px 16px; font-size: 13px; font-family: inherit; cursor: pointer;
+             transition: background .15s, border-color .15s; }
+  .hdr-btn:hover { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.6); }
+  .hdr-actions { display: flex; align-items: center; gap: 10px; }
   .container { max-width: 1100px; margin: 24px auto; padding: 0 16px 70px; }
   .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); padding: 16px 20px; margin-bottom: 16px; }
   label { font-size: 14px; color: #555; }
@@ -257,10 +263,6 @@
   #whoCard { position: relative; }
   .grid-outer { position: relative; }
   .onb-spot { position: relative; z-index: 1001; animation: onbpulse 1.6s ease-in-out infinite; }
-  /* 新手引導遮罩開啟時，成員操作鈕（邀請他人加入／換成其他人／不參加）仍浮在遮罩之上可見可按，
-     不因免登入模式的引導而看似消失（啟用 Entra ID 登入時不跑引導，故無此問題）；
-     指引泡泡會改排到操作鈕下方（見 startOnboarding），兩者不重疊 */
-  .onb-raise { position: relative; z-index: 1001; }
   @keyframes onbpulse {
     0%, 100% { box-shadow: 0 0 0 4px rgba(0,168,132,.95), 0 8px 30px rgba(0,0,0,.45); }
     50%      { box-shadow: 0 0 0 10px rgba(0,168,132,.35), 0 8px 30px rgba(0,0,0,.45); }
@@ -270,19 +272,22 @@
              box-shadow: 0 10px 30px rgba(0,0,0,.35); }
   .onb-pop::before { content: ''; position: absolute; bottom: 100%; left: 36px;
                      border: 9px solid transparent; border-bottom-color: #fff; }
-  /* 泡泡被改排到成員操作鈕下方時，向上的小箭頭會指到鈕而非姓名卡，故隱藏箭頭避免誤導 */
-  .onb-pop.detached::before { display: none; }
   .onb-pop b { color: #00a884; }
   .onb-pop button { margin-top: 10px; background: #00a884; color: #fff; border: none; border-radius: 6px;
                     padding: 7px 22px; font-size: 14px; cursor: pointer; font-family: inherit; }
   .onb-pop button:hover { background: #008f70; }
 
-  /* 表格操作說明：左半邊快速鈕／複製鈕，右半邊小時勾勾／30分鐘方格 */
-  .onb-pop-grid { position: absolute; top: 14px; left: 14px; right: 14px; max-width: none; }
-  .onb-pop-grid::before { display: none; }
-  .onb-grid-cols { display: flex; gap: 20px; margin-bottom: 10px; }
-  .onb-col { flex: 1; }
-  .onb-col + .onb-col { border-left: 1px dashed #cfd8d4; padding-left: 20px; }
+  /* 表格操作說明（分兩步）：先講左半邊快速鈕／複製鈕，再講右半邊小時勾勾／30分鐘方格。
+     說明視窗貼近左右半的交界（位置由 positionGridOnbPop 計算）：
+     講左半邊時視窗在交界右側、箭頭指左；講右半邊時視窗在交界左側、箭頭指右 */
+  .onb-pop-grid { position: absolute; top: 20px; width: 330px; max-width: calc(100% - 60px); z-index: 1003; }
+  /* 只突顯正在說明的那一半：把「另一半」再蓋一層與引導遮罩同色的壓暗層 */
+  #onbHalfDim { position: absolute; z-index: 1002; background: rgba(0,0,0,.55); pointer-events: none; }
+  .onb-pop-grid::before { bottom: auto; top: 22px; border: 9px solid transparent; }
+  .onb-pop-grid.at-right::before { left: auto; right: 100%; border-right-color: #fff; }
+  .onb-pop-grid.at-left::before { left: 100%; right: auto; border-left-color: #fff; }
+  .onb-grid-cols { margin-bottom: 10px; }
+  .onb-step-dot { float: right; font-size: 12px; color: #999; }
   .onb-col-title { font-weight: 700; color: #00a884; margin-bottom: 6px; font-size: 15px; }
   .onb-col-desc { font-size: 13px; color: #555; line-height: 1.7; }
   .modal-card.onb-modal-spot { z-index: 1241; }
@@ -312,8 +317,13 @@
 </head>
 <body>
 <header>
-  <h1 id="title">時間調查</h1>
-  <p id="subtitle"></p>
+  <div>
+    <h1 id="title">時間調查</h1>
+    <p id="subtitle"></p>
+  </div>
+  <div class="hdr-actions">
+    <button id="resetOnbBtn" class="hdr-btn" onclick="resetOnboarding()" title="重新顯示所有操作引導">🧭 重新顯示新手引導</button>
+  </div>
 </header>
 <div class="container" id="main" style="display:none">
   <div class="closed-banner" id="closedBanner" style="display:none">📋 本調查已結束，您僅能查看先前填寫的時段，無法再修改。</div>
@@ -366,18 +376,19 @@
   </div>
   <div class="grid-outer" id="gridOuter">
     <div class="card gridwrap" id="gridCard"></div>
+    <div id="onbHalfDim" style="display:none"></div>
     <div class="onb-pop onb-pop-grid" id="onbPopGrid" style="display:none">
       <div class="onb-grid-cols">
-        <div class="onb-col">
-          <div class="onb-col-title">⬅️ 左半邊：快速鈕</div>
+        <div class="onb-col" id="onbColLeft">
+          <div class="onb-col-title">⬅️ 左半邊：快速鈕<span class="onb-step-dot">1 / 2</span></div>
           <div class="onb-col-desc">點選「<b>全天／上午／下午</b>」可一次勾選整段時間；<br>📋 <b>複製</b>鈕可把這天已勾選的時段，複製貼到其他天。</div>
         </div>
-        <div class="onb-col">
-          <div class="onb-col-title">➡️ 右半邊：細部時段</div>
+        <div class="onb-col" id="onbColRight" style="display:none">
+          <div class="onb-col-title">➡️ 右半邊：細部時段<span class="onb-step-dot">2 / 2</span></div>
           <div class="onb-col-desc">點擊小時外框右上角的 <b>✓</b> 可整時勾選；<br>也可個別點選 <b>30 分鐘</b>方格做更精細的調整。</div>
         </div>
       </div>
-      <div style="text-align:center"><button onclick="endGridOnboarding()">知道了</button></div>
+      <div style="text-align:center"><button id="onbGridBtn" onclick="nextGridOnboarding()">下一步 →</button></div>
     </div>
   </div>
   <div class="ownlink">想調查大家的時間嗎？<a href="/" target="_blank">您也可以發起自己的會議時間調查 →</a></div>
@@ -721,19 +732,6 @@ function startOnboarding() {
   $('onbMask').style.display = '';
   $('onbPop').style.display = '';
   $('whoCard').classList.add('onb-spot');
-  $('actionBar').classList.add('onb-raise');   // 成員操作鈕維持可見可按，不被引導遮罩壓暗擋住
-  positionOnbPopBelowActions();
-}
-
-/* 指引泡泡預設緊貼姓名卡下方，但那裡正好是成員操作鈕（邀請／換員）的位置；
-   把泡泡改排到操作鈕下方，讓鈕露出可按、泡泡文字也不被蓋住 */
-function positionOnbPopBelowActions() {
-  const bar = $('actionBar');
-  if (getComputedStyle(bar).display === 'none') return;   // 無成員操作鈕時維持原本緊貼姓名卡
-  const wcTop = $('whoCard').getBoundingClientRect().top;
-  const barBottom = bar.getBoundingClientRect().bottom;
-  $('onbPop').style.top = (barBottom - wcTop + 14) + 'px';
-  $('onbPop').classList.add('detached');
 }
 
 function endOnboarding() {
@@ -741,33 +739,95 @@ function endOnboarding() {
   $('onbMask').style.display = 'none';
   $('onbPop').style.display = 'none';
   $('whoCard').classList.remove('onb-spot');
-  $('actionBar').classList.remove('onb-raise');
-  $('onbPop').style.top = '';
-  $('onbPop').classList.remove('detached');
   $('whoTrigger').focus();
 }
 
-/* 選好姓名、表格解鎖後：說明左半邊快速鈕／複製鈕、右半邊小時勾勾／30分鐘方格怎麼操作（只顯示一次） */
+let gridOnbStep = 1;   // 表格引導目前進行到第幾步（1=左半邊、2=右半邊）
+
+/* 選好姓名、表格解鎖後：分兩步說明表格操作（只顯示一次）
+   第 1 步：左半邊快速鈕／複製鈕；第 2 步：右半邊小時勾勾／30分鐘方格 */
 function maybeShowGridOnboarding() {
   if (readOnly || localStorage.getItem('surveyGridOnboarded')) return;
   $('onbMask').style.display = '';
   $('onbPopGrid').style.display = '';
   $('gridCard').classList.add('onb-spot');
-  $('actionBar').classList.add('onb-raise');   // 成員操作鈕維持可見可按，不被引導遮罩壓暗擋住
+  setGridOnbStep(1);
+}
+
+function setGridOnbStep(step) {
+  gridOnbStep = step;
+  $('onbColLeft').style.display = step === 1 ? '' : 'none';
+  $('onbColRight').style.display = step === 2 ? '' : 'none';
+  $('onbGridBtn').textContent = step === 1 ? '下一步 →' : '知道了';
+  // 視窗停在「另一半」上方，箭頭指向正在說明的那一半
+  $('onbPopGrid').classList.toggle('at-right', step === 1);
+  $('onbPopGrid').classList.toggle('at-left', step === 2);
+  positionGridOnbPop(step);
+}
+
+/* 讓說明視窗貼近左右半的交界（日期＋快速鈕欄的右緣），不要離被說明的區域太遠：
+   講左半邊時視窗左緣貼在交界右側，講右半邊時視窗右緣貼在交界左側；放不下時夾回容器內。
+   同時把「另一半」蓋上壓暗層（#onbHalfDim），讓突顯只落在正在說明的那一半 */
+function positionGridOnbPop(step) {
+  const pop = $('onbPopGrid');
+  const datecell = document.querySelector('#gridCard th.datecell');
+  if (!datecell) return;
+  const outer = $('gridOuter').getBoundingClientRect();
+  const split = datecell.getBoundingClientRect().right - outer.left;   // 交界的 x 座標
+  const gap = 16;                                                      // 留給箭頭的空隙
+  let left = step === 1 ? split + gap : split - gap - pop.offsetWidth;
+  left = Math.max(14, Math.min(left, outer.width - pop.offsetWidth - 14));
+  pop.style.left = left + 'px';
+  pop.style.right = 'auto';
+
+  // 壓暗「另一半」：講左半邊時暗右半、講右半邊時暗左半（圓角只留在卡片外側）
+  const dim = $('onbHalfDim');
+  const card = $('gridCard').getBoundingClientRect();
+  dim.style.top = (card.top - outer.top) + 'px';
+  dim.style.height = card.height + 'px';
+  if (step === 1) {
+    dim.style.left = split + 'px';
+    dim.style.width = (card.right - outer.left - split) + 'px';
+    dim.style.borderRadius = '0 8px 8px 0';
+  } else {
+    dim.style.left = (card.left - outer.left) + 'px';
+    dim.style.width = (split - (card.left - outer.left)) + 'px';
+    dim.style.borderRadius = '8px 0 0 8px';
+  }
+  dim.style.display = '';
+}
+
+/* 第 1 步按「下一步」進到右半邊說明，第 2 步按「知道了」結束引導 */
+function nextGridOnboarding() {
+  if (gridOnbStep === 1) setGridOnbStep(2);
+  else endGridOnboarding();
 }
 
 function endGridOnboarding() {
   localStorage.setItem('surveyGridOnboarded', '1');
   $('onbMask').style.display = 'none';
   $('onbPopGrid').style.display = 'none';
+  $('onbHalfDim').style.display = 'none';
   $('gridCard').classList.remove('onb-spot');
-  $('actionBar').classList.remove('onb-raise');
 }
 
 /* 點擊遮罩時，依目前顯示中的是哪一個引導泡泡決定要結束哪一個 */
 function dismissOnboarding() {
   if ($('onbPopGrid').style.display !== 'none') endGridOnboarding();
   else endOnboarding();
+}
+
+/* 重新顯示新手引導：清除「看過」紀錄，讓兩段引導（先選姓名／表格操作）再次出現。
+   已選好姓名（含 Entra ID 登入自動帶入）就直接重看表格操作說明，否則從「先選姓名」開始。 */
+function resetOnboarding() {
+  localStorage.removeItem('surveyOnboarded');
+  localStorage.removeItem('surveyGridOnboarded');
+  if (readOnly) return toast('本調查已結束，僅能查看，不需填寫引導');
+  if ($('main').style.display === 'none') return toast('調查尚未載入，無法顯示引導');
+  if (entraLocked && !whoValue) return toast('您不是本次調查的邀請對象，不需填寫引導');
+  if (whoValue) maybeShowGridOnboarding();
+  else startOnboarding();
+  toast('已重設新手引導');
 }
 
 function showErr(msg) {
