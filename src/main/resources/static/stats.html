@@ -36,6 +36,45 @@
   button { cursor: pointer; border: none; border-radius: 4px; padding: 5px 14px; font-size: 13px;
            font-family: inherit; background: #2c7be5; color: #fff; float: right; }
   button:hover { background: #1a68d1; }
+  /* 使用量統計（Entra ID 登入者） */
+  .usage-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid #d5dbdf; border-radius: 6px; overflow: hidden; }
+  .seg button { float: none; border-radius: 0; background: #fff; color: #555; padding: 6px 16px;
+                border-right: 1px solid #d5dbdf; }
+  .seg button:last-child { border-right: none; }
+  .seg button:hover { background: #f0f4f8; color: #333; }
+  .seg button.active { background: #2c7be5; color: #fff; }
+  .usage-bar select { padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #d5dbdf;
+                      border-radius: 6px; background: #fff; color: #333; max-width: 280px; }
+  .trend-wrap { margin: 4px 0 18px; }
+  .trend-wrap svg { width: 100%; height: auto; display: block; }
+  .trend-bar { fill: #9cc2f0; }
+  .trend-bar:hover { fill: #6ea6ea; }
+  .trend-axis { font-size: 11px; fill: #999; }
+  .trend-line-create { stroke: #e8873a; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+  .trend-line-create-dot { fill: #e8873a; pointer-events: none; }
+  .trend-line-reply { stroke: #28a745; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+  .trend-line-reply-dot { fill: #28a745; pointer-events: none; }
+  /* 直方圖即時提示框（跟著滑鼠顯示，無延遲） */
+  .chart-tip { position: fixed; z-index: 6000; background: #2c3e50; color: #fff; font-size: 12.5px;
+               line-height: 1.7; padding: 9px 12px; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,.35);
+               pointer-events: none; display: none; white-space: nowrap; }
+  .chart-tip .ctt-head { font-weight: 700; color: #ffd591; margin-bottom: 4px; }
+  .chart-tip .ctt-row { display: flex; align-items: center; gap: 7px; }
+  .chart-tip .ctt-row i { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .chart-tip .ctt-row b { margin-left: auto; padding-left: 14px; font-variant-numeric: tabular-nums; }
+  .trend-legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: #666; margin-bottom: 6px; }
+  .trend-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .trend-legend i { display: inline-block; }
+  .lg-bar { width: 12px; height: 10px; background: #9cc2f0; border-radius: 2px; }
+  .lg-line { width: 16px; height: 0; border-top: 2px solid; position: relative; }
+  .lg-line::after { content: ''; position: absolute; left: 5px; top: -3px; width: 5px; height: 5px;
+                    border-radius: 50%; background: currentColor; }
+  .lg-create { color: #e8873a; }
+  .lg-reply { color: #28a745; }
+  #usageTable tbody tr { cursor: pointer; }
+  #usageTable tbody tr:hover { background: #f4f8fd; }
+  #usageTable tbody tr.sel { background: #eaf2fd; }
 </style>
 </head>
 <body>
@@ -50,6 +89,28 @@
   <div class="card">
     <h2>總覽 <span class="muted" id="genAt" style="float:right;font-weight:400"></span></h2>
     <div class="stats" id="totArea"></div>
+  </div>
+
+  <!-- 啟用 Entra ID 登入時才顯示：登入者的使用量統計與趨勢 -->
+  <div class="card" id="usageCard" style="display:none">
+    <h2>使用量統計（Entra ID 登入者）</h2>
+    <div class="usage-bar">
+      <span class="seg" id="usagePeriods">
+        <button data-p="2w">近兩週</button><button data-p="1m">近一個月</button><button data-p="3m">近三個月</button><button data-p="6m">近半年</button>
+      </span>
+      <select id="usageUser" title="選擇整體或個人統計"></select>
+    </div>
+    <div class="stats" id="usageTiles" style="margin:16px 0 14px"></div>
+    <div class="trend-wrap" id="usageTrend"></div>
+    <div class="chart-tip" id="chartTip"></div>
+    <table id="usageTable">
+      <thead>
+        <tr><th>姓名</th><th>Email</th><th class="num">發出調查</th><th class="num">回覆時間</th>
+            <th class="num">開啟次數</th><th>佔比</th><th>最近使用</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p class="muted">每次以 Microsoft 帳號登入者開啟本系統任一頁面即記錄一筆；點選列可切換為該員的個人趨勢。</p>
   </div>
 
   <div class="card">
@@ -116,7 +177,192 @@ async function load() {
   }
 }
 
+/* ---------- 使用量統計（Entra ID 登入者；未啟用時整張卡片隱藏） ---------- */
+
+let usagePeriod = '2w';
+let usageUser = '';   // 選定的登入者 email；空字串 = 整體
+
+function fmtDt(s) {
+  return s ? String(s).replace('T', ' ').slice(0, 16) : '—';
+}
+
+/* 每日趨勢：長條圖（頁面開啟次數）搭配兩條折線（發起調查次數、參與調查人次）。
+   超過兩個月改以「週」為單位彙總，圖面才不會擠成一團 */
+function renderTrend(trend) {
+  let pts = trend.map(t => ({ label: t.date, count: t.count, creates: t.creates || 0, replies: t.replies || 0 }));
+  let unit = '日';
+  if (pts.length > 62) {
+    unit = '週';
+    const wk = new Map();
+    for (const t of trend) {
+      const d = new Date(t.date + 'T00:00:00');
+      d.setDate(d.getDate() - (d.getDay() + 6) % 7);   // 該週的週一
+      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') +
+          '-' + String(d.getDate()).padStart(2, '0');
+      const w = wk.get(key) || { label: key, count: 0, creates: 0, replies: 0 };
+      w.count += t.count; w.creates += t.creates || 0; w.replies += t.replies || 0;
+      wk.set(key, w);
+    }
+    pts = [...wk.values()];
+  }
+  const W = 1000, H = 190, padL = 34, padB = 22, padT = 12;
+  const max = Math.max(1, ...pts.map(p => Math.max(p.count, p.creates, p.replies)));
+  const bw = (W - padL) / pts.length;
+  const plotH = H - padB - padT;
+  const suf = unit === '週' ? ' 起一週' : '';
+  const cx = i => padL + i * bw + bw / 2;                  // 該點（折線）在圖上的 x
+  const cy = v => H - padB - (v / max) * plotH;            // 值 v 對應的 y
+
+  let bars = '', labels = '';
+  pts.forEach((p, i) => {
+    const h = (p.count / max) * plotH;
+    const x = padL + i * bw;
+    // tooltip 內容改由即時提示框呈現（見下方 usageTrend 的 mousemove）；資料掛在 data-* 上
+    bars += '<rect class="trend-bar" x="' + (x + bw * 0.12).toFixed(1) + '" y="' + (H - padB - h).toFixed(1) +
+        '" width="' + (bw * 0.76).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="1.5"' +
+        ' data-title="' + esc(fmtYmd(p.label) + suf) + '" data-count="' + p.count +
+        '" data-creates="' + p.creates + '" data-replies="' + p.replies + '"></rect>';
+  });
+
+  // 折線：發起調查次數（橘）、參與調查人次（綠）
+  const line = (key, cls) => {
+    const d = pts.map((p, i) => cx(i).toFixed(1) + ',' + cy(p[key]).toFixed(1)).join(' ');
+    let dots = '';
+    pts.forEach((p, i) => {
+      dots += '<circle class="' + cls + '-dot" cx="' + cx(i).toFixed(1) + '" cy="' + cy(p[key]).toFixed(1) +
+          '" r="2.5"/>';
+    });
+    return '<polyline class="' + cls + '" points="' + d + '" fill="none"/>' + dots;
+  };
+  const lines = line('creates', 'trend-line-create') + line('replies', 'trend-line-reply');
+
+  // X 軸標籤最多 8 個，避免重疊
+  const step = Math.max(1, Math.ceil(pts.length / 8));
+  pts.forEach((p, i) => {
+    if (i % step !== 0) return;
+    const [, m, d] = p.label.split('-');
+    labels += '<text class="trend-axis" x="' + cx(i).toFixed(1) + '" y="' + (H - 6) +
+        '" text-anchor="middle">' + (+m) + '/' + (+d) + '</text>';
+  });
+  const grid = '<line x1="' + padL + '" y1="' + (H - padB) + '" x2="' + W + '" y2="' + (H - padB) +
+      '" stroke="#e3e9f1"/>' +
+      '<text class="trend-axis" x="' + (padL - 6) + '" y="' + (padT + 10) + '" text-anchor="end">' + max + '</text>' +
+      '<text class="trend-axis" x="' + (padL - 6) + '" y="' + (H - padB) + '" text-anchor="end">0</text>';
+  const legend =
+      '<div class="trend-legend">' +
+      '<span><i class="lg-bar"></i>頁面開啟次數</span>' +
+      '<span><i class="lg-line lg-create"></i>發起調查次數</span>' +
+      '<span><i class="lg-line lg-reply"></i>參與調查人次</span>' +
+      '</div>';
+  $('usageTrend').innerHTML =
+      '<div class="muted" style="margin-bottom:4px">使用量趨勢（每' + unit + '）</div>' +
+      legend +
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="使用量趨勢圖">' +
+      grid + bars + lines + labels + '</svg>';
+}
+
+async function loadUsage() {
+  const res = await fetch('/api/stats/usage?period=' + usagePeriod +
+      (usageUser ? '&user=' + encodeURIComponent(usageUser) : ''));
+  if (!res.ok) return;
+  const d = await res.json();
+  if (!d.enabled) return;   // 未啟用 Entra ID：卡片維持隱藏
+  $('usageCard').style.display = '';
+
+  document.querySelectorAll('#usagePeriods button').forEach(b =>
+      b.classList.toggle('active', b.dataset.p === usagePeriod));
+
+  // 人員下拉：以本期間出現過的登入者重建選項
+  const sel = $('usageUser');
+  sel.innerHTML = '<option value="">整體（所有登入者）</option>' + d.users.map(u =>
+      '<option value="' + esc(u.email) + '">' + esc(u.name || u.email) +
+      '（' + u.opens + ' 次）</option>').join('');
+  sel.value = usageUser;
+  if (sel.value !== usageUser) {   // 該員在此期間無紀錄 → 退回整體
+    usageUser = '';
+    sel.value = '';
+  }
+
+  const days = Math.max(1, d.trend.length);
+  const me = usageUser ? d.users.find(u => (u.email || '').toLowerCase() === usageUser.toLowerCase()) : null;
+  $('usageTiles').innerHTML =
+      tile(d.totalOpens, usageUser ? '個人頁面開啟次數' : '頁面開啟次數') +
+      (usageUser ? '' : tile(d.totalUsers, '使用人數（登入者）')) +
+      tile(usageUser ? d.createOpens : d.createUsers, usageUser ? '發出調查次數' : '發出調查人數') +
+      tile(usageUser ? d.replyOpens : d.replyUsers, usageUser ? '回覆時間次數' : '回覆時間人數') +
+      tile((d.totalOpens / days).toFixed(1), '日平均開啟次數') +
+      tile('<span style="font-size:19px;line-height:2">' + (me ? fmtDt(me.lastAt) : fmtDt(d.users[0] && d.users.reduce(
+          (a, u) => u.lastAt > a ? u.lastAt : a, ''))) + '</span>', '最近使用時間');
+
+  renderTrend(d.trend);
+
+  const tbody = $('usageTable').querySelector('tbody');
+  tbody.innerHTML = '';
+  if (d.users.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">此期間尚無登入者的使用紀錄。</td></tr>';
+    return;
+  }
+  const sum = d.users.reduce((a, u) => a + u.opens, 0);
+  for (const u of d.users) {
+    const pct = sum > 0 ? Math.round(u.opens * 100 / sum) : 0;
+    const tr = document.createElement('tr');
+    if (usageUser && (u.email || '').toLowerCase() === usageUser.toLowerCase()) tr.className = 'sel';
+    tr.title = '點選查看「' + (u.name || u.email) + '」的個人趨勢';
+    tr.innerHTML =
+        '<td>' + esc(u.name || '（無姓名）') + '</td>' +
+        '<td>' + esc(u.email) + '</td>' +
+        '<td class="num">' + u.createOpens + '</td>' +
+        '<td class="num">' + u.replyOpens + '</td>' +
+        '<td class="num">' + u.opens + '</td>' +
+        '<td><span class="ratebar"><i style="width:' + pct + '%"></i></span>' + pct + '%</td>' +
+        '<td>' + fmtDt(u.lastAt) + '</td>';
+    tr.addEventListener('click', () => {
+      usageUser = usageUser.toLowerCase() === (u.email || '').toLowerCase() ? '' : u.email;
+      loadUsage();
+    });
+    tbody.appendChild(tr);
+  }
+}
+
+/* 直方圖即時提示：滑鼠移到長條上立即顯示該日/週三個數值，並跟著游標移動 */
+(function () {
+  const tip = $('chartTip');
+  const row = (color, label, val) =>
+      '<div class="ctt-row"><i style="background:' + color + '"></i>' + label + '<b>' + val + '</b></div>';
+  $('usageTrend').addEventListener('mousemove', e => {
+    const bar = e.target.closest ? e.target.closest('.trend-bar') : null;
+    if (!bar) { tip.style.display = 'none'; return; }
+    const b = bar.dataset;
+    tip.innerHTML =
+        '<div class="ctt-head">' + esc(b.title) + '</div>' +
+        row('#9cc2f0', '頁面開啟次數', b.count) +
+        row('#e8873a', '發起調查次數', b.creates) +
+        row('#28a745', '參與調查人次', b.replies);
+    tip.style.display = 'block';
+    // 置於游標右上，夾在視窗內；右／上放不下時翻到左／下
+    let left = e.clientX + 14;
+    if (left + tip.offsetWidth > window.innerWidth - 8) left = e.clientX - tip.offsetWidth - 14;
+    let top = e.clientY - tip.offsetHeight - 12;
+    if (top < 8) top = e.clientY + 16;
+    tip.style.left = Math.max(8, left) + 'px';
+    tip.style.top = top + 'px';
+  });
+  $('usageTrend').addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+})();
+
+$('usagePeriods').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  usagePeriod = b.dataset.p;
+  loadUsage();
+});
+$('usageUser').addEventListener('change', e => {
+  usageUser = e.target.value;
+  loadUsage();
+});
+
 load();
+loadUsage();
 </script>
 </body>
 </html>

@@ -1,5 +1,7 @@
 package com.angus.timesurvey.controller;
 
+import com.angus.timesurvey.model.UserActivity;
+import com.angus.timesurvey.repo.UserActivityRepository;
 import com.angus.timesurvey.service.EntraGraphService;
 import com.angus.timesurvey.service.EntraGraphService.GraphException;
 import com.angus.timesurvey.service.EntraGraphService.NotSignedInException;
@@ -18,6 +20,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,9 +47,11 @@ public class EntraApiController {
     static final String SESSION_RETURN = "entraReturn";
 
     private final EntraGraphService graph;
+    private final UserActivityRepository activityRepo;
 
-    public EntraApiController(EntraGraphService graph) {
+    public EntraApiController(EntraGraphService graph, UserActivityRepository activityRepo) {
         this.graph = graph;
+        this.activityRepo = activityRepo;
     }
 
     /** 前端據此決定是否啟用 Entra ID 登入：未設定回 204 */
@@ -58,12 +63,40 @@ public class EntraApiController {
         return ResponseEntity.ok(Map.of("loginPath", "/api/entra/login"));
     }
 
-    /** 目前登入者；未登入回 401（前端顯示登入遮罩） */
+    /** 目前登入者；未登入回 401（前端顯示登入遮罩）。
+     *  每頁載入時前端都會呼叫本端點（帶 page=頁面路徑），順帶記下一筆使用紀錄
+     *  （姓名、email、頁面、時間）供統計頁呈現使用量趨勢。 */
     @GetMapping("/api/entra/me")
-    public Map<String, Object> me(HttpServletRequest request) {
+    public Map<String, Object> me(@RequestParam(required = false) String page, HttpServletRequest request) {
         SignedInUser user = requireUser(request);
+        recordActivity(user, page);
         return Map.of("displayName", nullToEmpty(user.displayName()),
                       "username", nullToEmpty(user.username()));
+    }
+
+    /** 寫入一筆使用紀錄；統計為輔助功能，寫入失敗不影響登入流程。
+     *  統計頁本身是管理者查看用量的頁面，不算「使用量」；若記錄，管理者每次
+     *  開啟／重新整理統計頁都會讓「頁面開啟次數」灌水，故略過不記。 */
+    private void recordActivity(SignedInUser user, String page) {
+        if (isStatsPage(page)) {
+            return;
+        }
+        try {
+            UserActivity a = new UserActivity();
+            a.setUserId(user.userId());
+            a.setUserName(user.displayName());
+            a.setUserEmail(user.username());
+            a.setPage(page == null ? null : page.substring(0, Math.min(page.length(), 128)));
+            a.setOccurredAt(LocalDateTime.now());
+            activityRepo.save(a);
+        } catch (RuntimeException e) {
+            // 不讓統計寫入失敗擋住登入者
+        }
+    }
+
+    /** 統計頁（/stats，PageController forward 自 stats.html）：不列入使用量紀錄 */
+    static boolean isStatsPage(String page) {
+        return "/stats".equals(page) || "/stats.html".equals(page);
     }
 
     /** 導向微軟登入頁；return 為登入完成後要回去的站內路徑 */

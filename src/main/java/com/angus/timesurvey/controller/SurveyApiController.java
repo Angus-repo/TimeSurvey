@@ -437,7 +437,7 @@ public class SurveyApiController {
         }
         // 人數下限 2：太少湊不成會議。超過 30 人不阻擋，僅由前端提示（人數過多較難喬出共同時間）
         if (s.getParticipants().size() < 2) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "受調查人員至少需要兩位");
+            // throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "受調查人員至少需要兩位");
         }
     }
 }

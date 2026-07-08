@@ -1,9 +1,12 @@
 package com.angus.timesurvey.controller;
 
+import com.angus.timesurvey.model.UserActivity;
+import com.angus.timesurvey.repo.UserActivityRepository;
 import com.angus.timesurvey.service.EntraGraphService;
 import com.angus.timesurvey.service.EntraGraphService.NotSignedInException;
 import com.angus.timesurvey.service.EntraGraphService.SignedInUser;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 
@@ -20,7 +23,8 @@ import static org.mockito.Mockito.*;
 class EntraApiControllerTest {
 
     private final EntraGraphService graph = mock(EntraGraphService.class);
-    private final EntraApiController controller = new EntraApiController(graph);
+    private final UserActivityRepository activityRepo = mock(UserActivityRepository.class);
+    private final EntraApiController controller = new EntraApiController(graph, activityRepo);
 
     @Test
     void 未設定時設定API回傳204() {
@@ -76,7 +80,7 @@ class EntraApiControllerTest {
         assertThrows(NotSignedInException.class, () -> controller.users("王小明", req));
         assertThrows(NotSignedInException.class,
                 () -> controller.calendar("2026-07-06T00:00:00", "2026-07-07T00:00:00", req));
-        assertThrows(NotSignedInException.class, () -> controller.me(req));
+        assertThrows(NotSignedInException.class, () -> controller.me("/", req));
         assertThrows(NotSignedInException.class, () -> controller.suggest("an", req));
     }
 
@@ -94,9 +98,45 @@ class EntraApiControllerTest {
         MockHttpServletRequest req = new MockHttpServletRequest();
         req.getSession().setAttribute(EntraApiController.SESSION_USER,
                 new SignedInUser("u1", "王小明", "ming@example.com"));
-        Map<String, Object> me = controller.me(req);
+        Map<String, Object> me = controller.me("/stats", req);
         assertEquals("王小明", me.get("displayName"));
         assertEquals("ming@example.com", me.get("username"));
+    }
+
+    @Test
+    void me時記錄一筆使用紀錄含姓名email與頁面() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.getSession().setAttribute(EntraApiController.SESSION_USER,
+                new SignedInUser("u1", "王小明", "ming@example.com"));
+        controller.me("/s/abc", req);
+        ArgumentCaptor<UserActivity> cap = ArgumentCaptor.forClass(UserActivity.class);
+        verify(activityRepo).save(cap.capture());
+        UserActivity a = cap.getValue();
+        assertEquals("u1", a.getUserId());
+        assertEquals("王小明", a.getUserName());
+        assertEquals("ming@example.com", a.getUserEmail());
+        assertEquals("/s/abc", a.getPage());
+        assertNotNull(a.getOccurredAt());
+    }
+
+    @Test
+    void 統計頁不列入使用量紀錄() {
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.getSession().setAttribute(EntraApiController.SESSION_USER,
+                new SignedInUser("u1", "王小明", "ming@example.com"));
+        Map<String, Object> me = controller.me("/stats", req);
+        assertEquals("王小明", me.get("displayName"));   // me 仍正常回應（頁首頭像用）
+        verify(activityRepo, never()).save(any());       // 但不寫入使用紀錄，避免查看統計就灌水
+    }
+
+    @Test
+    void 使用紀錄寫入失敗不影響me回應() {
+        when(activityRepo.save(any())).thenThrow(new RuntimeException("db down"));
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.getSession().setAttribute(EntraApiController.SESSION_USER,
+                new SignedInUser("u1", "王小明", "ming@example.com"));
+        Map<String, Object> me = controller.me("/", req);
+        assertEquals("王小明", me.get("displayName"));
     }
 
     @Test

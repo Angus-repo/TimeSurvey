@@ -354,7 +354,8 @@ window.Entra = (function () {
     injectStyle();
 
     const loginErr = popLoginError();
-    const me = await fetch('/api/entra/me');
+    // 帶上目前頁面路徑：後端順帶記錄一筆使用紀錄（誰、何時、開了哪一頁）供統計
+    const me = await fetch('/api/entra/me?page=' + encodeURIComponent(location.pathname));
     if (me.status !== 200) {
       await requireLogin(loginErr);   // 導向登入頁後不再返回
       return false;

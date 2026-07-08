@@ -683,7 +683,8 @@ public class UiSteps {
         ctx.route("**/api/entra-config", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
                 .setStatus(200).setContentType("application/json")
                 .setBody("{\"loginPath\":\"/api/entra/login\"}")));
-        ctx.route("**/api/entra/me", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+        // me 端點會帶 ?page=… 記錄使用頁面，glob 需以 * 收尾才攔得到
+        ctx.route("**/api/entra/me*", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
                 .setStatus(200).setContentType("application/json")
                 .setBody("{\"displayName\":\"" + name + "\",\"username\":\"" + name + "@test.local\"}")));
         ctx.route("**/api/entra/photo", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
