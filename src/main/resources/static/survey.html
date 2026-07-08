@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>時間調查</title>
+<title data-i18n="sv.title">時間調查</title>
 <link rel="stylesheet" href="/date-range-calendar.css">
 <style>
   * { box-sizing: border-box; }
@@ -324,60 +324,62 @@
 <body>
 <header>
   <div>
-    <h1 id="title">時間調查</h1>
+    <h1 id="title" data-i18n="sv.title">時間調查</h1>
     <p id="subtitle"></p>
   </div>
   <div class="hdr-actions">
-    <button id="resetOnbBtn" class="hdr-btn" onclick="resetOnboarding()" title="重新顯示所有操作引導">🧭 重新顯示新手引導</button>
+    <button id="resetOnbBtn" class="hdr-btn" onclick="resetOnboarding()" data-i18n="idx.resetOnb" data-i18n-title="idx.resetOnbTitle">🧭 重新顯示新手引導</button>
   </div>
 </header>
 <div class="container" id="main" style="display:none">
-  <div class="closed-banner" id="closedBanner" style="display:none">📋 本調查已結束，您僅能查看先前填寫的時段，無法再修改。</div>
+  <div class="closed-banner" id="closedBanner" style="display:none" data-i18n="sv.closedBanner">📋 本調查已結束，您僅能查看先前填寫的時段，無法再修改。</div>
   <div class="card" id="whoCard">
     <div class="who-main">
-      <label>您的姓名：</label>
+      <label data-i18n="sv.yourName">您的姓名：</label>
       <div class="who-combo" id="whoCombo">
         <button type="button" class="who-trigger placeholder" id="whoTrigger" onclick="toggleWhoMenu(event)">
-          <span id="whoTriggerText">-- 請選擇 --</span><span class="who-arrow">▾</span>
+          <span id="whoTriggerText" data-i18n="sv.pleasePick">-- 請選擇 --</span><span class="who-arrow">▾</span>
         </button>
         <div class="who-menu" id="whoMenu" style="display:none"></div>
       </div>
     </div>
     <div class="who-help" id="whoHint">
       <span class="who-help-icon" aria-hidden="true">i</span>
-      <div class="who-help-main">選好姓名後，就可以標記可出席的時間。</div>
-      <div class="who-help-actions" aria-label="可用的快速操作">
-        <span class="who-help-chip">快速選整天</span>
-        <span class="who-help-chip">上午 / 下午</span>
-        <span class="who-help-chip">小時勾勾</span>
-        <span class="who-help-chip">30 分鐘格</span>
+      <div class="who-help-main" data-i18n="sv.whoHelp">選好姓名後，就可以標記可出席的時間。</div>
+      <div class="who-help-actions" data-i18n-aria="sv.quickActionsAria" aria-label="可用的快速操作">
+        <span class="who-help-chip" data-i18n="sv.chipAllDay">快速選整天</span>
+        <span class="who-help-chip" data-i18n="sv.chipAmPm">上午 / 下午</span>
+        <span class="who-help-chip" data-i18n="sv.chipHourChk">小時勾勾</span>
+        <span class="who-help-chip" data-i18n="sv.chip30min">30 分鐘格</span>
       </div>
     </div>
     <div class="who-alert" id="whoAlert" style="display:none"></div>
     <div class="onb-pop" id="onbPop" style="display:none">
-      👋 歡迎！<b>請先在這裡選擇您的姓名</b><br>
-      選好之後，下方的時段表格才會開放，點選您可以出席的時間再送出即可。
-      <div><button onclick="endOnboarding()">知道了</button></div>
+      <span data-i18n="sv.onbWelcomeHtml">👋 歡迎！<b>請先在這裡選擇您的姓名</b><br>
+      選好之後，下方的時段表格才會開放，點選您可以出席的時間再送出即可。</span>
+      <div><button onclick="endOnboarding()" data-i18n="common.gotIt">知道了</button></div>
     </div>
   </div>
   <div class="card topbar" id="actionBar" style="display:none">
     <div class="splitbtn" id="memberSplit" style="display:none">
       <button id="btnMemberMain" class="topbtn main" onclick="memberMainAction()"></button>
       <button id="btnMemberCaret" class="topbtn caret" onclick="toggleMemberMenu(event)"
+              data-i18n-title="sv.moreMember" data-i18n-aria="sv.moreMember"
               title="更多成員操作" aria-label="更多成員操作" style="display:none">▼</button>
       <div class="member-menu" id="memberMenu">
         <button id="miInvite" onclick="closeMemberMenu(); openInviteModal()">
-          <span class="btn-icon" aria-hidden="true">➕</span><span class="btn-text">邀請其他人加入</span>
+          <span class="btn-icon" aria-hidden="true">➕</span><span class="btn-text" data-i18n="sv.memberInvite">邀請其他人加入</span>
         </button>
         <button id="miSwap" onclick="closeMemberMenu(); openSwapModal()">
-          <span class="btn-icon" aria-hidden="true">🔄</span><span class="btn-text">換成其他人</span>
+          <span class="btn-icon" aria-hidden="true">🔄</span><span class="btn-text" data-i18n="sv.memberSwap">換成其他人</span>
         </button>
         <button id="miDecline" onclick="closeMemberMenu(); openDeclineModal()">
-          <span class="btn-icon" aria-hidden="true">🚫</span><span class="btn-text">不參加此會議</span>
+          <span class="btn-icon" aria-hidden="true">🚫</span><span class="btn-text" data-i18n="sv.memberDecline">不參加此會議</span>
         </button>
       </div>
     </div>
     <button id="btnCal" class="topbtn" onclick="loadMyCalendar()" style="display:none; background:#0a7d57"
+            data-i18n="sv.btnCal" data-i18n-title="sv.btnCalTitle"
             title="同意讀取您的行事曆後，會把調查期間已有的會議以灰色顯示在下方時段表，方便對照填寫">📅 同意讀取我的行事曆</button>
   </div>
   <div class="grid-outer" id="gridOuter">
@@ -386,45 +388,46 @@
     <div class="onb-pop onb-pop-grid" id="onbPopGrid" style="display:none">
       <div class="onb-grid-cols">
         <div class="onb-col" id="onbColLeft">
-          <div class="onb-col-title">⬅️ 左半邊：快速鈕<span class="onb-step-dot">1 / 2</span></div>
-          <div class="onb-col-desc">點選「<b>全天／上午／下午</b>」可一次勾選整段時間；<br>📋 <b>複製</b>鈕可把這天已勾選的時段，複製貼到其他天。</div>
+          <div class="onb-col-title"><span data-i18n="sv.onbLeftTitle">⬅️ 左半邊：快速鈕</span><span class="onb-step-dot">1 / 2</span></div>
+          <div class="onb-col-desc" data-i18n="sv.onbLeftDescHtml">點選「<b>全天／上午／下午</b>」可一次勾選整段時間；<br>📋 <b>複製</b>鈕可把這天已勾選的時段，複製貼到其他天。</div>
         </div>
         <div class="onb-col" id="onbColRight" style="display:none">
-          <div class="onb-col-title">➡️ 右半邊：細部時段<span class="onb-step-dot">2 / 2</span></div>
-          <div class="onb-col-desc">點擊小時外框右上角的 <b>✓</b> 可整時勾選；<br>也可個別點選 <b>30 分鐘</b>方格做更精細的調整。</div>
+          <div class="onb-col-title"><span data-i18n="sv.onbRightTitle">➡️ 右半邊：細部時段</span><span class="onb-step-dot">2 / 2</span></div>
+          <div class="onb-col-desc" data-i18n="sv.onbRightDescHtml">點擊小時外框右上角的 <b>✓</b> 可整時勾選；<br>也可個別點選 <b>30 分鐘</b>方格做更精細的調整。</div>
         </div>
       </div>
-      <div style="text-align:center"><button id="onbGridBtn" onclick="nextGridOnboarding()">下一步 →</button></div>
+      <div style="text-align:center"><button id="onbGridBtn" onclick="nextGridOnboarding()" data-i18n="sv.onbNext">下一步 →</button></div>
     </div>
   </div>
-  <div class="ownlink">想調查大家的時間嗎？<a href="/" target="_blank">您也可以發起自己的會議時間調查 →</a></div>
+  <div class="ownlink"><span data-i18n="sv.ownLinkLead">想調查大家的時間嗎？</span><a href="/" target="_blank" data-i18n="sv.ownLink">您也可以發起自己的會議時間調查 →</a></div>
 </div>
 <div class="container" id="done" style="display:none">
   <div class="card">
-    <h2>✅ 已送出！感謝您的填寫</h2>
-    <p><b id="doneName"></b><span id="doneLead">，以下是您勾選的可出席時間：</span></p>
+    <h2 data-i18n="sv.doneTitle">✅ 已送出！感謝您的填寫</h2>
+    <p><b id="doneName"></b><span id="doneLead" data-i18n="sv.doneLead">，以下是您勾選的可出席時間：</span></p>
     <div id="doneList"></div>
-    <button class="btn-edit" onclick="backToEdit()">修改填寫內容</button>
+    <button class="btn-edit" onclick="backToEdit()" data-i18n="sv.editResponse">修改填寫內容</button>
     <hr>
-    <p class="muted">想調查大家的時間嗎？您也可以發起自己的會議時間調查：</p>
-    <a class="btn-new" href="/" target="_blank">➕ 建立我自己的時間調查</a>
+    <p class="muted" data-i18n="sv.doneOwnLead">想調查大家的時間嗎？您也可以發起自己的會議時間調查：</p>
+    <a class="btn-new" href="/" target="_blank" data-i18n="sv.doneOwnBtn">➕ 建立我自己的時間調查</a>
   </div>
 </div>
 <div class="onb-mask" id="onbMask" style="display:none" onclick="dismissOnboarding()"></div>
 <div class="err" id="err" style="display:none"></div>
 <div class="submit-bar" id="bar" style="display:none">
   <span class="count" id="count">已勾選 0 個時段</span>
-  <span class="hint" id="roNote" style="display:none">📋 調查已結束，僅能查看，無法修改</span>
+  <span class="hint" id="roNote" style="display:none" data-i18n="sv.roNote">📋 調查已結束，僅能查看，無法修改</span>
   <span class="submit-actions" id="submitSplit">
     <button id="submitBtn" class="submit-main" onclick="submitResponse()">
-      <span class="btn-icon" aria-hidden="true">🕒</span><span class="btn-text">送出我的可出席時間</span>
+      <span class="btn-icon" aria-hidden="true">🕒</span><span class="btn-text" data-i18n="sv.submit">送出我的可出席時間</span>
     </button>
     <button id="submitMenuBtn" class="submit-caret" onclick="toggleSubmitMenu(event)"
+            data-i18n-title="sv.moreSubmit" data-i18n-aria="sv.moreSubmit"
             title="更多送出選項" aria-label="更多送出選項" aria-haspopup="menu" aria-expanded="false">▼</button>
     <span class="submit-menu" id="submitMenu" role="menu">
       <button id="miNoTime" type="button" role="menuitem"
               onclick="closeSubmitMenu(); submitNoTimeChoice()">
-        <span class="btn-icon" aria-hidden="true">🚫</span><span class="btn-text">沒有我可以出席的時間</span>
+        <span class="btn-icon" aria-hidden="true">🚫</span><span class="btn-text" data-i18n="sv.noTimeOption">沒有我可以出席的時間</span>
       </button>
     </span>
   </span>
@@ -433,73 +436,73 @@
 <div class="cal-tip" id="calTip"></div>
 <div class="modal-mask" id="inviteMask" style="display:none" onclick="closeInviteModal()"></div>
 <div class="card modal-card" id="inviteModal" style="display:none">
-  <h3>➕ 邀請其他人加入</h3>
-  <p class="modal-hint">輸入姓名按 Enter，或直接貼上整串名單（可用分號、逗號、換行等分隔）</p>
+  <h3 data-i18n="sv.inviteTitle">➕ 邀請其他人加入</h3>
+  <p class="modal-hint" data-i18n="sv.inviteHint">輸入姓名按 Enter，或直接貼上整串名單（可用分號、逗號、換行等分隔）</p>
   <div class="ptags" id="inviteTags">
-    <input id="inviteInput" placeholder="輸入姓名後按;分號，或貼上「王大明;陳小明」這類名單">
+    <input id="inviteInput" data-i18n-placeholder="sv.invitePh" placeholder="輸入姓名後按;分號，或貼上「王大明;陳小明」這類名單">
   </div>
   <div class="modal-actions">
     <span class="muted" id="inviteCount">共 0 人</span>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeInviteModal()">取消</button>
-      <button class="topbtn" onclick="confirmInvite()">確認邀請</button>
+      <button class="btn-cancel" onclick="closeInviteModal()" data-i18n="common.cancel">取消</button>
+      <button class="topbtn" onclick="confirmInvite()" data-i18n="sv.confirmInvite">確認邀請</button>
     </div>
   </div>
 </div>
 <div class="modal-mask" id="swapMask" style="display:none" onclick="closeSwapModal()"></div>
 <div class="card modal-card" id="swapModal" style="display:none">
-  <h3>🔄 換成其他人</h3>
-  <p class="modal-hint" id="swapHint">輸入新的姓名按 Enter，可輸入一位或多位</p>
+  <h3 data-i18n="sv.swapTitle">🔄 換成其他人</h3>
+  <p class="modal-hint" id="swapHint" data-i18n="sv.swapHint">輸入新的姓名按 Enter，可輸入一位或多位</p>
   <div class="ptags" id="swapTags">
-    <input id="swapInput" placeholder="輸入新的姓名後按 Enter（姓名可含空白），或貼上「陳大文;林小美」這類名單">
+    <input id="swapInput" data-i18n-placeholder="sv.swapPh" placeholder="輸入新的姓名後按 Enter（姓名可含空白），或貼上「陳大文;林小美」這類名單">
   </div>
   <div class="modal-actions">
     <span class="muted" id="swapCount">共 0 人</span>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeSwapModal()">取消</button>
-      <button class="topbtn alt" onclick="confirmSwap()">確認換員</button>
+      <button class="btn-cancel" onclick="closeSwapModal()" data-i18n="common.cancel">取消</button>
+      <button class="topbtn alt" onclick="confirmSwap()" data-i18n="sv.confirmSwap">確認換員</button>
     </div>
   </div>
 </div>
 <div class="modal-mask" id="linkPromptMask" style="display:none" onclick="closeLinkPrompt()"></div>
 <div class="card modal-card" id="linkPromptModal" style="display:none">
-  <h3>🔗 記得分享連結給新加入的人</h3>
+  <h3 data-i18n="sv.linkPromptTitle">🔗 記得分享連結給新加入的人</h3>
   <p class="modal-hint" id="linkPromptNames"></p>
   <div style="display:flex; gap:8px; align-items:center; margin:4px 0 12px">
     <input id="linkPromptUrl" readonly onclick="this.select()"
            style="flex:1; padding:9px 10px; border:1px solid #d4d9e0; border-radius:6px; font-size:13px; color:#555; background:#f7f9f8">
-    <button class="topbtn" onclick="copySurveyLink()">📋 複製連結</button>
+    <button class="topbtn" onclick="copySurveyLink()" data-i18n="sv.copyLinkBtn">📋 複製連結</button>
   </div>
   <div class="modal-actions" style="justify-content:flex-end">
-    <button class="btn-cancel" onclick="closeLinkPrompt()">知道了</button>
+    <button class="btn-cancel" onclick="closeLinkPrompt()" data-i18n="common.gotIt">知道了</button>
   </div>
 </div>
 <div class="modal-mask" id="declineMask" style="display:none" onclick="closeDeclineModal()"></div>
 <div class="card modal-card" id="declineModal" style="display:none">
-  <h3>🚫 不參加此會議</h3>
-  <p class="modal-hint">表明不參加後，您不需要填寫時段；調查發起人會在結果頁看到您的姓名與原因</p>
-  <textarea id="declineReason" placeholder="請說明不參加的原因（必填），例如：此議題與我的業務無關、已指派代理人出席"></textarea>
+  <h3 data-i18n="sv.declineTitle">🚫 不參加此會議</h3>
+  <p class="modal-hint" data-i18n="sv.declineHint">表明不參加後，您不需要填寫時段；調查發起人會在結果頁看到您的姓名與原因</p>
+  <textarea id="declineReason" data-i18n-placeholder="sv.declinePh" placeholder="請說明不參加的原因（必填），例如：此議題與我的業務無關、已指派代理人出席"></textarea>
   <div class="modal-actions" style="justify-content:flex-end">
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeDeclineModal()">取消</button>
-      <button class="btn-danger" onclick="confirmDecline()">確認不參加</button>
+      <button class="btn-cancel" onclick="closeDeclineModal()" data-i18n="common.cancel">取消</button>
+      <button class="btn-danger" onclick="confirmDecline()" data-i18n="sv.confirmDecline">確認不參加</button>
     </div>
   </div>
 </div>
 <div class="modal-mask" id="noTimeMask" style="display:none" onclick="closeNoTimeModal()"></div>
 <div class="card modal-card" id="noTimeModal" style="display:none">
-  <h3>😥 完全沒有可出席的時段</h3>
-  <p class="modal-hint">您沒有勾選任何時段。若調查期間完全無法出席（可能因請假、出差等），
+  <h3 data-i18n="sv.noTimeTitle">😥 完全沒有可出席的時段</h3>
+  <p class="modal-hint" data-i18n="sv.noTimeHint">您沒有勾選任何時段。若調查期間完全無法出席（可能因請假、出差等），
     請說明原因並建議可行的會議日期區間，讓發起人參考調整；若只是漏勾，請按「返回勾選」。</p>
-  <textarea id="noTimeReason" placeholder="請說明原因（必填），例如：7/6~7/17 出差美國、整週請假"></textarea>
+  <textarea id="noTimeReason" data-i18n-placeholder="sv.noTimePh" placeholder="請說明原因（必填），例如：7/6~7/17 出差美國、整週請假"></textarea>
   <div class="modal-field">
-    <span class="flabel">建議的會議日期區間（必填）：</span>
+    <span class="flabel" data-i18n="sv.suggestLabel">建議的會議日期區間（必填）：</span>
     <div class="suggest-cal-wrap">
       <input type="hidden" id="suggestStart">
       <input type="hidden" id="suggestEnd">
       <input type="hidden" id="suggestExcludedDates">
       <button type="button" class="cal-trigger empty" id="suggestCalTrigger" onclick="toggleSuggestCal(event)">
-        <span id="suggestCalTriggerText">請選擇日期範圍</span>
+        <span id="suggestCalTriggerText" data-i18n="common.pickRange">請選擇日期範圍</span>
         <svg class="cal-ic" viewBox="0 0 24 24" aria-hidden="true">
           <rect x="3" y="4" width="18" height="18" rx="2"></rect>
           <path d="M16 2v4M8 2v4M3 10h18"></path>
@@ -509,10 +512,10 @@
         <div class="cal">
           <div class="cal-head">
             <div class="cal-title" id="suggestCalTitle"></div>
-            <div class="cal-hint">選起日與迄日</div>
+            <div class="cal-hint" data-i18n="cal.pickStartHint">選起日與迄日</div>
           </div>
           <div class="cal-grid cal-week">
-            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+            <span data-i18n="common.wd0">日</span><span data-i18n="common.wd1">一</span><span data-i18n="common.wd2">二</span><span data-i18n="common.wd3">三</span><span data-i18n="common.wd4">四</span><span data-i18n="common.wd5">五</span><span data-i18n="common.wd6">六</span>
           </div>
           <div class="cal-scroll" id="suggestCalScroll">
             <div class="cal-grid" id="suggestCalDays"></div>
@@ -524,26 +527,33 @@
   </div>
   <div class="modal-actions" style="justify-content:flex-end">
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeNoTimeModal()">返回勾選</button>
-      <button class="topbtn" onclick="confirmNoTime()">送出</button>
+      <button class="btn-cancel" onclick="closeNoTimeModal()" data-i18n="sv.backToPick">返回勾選</button>
+      <button class="topbtn" onclick="confirmNoTime()" data-i18n="sv.send">送出</button>
     </div>
   </div>
 </div>
 <div class="modal-mask" id="calOnbMask" style="display:none" onclick="endSuggestCalOnb()"></div>
 <div class="onb-pop" id="calOnbPop" style="display:none">
-  📅 這裡可以用<b>大日曆</b>選擇建議的會議日期區間。<br>
-  先點起日，再點迄日；區間中的日期可點一下挖空、再點復原。
+  <span data-i18n="sv.onbSuggestCalHtml">📅 這裡可以用<b>大日曆</b>選擇建議的會議日期區間。<br>
+  先點起日，再點迄日；區間中的日期可點一下挖空、再點復原。</span>
   <div class="cal-onb-legend">
-    <span><i class="cal-onb-sw range">1</i>起日 / 迄日</span>
-    <span><i class="cal-onb-sw skip">2</i>挖空日</span>
+    <span><i class="cal-onb-sw range">1</i><span data-i18n="sv.onbCalLegendRange">起日 / 迄日</span></span>
+    <span><i class="cal-onb-sw skip">2</i><span data-i18n="sv.onbCalLegendSkip">挖空日</span></span>
   </div>
-  <div><button onclick="endSuggestCalOnb(event)">知道了</button></div>
+  <div><button onclick="endSuggestCalOnb(event)" data-i18n="common.gotIt">知道了</button></div>
 </div>
 
+<script src="/i18n/zh-TW.js"></script>
+<script src="/i18n/en.js"></script>
+<script src="/i18n.js"></script>
 <script src="/date-range-calendar.js"></script>
 <script src="/entra.js"></script>
 <script>
 const $ = id => document.getElementById(id);
+I18N.apply();
+$('count').textContent = I18N.t('sv.countLabel', 0);
+$('inviteCount').textContent = I18N.t('common.people', 0);
+$('swapCount').textContent = I18N.t('common.people', 0);
 const surveyId = location.pathname.split('/')[2];
 
 let survey = null;
@@ -600,14 +610,13 @@ function timeSlots(startTime, endTime) {
   return out;
 }
 
-const WEEK = ['日','一','二','三','四','五','六'];
-const WHO_HINT_ACTIONS = ['快速選整天', '上午 / 下午', '小時勾勾', '30 分鐘格'];
+const WHO_HINT_ACTION_KEYS = ['sv.chipAllDay', 'sv.chipAmPm', 'sv.chipHourChk', 'sv.chip30min'];
 
 function whoHintHtml(message) {
   return '<span class="who-help-icon" aria-hidden="true">i</span>' +
          '<div class="who-help-main">' + escHtml(message) + '</div>' +
-         '<div class="who-help-actions" aria-label="可用的快速操作">' +
-         WHO_HINT_ACTIONS.map(a => '<span class="who-help-chip">' + escHtml(a) + '</span>').join('') +
+         '<div class="who-help-actions" aria-label="' + escHtml(I18N.t('sv.quickActionsAria')) + '">' +
+         WHO_HINT_ACTION_KEYS.map(k => '<span class="who-help-chip">' + escHtml(I18N.t(k)) + '</span>').join('') +
          '</div>';
 }
 
@@ -656,16 +665,16 @@ function weekKey(ds) {
 }
 
 async function init() {
-  if (!surveyId) return showErr('連結不正確');
+  if (!surveyId) return showErr(I18N.t('sv.badLink'));
   let res = await fetch('/api/surveys/' + surveyId);
-  if (!res.ok) return showErr('找不到這份調查，請確認連結是否正確。');
+  if (!res.ok) return showErr(I18N.t('sv.notFound'));
   survey = await res.json();
 
   $('title').textContent = survey.name;
   readOnly = !!survey.closedAt;   // 已結束的調查仍可查看已填時段，但不可再修改
-  $('subtitle').textContent = '調查期間：' + fmtMd(survey.startDate) + ' ~ ' + fmtMd(survey.endDate) +
-      '，每日 ' + survey.startTime.slice(0,5) + ' ~ ' + survey.endTime.slice(0,5) + '（不含週六日及 12:00~13:00 午休）' +
-      (readOnly ? '　｜　📋 本調查已結束（唯讀）' : '');
+  $('subtitle').textContent = I18N.t('sv.subtitle', fmtMd(survey.startDate), fmtMd(survey.endDate),
+      survey.startTime.slice(0,5), survey.endTime.slice(0,5)) +
+      (readOnly ? I18N.t('sv.subtitleClosed') : '');
 
   buildWhoMenu();
   refreshWhoTrigger();
@@ -691,13 +700,13 @@ async function init() {
     // 主按鈕依序取「邀請其他人加入」→「換成其他人」→「不參加此會議」
     if (showInvite) {
       memberMainAction = openInviteModal;
-      setIconButton('btnMemberMain', '➕', '邀請其他人加入');
+      setIconButton('btnMemberMain', '➕', I18N.t('sv.memberInvite'));
     } else if (showSwap) {
       memberMainAction = openSwapModal;
-      setIconButton('btnMemberMain', '🔄', '換成其他人');
+      setIconButton('btnMemberMain', '🔄', I18N.t('sv.memberSwap'));
     } else {
       memberMainAction = openDeclineModal;
-      setIconButton('btnMemberMain', '🚫', '不參加此會議');
+      setIconButton('btnMemberMain', '🚫', I18N.t('sv.memberDecline'));
     }
     // 選單只列出「非主按鈕」的其他操作；有其他操作時才需要右側箭頭
     $('miInvite').style.display = 'none';
@@ -724,7 +733,7 @@ async function init() {
     $('submitSplit').style.display = 'none';
     $('roNote').style.display = '';
     $('closedBanner').style.display = '';
-    toast('📋 本調查已結束，僅能查看，無法修改');
+    toast(I18N.t('sv.closedToast'));
   }
 }
 
@@ -764,7 +773,7 @@ function setGridOnbStep(step) {
   gridOnbStep = step;
   $('onbColLeft').style.display = step === 1 ? '' : 'none';
   $('onbColRight').style.display = step === 2 ? '' : 'none';
-  $('onbGridBtn').textContent = step === 1 ? '下一步 →' : '知道了';
+  $('onbGridBtn').textContent = step === 1 ? I18N.t('sv.onbNext') : I18N.t('common.gotIt');
   // 視窗停在「另一半」上方，箭頭指向正在說明的那一半
   $('onbPopGrid').classList.toggle('at-right', step === 1);
   $('onbPopGrid').classList.toggle('at-left', step === 2);
@@ -828,12 +837,12 @@ function dismissOnboarding() {
 function resetOnboarding() {
   localStorage.removeItem('surveyOnboarded');
   localStorage.removeItem('surveyGridOnboarded');
-  if (readOnly) return toast('本調查已結束，僅能查看，不需填寫引導');
-  if ($('main').style.display === 'none') return toast('調查尚未載入，無法顯示引導');
-  if (entraLocked && !whoValue) return toast('您不是本次調查的邀請對象，不需填寫引導');
+  if (readOnly) return toast(I18N.t('sv.onbClosedRo'));
+  if ($('main').style.display === 'none') return toast(I18N.t('sv.onbNotLoaded'));
+  if (entraLocked && !whoValue) return toast(I18N.t('sv.onbNotInvited'));
   if (whoValue) maybeShowGridOnboarding();
   else startOnboarding();
-  toast('已重設新手引導');
+  toast(I18N.t('sv.onbReset'));
 }
 
 function showErr(msg) {
@@ -850,11 +859,11 @@ function dayHourSlots(d, h) {
    調查已結束後也不可勾選，這裡直接跓出明確提示 */
 function requireName() {
   if (readOnly) {
-    toast('📋 調查已結束，僅能查看已填時段，無法再修改');
+    toast(I18N.t('sv.closedNoEdit'));
     return false;
   }
   if (!whoValue) {
-    toast(entraLocked ? '您不是本次調查的邀請對象，無法填寫時段' : '請先選擇您的姓名，再勾選時段');
+    toast(entraLocked ? I18N.t('sv.notInvited') : I18N.t('sv.pickNameFirst'));
     return false;
   }
   return true;
@@ -863,15 +872,15 @@ function requireName() {
 function renderGrid() {
   const dates = dateList(survey.startDate, survey.endDate, survey.excludedDates);
   if (dates.length === 0) {
-    return showErr('調查日期範圍內沒有工作日（週六日不列入調查），請聯絡調查發起人調整日期。');
+    return showErr(I18N.t('sv.noWorkday'));
   }
 
-  let html = '<table class="grid"><thead><tr><th style="text-align:left">日期 \\ 時間</th>';
+  let html = '<table class="grid"><thead><tr><th style="text-align:left">' + I18N.t('sv.thDateTime') + '</th>';
   // 上午最後一個小時與下午第一個小時之間插入分隔欄（兩段皆有時段才插入）
   const splitHour = (amTimes.length && pmTimes.length) ? hours.find(h => h >= '12') : null;
   for (const h of hours) {
     if (h === splitHour) html += '<th class="col-sep"></th>';
-    html += '<th>' + h + '時</th>';
+    html += '<th>' + I18N.t('sv.hourHead', h) + '</th>';
   }
   html += '</tr></thead><tbody>';
 
@@ -889,21 +898,21 @@ function renderGrid() {
   const colCount = 1 + hours.length + (splitHour ? 1 : 0);
   let prevWeek = null;
   for (const d of dates) {
-    const w = WEEK[new Date(d + 'T00:00:00').getDay()];
+    const w = I18N.weekWrap(new Date(d + 'T00:00:00').getDay());
     const md = fmtMd(d);
     if (prevWeek !== null && weekKey(d) !== prevWeek) {
       const wk = weekKey(d).split('-');   // [yyyy, M, D] -> 新一週的週一日期
       const wl = wk[1] + '/' + wk[2];
       html += '<tr class="week-sep"><td colspan="' + colCount + '"><div class="wsep">' +
-              '<span class="wsep-label">📅 ' + wl + ' 開始・新的一週</span></div></td></tr>';
+              '<span class="wsep-label">' + I18N.t('sv.newWeek', wl) + '</span></div></td></tr>';
     }
     prevWeek = weekKey(d);
-    html += '<tr><th class="datecell"><div class="dname">' + md + '（週' + w + '）</div>' +
+    html += '<tr><th class="datecell"><div class="dname">' + md + w + '</div>' +
             '<div class="quick" data-date="' + d + '">' +
-            '<label data-grp="all">全天</label>' +
-            (amTimes.length ? '<label data-grp="am">上午</label>' : '') +
-            (pmTimes.length ? '<label data-grp="pm">下午</label>' : '') +
-            '<button class="copybtn" data-date="' + d + '" data-state="複製" data-tip="複製此列的時段" aria-label="複製此列的時段">' + ICON.copy + '</button>' +
+            '<label data-grp="all">' + I18N.t('sv.quickAll') + '</label>' +
+            (amTimes.length ? '<label data-grp="am">' + I18N.t('sv.quickAm') + '</label>' : '') +
+            (pmTimes.length ? '<label data-grp="pm">' + I18N.t('sv.quickPm') + '</label>' : '') +
+            '<button class="copybtn" data-date="' + d + '" data-state="' + I18N.t('sv.stateCopy') + '" data-tip="' + I18N.t('sv.tipCopyRow') + '" aria-label="' + I18N.t('sv.tipCopyRow') + '">' + ICON.copy + '</button>' +
             '</div></th>';
     for (const h of hours) {
       if (h === splitHour) html += '<td class="col-sep"></td>';
@@ -971,18 +980,18 @@ function refreshCopyButtons() {
   document.querySelectorAll('.copybtn').forEach(btn => {
     btn.classList.remove('paste', 'cancel');
     if (copySource === null) {
-      btn.dataset.state = '複製';
+      btn.dataset.state = I18N.t('sv.stateCopy');
       btn.innerHTML = ICON.copy;
-      btn.dataset.tip = '複製此列的時段';
+      btn.dataset.tip = I18N.t('sv.tipCopyRow');
     } else if (btn.dataset.date === copySource) {
-      btn.dataset.state = '取消';
+      btn.dataset.state = I18N.t('sv.stateCancel');
       btn.innerHTML = ICON.cancel;
-      btn.dataset.tip = '取消複製';
+      btn.dataset.tip = I18N.t('sv.tipCancelCopy');
       btn.classList.add('cancel');
     } else {
-      btn.dataset.state = '貼上';
+      btn.dataset.state = I18N.t('sv.statePaste');
       btn.innerHTML = ICON.paste;
-      btn.dataset.tip = '貼上到此列（按住 Ctrl / ⌘ 可連續貼上多列）';
+      btn.dataset.tip = I18N.t('sv.tipPasteRow');
       btn.classList.add('paste');
     }
     btn.setAttribute('aria-label', btn.dataset.tip);
@@ -995,7 +1004,7 @@ function pasteRow(srcDate, dstDate) {
   for (const t of times) selected.delete(dstDate + 'T' + t);
   for (const t of srcTimes) selected.add(dstDate + 'T' + t);
   refreshAll();
-  toast('已複製 ' + fmtMd(srcDate) + ' 的時段到 ' + fmtMd(dstDate));
+  toast(I18N.t('sv.pasted', fmtMd(srcDate), fmtMd(dstDate)));
 }
 
 function refreshAll() {
@@ -1017,7 +1026,7 @@ function refreshAll() {
       el.classList.toggle('on', isOn(grp === 'all' ? times : grp === 'am' ? amTimes : pmTimes));
     });
   });
-  $('count').textContent = '已勾選 ' + selected.size + ' 個時段';
+  $('count').textContent = I18N.t('sv.countLabel', selected.size);
 }
 
 async function loadMyResponse() {
@@ -1035,16 +1044,16 @@ async function loadMyResponse() {
       const mine = list.find(r => r.participantName === name);
       if (mine && mine.declineReason) {
         myDecline = mine.declineReason;
-        toast(readOnly ? '您先前已表示不參加此會議（原因：' + myDecline + '）'
-                       : '您先前已表示不參加此會議（原因：' + myDecline + '）；若改為參加，勾選時段後重新送出即可');
+        toast(readOnly ? I18N.t('sv.prevDeclinedRo', myDecline)
+                       : I18N.t('sv.prevDeclined', myDecline));
       } else if (mine && mine.noTimeReason) {
         myNoTime = { reason: mine.noTimeReason, from: mine.suggestedStartDate, to: mine.suggestedEndDate,
                      excluded: mine.suggestedExcludedDates || [] };
-        toast(readOnly ? '您先前已回覆此期間沒有可出席的時段（原因：' + myNoTime.reason + '）'
-                       : '您先前已回覆此期間沒有可出席的時段；若情況有變，勾選時段後重新送出即可');
+        toast(readOnly ? I18N.t('sv.prevNoTimeRo', myNoTime.reason)
+                       : I18N.t('sv.prevNoTime'));
       } else if (mine && mine.slots) {
         selected = new Set(mine.slots.split(',').filter(x => x));
-        toast(readOnly ? '已顯示您先前填寫的時段（調查已結束，僅能查看）' : '已載入您先前填寫的內容，可直接修改後再送出');
+        toast(readOnly ? I18N.t('sv.prevLoadedRo') : I18N.t('sv.prevLoaded'));
       }
     }
     maybeShowGridOnboarding();
@@ -1070,19 +1079,18 @@ function applyEntraIdentity() {
   trigger.querySelector('.who-arrow').style.display = 'none';
 
   if (matched) {
-    trigger.title = '已依您的 Microsoft 登入身分自動帶入，無法選擇其他人';
-    setWhoHint('已用登入身分帶入姓名，接下來請標記可出席的時間。');
+    trigger.title = I18N.t('sv.entraAutoTitle');
+    setWhoHint(I18N.t('sv.whoHelpEntra'));
     selectWho(matched);
   } else {
     whoValue = '';
     refreshWhoTrigger();
     loadMyResponse();   // 清空先前選取並鎖定格線
-    trigger.querySelector('#whoTriggerText').textContent = loginName || '（無法取得登入者名稱）';
+    trigger.querySelector('#whoTriggerText').textContent = loginName || I18N.t('sv.entraNoName');
     trigger.classList.remove('placeholder');
-    trigger.title = '您的 Microsoft 登入身分不在本次調查的受邀名單中';
+    trigger.title = I18N.t('sv.entraNotInListTitle');
     $('whoHint').style.display = 'none';
-    $('whoAlert').textContent = '⚠ 您（' + (loginName || '無法取得登入者名稱') +
-        '）不是本次調查的邀請對象，無法填寫時段。若您應在受邀名單中，請聯絡調查發起人確認名單上的姓名與您的帳號顯示名稱一致。';
+    $('whoAlert').textContent = I18N.t('sv.entraNotInList', loginName || I18N.t('sv.entraNoNamePlain'));
     $('whoAlert').style.display = '';
   }
 }
@@ -1096,7 +1104,7 @@ async function loadMyCalendar() {
   const btn = $('btnCal');
   const orig = btn.textContent;
   btn.disabled = true;
-  btn.textContent = '📅 讀取行事曆中…';
+  btn.textContent = I18N.t('sv.btnCalLoading');
   try {
     const events = await Entra.myCalendar(survey.startDate + 'T00:00:00', survey.endDate + 'T23:59:59');
     busyMap = {};
@@ -1106,9 +1114,9 @@ async function loadMyCalendar() {
       const es = new Date(String(ev.start.dateTime).slice(0, 19));
       const ee = new Date(String(ev.end.dateTime).slice(0, 19));
       const item = {
-        subject: ev.subject || '（未命名會議）',
+        subject: ev.subject || I18N.t('sv.untitledMeeting'),
         organizer: (ev.organizer && ev.organizer.emailAddress &&
-                    (ev.organizer.emailAddress.name || ev.organizer.emailAddress.address)) || '（不明）'
+                    (ev.organizer.emailAddress.name || ev.organizer.emailAddress.address)) || I18N.t('sv.unknownOrganizer')
       };
       // 與各 30 分鐘時段做重疊判斷（含跨多時段、全天的會議）
       for (const d of dates) {
@@ -1120,13 +1128,13 @@ async function loadMyCalendar() {
       }
     }
     applyBusy();
-    btn.textContent = '📅 已帶入行事曆（' + events.length + ' 筆會議，可點擊重新整理）';
+    btn.textContent = I18N.t('sv.btnCalDone', events.length);
     toast(events.length > 0
-        ? '已帶入您的行事曆：灰色時段表示已有會議，滑鼠移過可查看會議名稱與邀請人'
-        : '已讀取您的行事曆：調查期間沒有既有的會議');
+        ? I18N.t('sv.calLoaded')
+        : I18N.t('sv.calEmpty'));
   } catch (e) {
     btn.textContent = orig;
-    toast('讀取行事曆失敗：' + (e.message || '請稍後再試'));
+    toast(I18N.t('sv.calFail', e.message || I18N.t('sv.tryLater')));
   }
   btn.disabled = false;
 }
@@ -1168,7 +1176,7 @@ document.addEventListener('mouseover', e => {
   if (list.length > 1) {
     const h = document.createElement('div');
     h.className = 'ct-head';
-    h.textContent = '📅 此時段有 ' + list.length + ' 個會議';
+    h.textContent = I18N.t('sv.tipMeetings', list.length);
     tip.appendChild(h);
   }
   for (const m of list) {
@@ -1179,7 +1187,7 @@ document.addEventListener('mouseover', e => {
     s.textContent = m.subject;
     const o = document.createElement('div');
     o.className = 'ct-org';
-    o.textContent = '邀請人：' + m.organizer;
+    o.textContent = I18N.t('sv.organizer', m.organizer);
     it.append(s, o);
     tip.appendChild(it);
   }
@@ -1207,7 +1215,7 @@ async function verifyEntraNames(names, list, verify, rerender) {
       const r = await Entra.verifyName(name);
       if (r.status === 'disabled') { delete verify[name]; return; }
       verify[name] = r;
-      if (r.status === 'notfound') toast('「' + name + '」不在公司組織中，請確認姓名是否正確');
+      if (r.status === 'notfound') toast(I18N.t('sv.verifyNotFoundTitle', name));
     } catch (e) {
       delete verify[name];   // 查詢失敗（網路、權限等）不擋操作，僅不顯示檢查結果
     }
@@ -1222,17 +1230,17 @@ function entraVerifyNoteEl(tag, name, verify) {
   const el = document.createElement('span');
   el.className = 'note';
   if (v.status === 'checking') {
-    el.textContent = '（查詢組織中…）';
+    el.textContent = I18N.t('sv.verifyChecking');
   } else if (v.status === 'notfound') {
-    el.textContent = '（⚠ 查無此人）';
+    el.textContent = I18N.t('sv.verifyNotFound');
     tag.classList.add('warn');
-    tag.title = '「' + name + '」不在公司組織中，請確認姓名是否正確';
+    tag.title = I18N.t('sv.verifyNotFoundTitle', name);
   } else if (v.status === 'cancelled') {
-    el.textContent = '（⚠ 同名多人，未指定）';
+    el.textContent = I18N.t('sv.verifyCancelled');
     tag.classList.add('warn');
-    tag.title = '組織中有多位「' + name + '」，尚未指定是哪一位';
+    tag.title = I18N.t('sv.verifyCancelledTitle', name);
   } else if (v.status === 'ok' && v.user) {
-    el.textContent = '（' + (v.user.department || v.user.jobTitle || '已確認') + '）';
+    el.textContent = '（' + (v.user.department || v.user.jobTitle || I18N.t('sv.verifyConfirmed')) + '）';
     tag.title = v.user.mail || v.user.userPrincipalName || '';
   }
   return el;
@@ -1280,8 +1288,8 @@ document.addEventListener('click', e => {
 });
 
 function submitNoTimeChoice() {
-  if (readOnly) return toast('調查已結束，無法再送出');
-  if (!whoValue) return toast(entraLocked ? '您不是本次調查的邀請對象，無法送出' : '請先選擇您的姓名');
+  if (readOnly) return toast(I18N.t('sv.closedNoSubmit'));
+  if (!whoValue) return toast(entraLocked ? I18N.t('sv.notInvitedSubmit') : I18N.t('sv.pickNameSubmit'));
   openNoTimeModal();
 }
 
@@ -1290,7 +1298,7 @@ function submitNoTimeChoice() {
    姓名維持一般顏色，「（由 X 邀請加入／換員轉入）」等來源說明則以灰色顯示 */
 function buildWhoMenu() {
   const menu = $('whoMenu');
-  let html = '<div class="who-item' + (whoValue === '' ? ' active' : '') + '" data-name="">-- 請選擇 --</div>';
+  let html = '<div class="who-item' + (whoValue === '' ? ' active' : '') + '" data-name="">' + I18N.t('sv.pleasePick') + '</div>';
   for (const p of survey.participants) {
     const note = survey.participantNotes && survey.participantNotes[p];
     html += '<div class="who-item' + (whoValue === p ? ' active' : '') + '" data-name="' + p + '">' +
@@ -1307,7 +1315,7 @@ function buildWhoMenu() {
 
 function refreshWhoTrigger() {
   const trigger = $('whoTrigger');
-  trigger.querySelector('#whoTriggerText').textContent = whoValue || '-- 請選擇 --';
+  trigger.querySelector('#whoTriggerText').textContent = whoValue || I18N.t('sv.pleasePick');
   trigger.classList.toggle('placeholder', !whoValue);
 }
 
@@ -1367,8 +1375,8 @@ let inviteBlurSkipped = { dupNames: [], existingNames: [] };   // blur 靜默提
 
 function openInviteModal() {
   const inviter = whoValue;
-  if (!inviter) return toast(entraLocked ? '您不是本次調查的邀請對象，無法邀請其他人加入'
-                                         : '請先選擇您的姓名，再邀請其他人加入');
+  if (!inviter) return toast(entraLocked ? I18N.t('sv.notInvitedInvite')
+                                         : I18N.t('sv.pickNameInvite'));
   inviteList = [];
   inviteVerify = {};
   inviteBlurSkipped = { dupNames: [], existingNames: [] };
@@ -1398,7 +1406,7 @@ function renderInviteTags() {
     const x = document.createElement('span');
     x.className = 'x';
     x.textContent = '×';
-    x.title = '移除 ' + name;
+    x.title = I18N.t('common.removeName', name);
     x.onclick = e => {
       e.stopPropagation();
       inviteList.splice(i, 1);
@@ -1408,7 +1416,7 @@ function renderInviteTags() {
     tag.append(label, x);
     box.insertBefore(tag, input);
   });
-  $('inviteCount').textContent = '共 ' + inviteList.length + ' 人';
+  $('inviteCount').textContent = I18N.t('common.people', inviteList.length);
 }
 
 /* 把整串文字拆成多位姓名，略過重複輸入或已在受調查名單中的姓名，並回傳被略過的姓名；
@@ -1426,11 +1434,11 @@ function addInviteNames(text, silent) {
   if (added.length > 0) verifyEntraNames(added, inviteList, inviteVerify, renderInviteTags);   // 背景檢查組織目錄
   if (!silent) {
     if (existingNames.length > 0) {
-      let msg = '「' + existingNames.join('、') + '」已在受調查人員名單中，無法重複邀請，已略過';
-      if (dupNames.length > 0) msg += '；「' + dupNames.join('、') + '」重複輸入，已略過';
+      let msg = I18N.t('sv.existsSkipInvite', I18N.join(existingNames));
+      if (dupNames.length > 0) msg += I18N.partSep() + I18N.t('sv.dupSkip', I18N.join(dupNames));
       toast(msg);
     } else if (dupNames.length > 0) {
-      toast('「' + dupNames.join('、') + '」重複輸入，已略過');
+      toast(I18N.t('sv.dupSkip', I18N.join(dupNames)));
     }
   }
   renderInviteTags();
@@ -1495,13 +1503,13 @@ async function confirmInvite() {
     // 名單是空的也要把「輸入的姓名其實是重複而被略過」明確告訴使用者，
     // 不能只提示「請輸入至少一位姓名」讓人誤以為沒輸入過
     const parts = [];
-    if (pending.existingNames.length > 0) parts.push('「' + pending.existingNames.join('、') + '」已在受調查人員名單中，無法重複邀請，已略過');
-    if (pending.dupNames.length > 0) parts.push('「' + pending.dupNames.join('、') + '」重複輸入，已略過');
-    parts.push('請輸入至少一位姓名');
-    return toast(parts.join('；'));
+    if (pending.existingNames.length > 0) parts.push(I18N.t('sv.existsSkipInvite', I18N.join(pending.existingNames)));
+    if (pending.dupNames.length > 0) parts.push(I18N.t('sv.dupSkip', I18N.join(pending.dupNames)));
+    parts.push(I18N.t('sv.needOneName'));
+    return toast(parts.join(I18N.partSep()));
   }
   const inviter = whoValue;
-  if (!inviter) { closeInviteModal(); return toast('請先選擇您的姓名，再邀請其他人加入'); }
+  if (!inviter) { closeInviteModal(); return toast(I18N.t('sv.pickNameInvite')); }
 
   const added = [];
   const skipped = [...pending.existingNames];
@@ -1517,9 +1525,9 @@ async function confirmInvite() {
       survey = await res.json();
       added.push(name);
     } else {
-      let msg = '新增失敗，請稍後再試';
+      let msg = I18N.t('sv.addFail');
       try { msg = (await res.json()).message || msg; } catch (e) {}
-      failMsg = '「' + name + '」' + msg;
+      failMsg = I18N.t('sv.namedFail', name, msg);
       break;   // 遇到失敗（例如調查已結束）就停止，避免連續跳出多個錯誤提示
     }
   }
@@ -1528,11 +1536,11 @@ async function confirmInvite() {
     closeInviteModal();
   }
   const parts = [];
-  if (added.length > 0) parts.push('已將「' + added.join('、') + '」加入受調查名單（由 ' + inviter + ' 邀請加入）');
+  if (added.length > 0) parts.push(I18N.t('sv.invited', I18N.join(added), inviter));
   if (failMsg) parts.push(failMsg);
-  if (skipped.length > 0) parts.push('「' + skipped.join('、') + '」已在受調查人員名單中，無法重複邀請，已略過');
-  if (pending.dupNames.length > 0) parts.push('「' + pending.dupNames.join('、') + '」重複輸入，已略過');
-  if (parts.length > 0) toast(parts.join('；'));
+  if (skipped.length > 0) parts.push(I18N.t('sv.existsSkipInvite', I18N.join(skipped)));
+  if (pending.dupNames.length > 0) parts.push(I18N.t('sv.dupSkip', I18N.join(pending.dupNames)));
+  if (parts.length > 0) toast(parts.join(I18N.partSep()));
   if (added.length > 0) showLinkPrompt(added);
 }
 
@@ -1544,13 +1552,13 @@ let swapBlurSkipped = { dupNames: [], existingNames: [] };   // blur 靜默提�
 
 function openSwapModal() {
   const current = whoValue;
-  if (!current) return toast(entraLocked ? '您不是本次調查的邀請對象，無法進行換員'
-                                         : '請先選擇您的姓名，再進行換員');
+  if (!current) return toast(entraLocked ? I18N.t('sv.notInvitedSwap')
+                                         : I18N.t('sv.pickNameSwap'));
   swapList = [];
   swapVerify = {};
   swapBlurSkipped = { dupNames: [], existingNames: [] };
   $('swapInput').value = '';
-  $('swapHint').textContent = '要把「' + current + '」換成誰？可輸入一或多位新的姓名';
+  $('swapHint').textContent = I18N.t('sv.swapWhoHint', current);
   renderSwapTags();
   $('swapMask').style.display = '';
   $('swapModal').style.display = '';
@@ -1575,7 +1583,7 @@ function renderSwapTags() {
     if (vEl) label.appendChild(vEl);
     const x = document.createElement('span');
     x.className = 'x';
-    x.title = '移除 ' + name;
+    x.title = I18N.t('common.removeName', name);
     x.textContent = '×';
     x.onclick = e => {
       e.stopPropagation();
@@ -1586,7 +1594,7 @@ function renderSwapTags() {
     tag.append(label, x);
     box.insertBefore(tag, input);
   });
-  $('swapCount').textContent = '共 ' + swapList.length + ' 人';
+  $('swapCount').textContent = I18N.t('common.people', swapList.length);
 }
 
 /* 把整串文字拆成多位姓名，略過重複輸入或已在受調查名單中的姓名，並回備被略過的姓名；
@@ -1604,11 +1612,11 @@ function addSwapNames(text, silent) {
   if (added.length > 0) verifyEntraNames(added, swapList, swapVerify, renderSwapTags);   // 背景檢查組織目錄
   if (!silent) {
     if (existingNames.length > 0) {
-      let msg = '「' + existingNames.join('、') + '」已在受調查人員名單中，無法換成同一人，已略過';
-      if (dupNames.length > 0) msg += '；「' + dupNames.join('、') + '」重複輸入，已略過';
+      let msg = I18N.t('sv.existsSkipSwap', I18N.join(existingNames));
+      if (dupNames.length > 0) msg += I18N.partSep() + I18N.t('sv.dupSkip', I18N.join(dupNames));
       toast(msg);
     } else if (dupNames.length > 0) {
-      toast('「' + dupNames.join('、') + '」重複輸入，已略過');
+      toast(I18N.t('sv.dupSkip', I18N.join(dupNames)));
     }
   }
   renderSwapTags();
@@ -1654,17 +1662,17 @@ async function confirmSwap() {
   const pending = mergeSkipped(swapBlurSkipped, commitSwapInput(true));
   swapBlurSkipped = { dupNames: [], existingNames: [] };
   const current = whoValue;
-  if (!current) { closeSwapModal(); return toast('請先選擇您的姓名，再進行換員'); }
+  if (!current) { closeSwapModal(); return toast(I18N.t('sv.pickNameSwap')); }
   if (swapList.length === 0) {
     // 同「確認邀請」：輸入的姓名若因重複被略過，要明確告知，不能只提示「請輸入新的姓名」
     const parts = [];
-    if (pending.existingNames.length > 0) parts.push('「' + pending.existingNames.join('、') + '」已在受調查人員名單中，無法換成同一人，已略過');
-    if (pending.dupNames.length > 0) parts.push('「' + pending.dupNames.join('、') + '」重複輸入，已略過');
-    parts.push('請輸入新的姓名');
-    return toast(parts.join('；'));
+    if (pending.existingNames.length > 0) parts.push(I18N.t('sv.existsSkipSwap', I18N.join(pending.existingNames)));
+    if (pending.dupNames.length > 0) parts.push(I18N.t('sv.dupSkip', I18N.join(pending.dupNames)));
+    parts.push(I18N.t('sv.needNewName'));
+    return toast(parts.join(I18N.partSep()));
   }
   const newNames = [...swapList];
-  if (!confirm('確定將「' + current + '」換成「' + newNames.join('、') + '」？換人後原本填寫的時段會被清除，需由新的人重新填寫。')) return;
+  if (!confirm(I18N.t('sv.confirmSwapMsg', current, I18N.join(newNames)))) return;
   const res = await fetch('/api/surveys/' + surveyId + '/replace-participant', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1683,13 +1691,13 @@ async function confirmSwap() {
       await loadMyResponse();
     }
     closeSwapModal();
-    const parts = ['已將「' + current + '」換成「' + newNames.join('、') + '」（名單中會註明此為換員紀錄）'];
-    if (pending.existingNames.length > 0) parts.push('「' + pending.existingNames.join('、') + '」已在受調查人員名單中，無法換成同一人，已略過');
-    if (pending.dupNames.length > 0) parts.push('「' + pending.dupNames.join('、') + '」重複輸入，已略過');
-    toast(parts.join('；'));
+    const parts = [I18N.t('sv.swapped', current, I18N.join(newNames))];
+    if (pending.existingNames.length > 0) parts.push(I18N.t('sv.existsSkipSwap', I18N.join(pending.existingNames)));
+    if (pending.dupNames.length > 0) parts.push(I18N.t('sv.dupSkip', I18N.join(pending.dupNames)));
+    toast(parts.join(I18N.partSep()));
     showLinkPrompt(newNames);
   } else {
-    let msg = '換員失敗，請稍後再試';
+    let msg = I18N.t('sv.swapFail');
     try { msg = (await res.json()).message || msg; } catch (e) {}
     toast(msg);
   }
@@ -1699,7 +1707,7 @@ async function confirmSwap() {
 function showLinkPrompt(names) {
   const url = location.origin + location.pathname;
   $('linkPromptUrl').value = url;
-  $('linkPromptNames').textContent = '請把下方連結分享給「' + names.join('、') + '」，讓他們可以開啟這份調查填寫。';
+  $('linkPromptNames').textContent = I18N.t('sv.sharePrompt', I18N.join(names));
   $('linkPromptMask').style.display = '';
   $('linkPromptModal').style.display = '';
 }
@@ -1712,19 +1720,19 @@ function closeLinkPrompt() {
 function copySurveyLink() {
   const url = $('linkPromptUrl').value;
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(url).then(() => toast('已複製調查連結'));
+    navigator.clipboard.writeText(url).then(() => toast(I18N.t('sv.linkCopied')));
   } else {
     $('linkPromptUrl').select();
     document.execCommand('copy');
-    toast('已複製調查連結');
+    toast(I18N.t('sv.linkCopied'));
   }
 }
 
 /* ---------- 不參加此會議：輸入原因（必填）後送出，發起人會在結果頁看到姓名與原因 ---------- */
 function openDeclineModal() {
-  if (readOnly) return toast('調查已結束，無法再表明不參加');
-  if (!whoValue) return toast(entraLocked ? '您不是本次調查的邀請對象，無法表明不參加'
-                                          : '請先選擇您的姓名，再表明不參加');
+  if (readOnly) return toast(I18N.t('sv.closedNoDecline'));
+  if (!whoValue) return toast(entraLocked ? I18N.t('sv.notInvitedDecline')
+                                          : I18N.t('sv.pickNameDecline'));
   $('declineReason').value = myDecline || '';
   $('declineMask').style.display = '';
   $('declineModal').style.display = '';
@@ -1740,7 +1748,7 @@ async function confirmDecline() {
   const reason = $('declineReason').value.trim();
   if (!reason) {
     $('declineReason').focus();
-    return toast('請說明不參加的原因');
+    return toast(I18N.t('sv.needDeclineReason'));
   }
   const res = await fetch('/api/surveys/' + surveyId + '/responses', {
     method: 'POST',
@@ -1755,7 +1763,7 @@ async function confirmDecline() {
     closeDeclineModal();
     showDone(whoValue, { decline: reason });
   } else {
-    let msg = '送出失敗，請稍後再試';
+    let msg = I18N.t('sv.submitFail');
     try { msg = (await res.json()).message || msg; } catch (e) {}
     toast(msg);
   }
@@ -1778,7 +1786,7 @@ function updateSuggestCalTrigger() {
   const text = $('suggestCalTriggerText');
   if (!trigger || !text) return;
   if (!suggestCalStart) {
-    text.textContent = '請選擇日期範圍';
+    text.textContent = I18N.t('common.pickRange');
     trigger.classList.add('empty');
   } else {
     const end = suggestCalEnd || suggestCalStart;
@@ -1789,7 +1797,7 @@ function updateSuggestCalTrigger() {
 
 function suggestedExcludedBadgeHtml() {
   return TimeSurveyDateRange.excludedBadgeHtml(suggestCalExcluded, {
-    suffix: '不建議',
+    suffix: I18N.t('cal.suffix.notSuggest'),
     formatDate: fmtMd,
     escapeHtml: escHtml
   });
@@ -1843,15 +1851,15 @@ function renderSuggestCalendar() {
   base.setDate(1);
   base.setHours(0, 0, 0, 0);
   const endM = new Date(base.getFullYear(), base.getMonth() + 2, 0);
-  $('suggestCalTitle').textContent = base.getFullYear() + '年 ' + (base.getMonth() + 1) + '月 ～ ' +
-      endM.getFullYear() + '年 ' + (endM.getMonth() + 1) + '月';
+  $('suggestCalTitle').textContent = I18N.ymRange(base.getFullYear(), base.getMonth() + 1,
+      endM.getFullYear(), endM.getMonth() + 1);
   const today = todayYmd();
 
   let html = '';
   for (let i = 0; i < base.getDay(); i++) html += '<span class="cal-day cal-blank"></span>';
   for (const d = new Date(base); d <= endM; d.setDate(d.getDate() + 1)) {
     if (d.getDate() === 1 && d.getTime() !== base.getTime()) {
-      html += '<div class="cal-month-divider">' + (d.getMonth() + 1) + '月</div>';
+      html += '<div class="cal-month-divider">' + I18N.monthLabel(d.getMonth() + 1) + '</div>';
       for (let i = 0; i < d.getDay(); i++) html += '<span class="cal-day cal-blank"></span>';
     }
     const ds = ymd(d);
@@ -1871,11 +1879,11 @@ function renderSuggestCalendar() {
   $('suggestCalDays').innerHTML = html;
 
   let foot = '';
-  if (!suggestCalStart) foot = '請點選建議區間的「起日」';
-  else if (!suggestCalEnd) foot = '起日：' + fmtMd(suggestCalStart) + '　請再點「迄日」（再點起日可取消）';
+  if (!suggestCalStart) foot = I18N.t('cal.footSuggestPickStart');
+  else if (!suggestCalEnd) foot = I18N.t('cal.footPickEnd', fmtMd(suggestCalStart));
   else {
-    foot = '建議區間：' + fmtMd(suggestCalStart) + ' ~ ' + fmtMd(suggestCalEnd);
-    if (suggestCalExcluded.size) foot += '　已挖空 ' + suggestCalExcluded.size + ' 天';
+    foot = I18N.t('cal.footSuggestRange', fmtMd(suggestCalStart), fmtMd(suggestCalEnd));
+    if (suggestCalExcluded.size) foot += I18N.t('cal.footExcluded', suggestCalExcluded.size);
   }
   $('suggestCalFoot').textContent = foot;
 }
@@ -1893,7 +1901,7 @@ function onSuggestCalDayClick(ds) {
     } else {
       let a = suggestCalStart, b = ds;
       if (b < a) { const t = a; a = b; b = t; }
-      if (!within1Month(a, b)) return toast('日期範圍不可超過一個月');
+      if (!within1Month(a, b)) return toast(I18N.t('common.rangeMax1Month'));
       suggestCalStart = a;
       suggestCalEnd = b;
       suggestCalExcluded.clear();
@@ -1990,11 +1998,11 @@ async function confirmNoTime() {
   const reason = $('noTimeReason').value.trim();
   if (!reason) {
     $('noTimeReason').focus();
-    return toast('請說明完全沒有可出席時段的原因（例如請假、出差）');
+    return toast(I18N.t('sv.needNoTimeReason'));
   }
   const from = $('suggestStart').value, to = $('suggestEnd').value;
-  if (!from || !to) return toast('請選擇建議的會議日期區間');
-  if (to < from) return toast('建議的結束日期不可早於開始日期');
+  if (!from || !to) return toast(I18N.t('sv.needSuggestRange'));
+  if (to < from) return toast(I18N.t('sv.suggestEndBeforeStart'));
   const excluded = $('suggestExcludedDates').value;
   const res = await fetch('/api/surveys/' + surveyId + '/responses', {
     method: 'POST',
@@ -2009,18 +2017,18 @@ async function confirmNoTime() {
     closeNoTimeModal();
     showDone(whoValue, { noTime: { reason, from, to, excluded: myNoTime.excluded } });
   } else {
-    let msg = '送出失敗，請稍後再試';
+    let msg = I18N.t('sv.submitFail');
     try { msg = (await res.json()).message || msg; } catch (e) {}
     toast(msg);
   }
 }
 
 async function submitResponse() {
-  if (readOnly) return toast('調查已結束，無法再送出');
+  if (readOnly) return toast(I18N.t('sv.closedNoSubmit'));
   const name = whoValue;
-  if (!name) return toast(entraLocked ? '您不是本次調查的邀請對象，無法送出' : '請先選擇您的姓名');
+  if (!name) return toast(entraLocked ? I18N.t('sv.notInvitedSubmit') : I18N.t('sv.pickNameSubmit'));
   if (selected.size === 0) {
-    return toast('請先勾選至少一個可出席時段；若沒有可出席時間，請從右側選單選擇「沒有我可以出席的時間」');
+    return toast(I18N.t('sv.noTimeFirst'));
   }
   // 送出期間停用按鈕並顯示執行中效果，避免連點造成重複送出
   const btn = $('submitBtn');
@@ -2029,7 +2037,7 @@ async function submitResponse() {
   const btnIcon = btn.querySelector('.btn-icon'), btnText = btn.querySelector('.btn-text');
   const origIcon = btnIcon.innerHTML, origText = btnText.textContent;
   btnIcon.innerHTML = '<span class="spin"></span>';
-  btnText.textContent = '送出中…';
+  btnText.textContent = I18N.t('sv.submitting');
   try {
     const res = await fetch('/api/surveys/' + surveyId + '/responses', {
       method: 'POST',
@@ -2041,12 +2049,12 @@ async function submitResponse() {
       myNoTime = null;
       showDone(name);
     } else {
-      let msg = '送出失敗，請稍後再試';
+      let msg = I18N.t('sv.submitFail');
       try { msg = (await res.json()).message || msg; } catch (e) {}
       toast(msg);
     }
   } catch (e) {
-    toast('送出失敗，請稍後再試');
+    toast(I18N.t('sv.submitFail'));
   } finally {
     btn.disabled = false;
     btnIcon.innerHTML = origIcon;
@@ -2080,21 +2088,17 @@ function showDone(name, extra) {
   const dates = Object.keys(byDate).sort();
   let html = '';
   if (extra && extra.decline) {
-    html = '<p>🚫 您已表明<b>不參加此會議</b>，不需要填寫時段。</p>' +
-           '<p>原因：' + escHtml(extra.decline) + '</p>' +
-           '<p class="muted">調查發起人會在結果頁看到您的姓名與原因；若改為參加，可點「修改填寫內容」勾選時段後重新送出。</p>';
+    html = I18N.t('sv.doneDeclined', escHtml(extra.decline));
   } else if (extra && extra.noTime) {
     const ex = extra.noTime.excluded || [];
-    const exText = ex.length ? '（已跳過：' + ex.map(fmtMd).join('、') + '）' : '';
-    html = '<p>😥 您已回覆：調查期間<b>完全沒有可出席的時段</b>。</p>' +
-           '<p>原因：' + escHtml(extra.noTime.reason) + '</p>' +
-           '<p>建議的會議日期區間：' + fmtMd(extra.noTime.from) + ' ~ ' + fmtMd(extra.noTime.to) + exText + '</p>' +
-           '<p class="muted">調查發起人會在結果頁看到您的原因與建議區間；若情況有變，可點「修改填寫內容」勾選時段後重新送出。</p>';
+    const exText = ex.length ? I18N.t('sv.doneNoTimeSkipped', I18N.join(ex.map(fmtMd))) : '';
+    html = I18N.t('sv.doneNoTime', escHtml(extra.noTime.reason),
+        fmtMd(extra.noTime.from), fmtMd(extra.noTime.to), exText);
   } else if (dates.length === 0) {
-    html = '<p class="muted">您沒有勾選任何時段（表示這段期間都無法出席）。</p>';
+    html = '<p class="muted">' + I18N.t('sv.doneEmpty') + '</p>';
   } else {
     for (const d of dates) {
-      const w = WEEK[new Date(d + 'T00:00:00').getDay()];
+      const w = I18N.weekWrap(new Date(d + 'T00:00:00').getDay());
       const ts = byDate[d];
       const ranges = [];
       let start = ts[0], prev = ts[0];
@@ -2104,12 +2108,12 @@ function showDone(name, extra) {
         ranges.push(start + ' ~ ' + plus30(prev));
         start = prev = cur;
       }
-      html += '<div class="dday"><span class="dlabel">' + fmtMd(d) + '（週' + w + '）</span>' +
+      html += '<div class="dday"><span class="dlabel">' + fmtMd(d) + w + '</span>' +
               ranges.map(r => '<span class="chip">' + r + '</span>').join('') + '</div>';
     }
   }
   $('doneName').textContent = name;
-  $('doneLead').textContent = extra ? '，已收到您的回覆：' : '，以下是您勾選的可出席時間：';
+  $('doneLead').textContent = extra ? I18N.t('sv.doneLeadExtra') : I18N.t('sv.doneLead');
   $('doneList').innerHTML = html;
   $('main').style.display = 'none';
   $('bar').style.display = 'none';

@@ -29,6 +29,11 @@ window.Entra = (function () {
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function t(key) {
+    const args = Array.prototype.slice.call(arguments, 1);
+    return window.I18N ? I18N.t.apply(I18N, [key].concat(args)) : key;
+  }
+
   /* 導向後端登入端點（登入完成後回到目前頁面） */
   function gotoLogin() {
     location.href = '/api/entra/login?return=' +
@@ -44,7 +49,7 @@ window.Entra = (function () {
       return new Promise(() => {});
     }
     if (!res.ok) {
-      let msg = 'API 呼叫失敗（' + res.status + '）';
+      let msg = t('auth.apiFail', res.status);
       try { msg = (await res.json()).message || msg; } catch (e) {}
       throw new Error(msg);
     }
@@ -144,15 +149,15 @@ window.Entra = (function () {
     mask.className = 'entra-mask';
     mask.innerHTML =
         '<div class="entra-card">' +
-        '<h2>🔐 需要登入</h2>' +
-        '<p>本網站已啟用 Microsoft Entra ID 登入，<br>請以您的公司帳號登入後繼續使用。</p>' +
-        '<button class="entra-login-btn">' + MS_LOGO + '使用 Microsoft 帳號登入</button>' +
+        '<h2>' + t('auth.loginTitle') + '</h2>' +
+        '<p>' + t('auth.loginDesc') + '</p>' +
+        '<button class="entra-login-btn">' + MS_LOGO + t('auth.loginBtn') + '</button>' +
         '<div class="entra-err"></div>' +
         '</div>';
     document.body.appendChild(mask);
     if (initialErr) {
       const err = mask.querySelector('.entra-err');
-      err.textContent = '登入失敗：' + initialErr;
+      err.textContent = t('auth.loginFail', initialErr);
       err.style.display = 'block';
     }
     mask.querySelector('.entra-login-btn').addEventListener('click', gotoLogin);
@@ -206,8 +211,8 @@ window.Entra = (function () {
     chipEl = document.createElement('button');
     chipEl.type = 'button';
     chipEl.className = 'entra-chip';
-    chipEl.title = name + '（點選查看帳號資訊）';
-    chipEl.setAttribute('aria-label', '登入者：' + name + '，點選查看帳號資訊');
+    chipEl.title = t('auth.chipTitle', name);
+    chipEl.setAttribute('aria-label', t('auth.chipAria', name));
     applyAvatar(chipEl, name);
     chipEl.addEventListener('click', e => {
       e.stopPropagation();
@@ -265,14 +270,14 @@ window.Entra = (function () {
     head.append(ava, idBox);
 
     const body = document.createElement('div');
-    body.innerHTML = '<div class="entra-panel-loading">載入帳號資訊中…</div>';
+    body.innerHTML = '<div class="entra-panel-loading">' + t('auth.loading') + '</div>';
 
     const foot = document.createElement('div');
     foot.className = 'entra-panel-foot';
     const out = document.createElement('button');
     out.type = 'button';
     out.className = 'entra-logout';
-    out.textContent = '登出';
+    out.textContent = t('auth.logout');
     out.addEventListener('click', () => {
       location.href = '/api/entra/logout';
     });
@@ -295,11 +300,11 @@ window.Entra = (function () {
       ml.textContent = profile.mail || profile.userPrincipalName || ml.textContent;
       body.innerHTML = '';
       const rows = [
-        ['職稱', profile.jobTitle],
-        ['部門', profile.department],
-        ['辦公室', profile.officeLocation],
-        ['手機', profile.mobilePhone],
-        ['公司電話', profile.businessPhones && profile.businessPhones[0]]
+        [t('auth.jobTitle'), profile.jobTitle],
+        [t('auth.department'), profile.department],
+        [t('auth.office'), profile.officeLocation],
+        [t('auth.mobile'), profile.mobilePhone],
+        [t('auth.phone'), profile.businessPhones && profile.businessPhones[0]]
       ];
       let shown = 0;
       for (const [k, v] of rows) {
@@ -317,10 +322,10 @@ window.Entra = (function () {
         body.appendChild(row);
       }
       if (shown === 0) {
-        body.innerHTML = '<div class="entra-panel-loading">（無其他公開的帳號資訊）</div>';
+        body.innerHTML = '<div class="entra-panel-loading">' + t('auth.noInfo') + '</div>';
       }
     } catch (e) {
-      if (panelEl) body.innerHTML = '<div class="entra-panel-loading">帳號資訊載入失敗</div>';
+      if (panelEl) body.innerHTML = '<div class="entra-panel-loading">' + t('auth.loadFail') + '</div>';
     }
   }
 
@@ -346,11 +351,11 @@ window.Entra = (function () {
       return false;   // 設定 API 取不到時視為未啟用，不影響原功能
     }
     if (res.status !== 200) {
-      console.info('[Entra] 未設定 CLIENT_ID／CLIENT_SECRET（data/entra.properties），不啟用 Entra ID 登入');
+      console.info('[Entra] not configured; Microsoft Entra ID sign-in is disabled');
       return false;   // 204 = 未設定
     }
     enabled = true;
-    console.info('[Entra] 已啟用 Entra ID 登入（後端授權碼流程）');
+    console.info('[Entra] Microsoft Entra ID sign-in is enabled');
     injectStyle();
 
     const loginErr = popLoginError();
@@ -418,7 +423,7 @@ window.Entra = (function () {
         // 查無符合的姓名也要明確提示，避免使用者以為建議功能沒有作用
         const empty = document.createElement('div');
         empty.className = 'entra-suggest-empty';
-        empty.textContent = '⚠ 組織中無符合的姓名';
+        empty.textContent = t('auth.noMatch');
         box.appendChild(empty);
       }
       list.forEach((u, i) => {
@@ -492,16 +497,16 @@ window.Entra = (function () {
       mask.className = 'entra-pick-mask';
       const box = document.createElement('div');
       box.className = 'entra-pick';
-      let html = '<h3>👥 組織中有多位「' + esc(name) + '」</h3>' +
-          '<p class="entra-pick-hint">請依部門與 email 選擇您要指定的人：</p><div class="entra-pick-list">';
+      let html = '<h3>' + t('auth.pickTitle', esc(name)) + '</h3>' +
+          '<p class="entra-pick-hint">' + t('auth.pickHint') + '</p><div class="entra-pick-list">';
       candidates.forEach((u, i) => {
         html += '<button type="button" class="entra-pick-item" data-i="' + i + '">' +
             '<div class="entra-pick-name">' + esc(u.displayName) +
             (u.jobTitle ? '<span style="font-weight:400;color:#8a94a0">　' + esc(u.jobTitle) + '</span>' : '') + '</div>' +
-            '<div class="entra-pick-meta">🏢 ' + esc(u.department || '（無部門資料）') +
-            '　✉️ ' + esc(u.mail || u.userPrincipalName || '（無 email）') + '</div></button>';
+            '<div class="entra-pick-meta">🏢 ' + esc(u.department || t('auth.noDept')) +
+            '　✉️ ' + esc(u.mail || u.userPrincipalName || t('auth.noMail')) + '</div></button>';
       });
-      html += '</div><button type="button" class="entra-pick-cancel">取消</button><div style="clear:both"></div>';
+      html += '</div><button type="button" class="entra-pick-cancel">' + t('common.cancel') + '</button><div style="clear:both"></div>';
       box.innerHTML = html;
       const done = u => { mask.remove(); box.remove(); resolve(u); };
       box.querySelectorAll('.entra-pick-item').forEach(btn =>
@@ -536,7 +541,7 @@ window.Entra = (function () {
   // 初始化失敗時不讓 ready 變成 rejected promise，
   // 各頁 await Entra.ready 一律拿到 true / false，不需另行處理例外
   const ready = init().catch(e => {
-    console.warn('Entra ID 初始化失敗，維持免登入模式：', e);
+    console.warn('Entra ID initialization failed; continuing without sign-in:', e);
     return false;
   });
   return {

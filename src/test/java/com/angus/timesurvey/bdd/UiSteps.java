@@ -69,9 +69,13 @@ public class UiSteps {
         return browser;
     }
 
+    private static BrowserContext newUiContext() {
+        return sharedBrowser().newContext(new Browser.NewContextOptions().setLocale("zh-TW"));
+    }
+
     @Before("@ui")
     public void openBrowserContext() {
-        ctx = sharedBrowser().newContext();
+        ctx = newUiContext();
         // 預設視為已看過新手引導，避免遮罩擋住一般場景；引導本身由專屬場景測試
         ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
                 "localStorage.setItem('surveyOnboarded', '1');" +
@@ -187,7 +191,7 @@ public class UiSteps {
                     "</div>" +
                     "<div style='border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;'>" + rows + "</div>" +
                     "</div></body></html>";
-            try (BrowserContext c = browser.newContext()) {
+            try (BrowserContext c = browser.newContext(new Browser.NewContextOptions().setLocale("zh-TW"))) {
                 Page p = c.newPage();
                 p.setContent(html);
                 summaryPng = p.screenshot(new Page.ScreenshotOptions().setFullPage(true));
@@ -373,7 +377,7 @@ public class UiSteps {
     public void openSurveyPageFirstTime(String surveyName) {
         // 換一個沒有「已看過引導」紀錄的全新瀏覽器環境（init script 每次載頁都會執行，無法事後移除）
         ctx.close();
-        ctx = sharedBrowser().newContext();
+        ctx = newUiContext();
         ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "')");
         page = ctx.newPage();
         page.navigate(base() + "/s/" + surveyIds.get(surveyName));
@@ -385,7 +389,7 @@ public class UiSteps {
         // 只清掉 dateRangeOnboarded，模擬「index / survey 都沒用過大日曆」；
         // 其他填寫頁教學維持已看過，避免遮罩干擾本場景。
         ctx.close();
-        ctx = sharedBrowser().newContext();
+        ctx = newUiContext();
         ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
                 "localStorage.setItem('surveyOnboarded', '1');" +
                 "localStorage.setItem('surveyGridOnboarded', '1');" +
@@ -859,11 +863,26 @@ public class UiSteps {
         page.locator("#surveyList").waitFor();
     }
 
+    @When("切換語言為英文")
+    public void switchLanguageToEnglish() {
+        page.locator(".i18n-switch").waitFor();
+        page.selectOption(".i18n-switch", "en");
+        page.waitForFunction("() => document.documentElement.lang === 'en'");
+        page.locator("#surveyList").waitFor();
+    }
+
+    @Then("後台維護頁應顯示英文介面")
+    public void adminPageShowsEnglishUi() {
+        assertThat(page.locator("header h1")).hasText("⏰ Time Survey - Admin");
+        assertThat(page.locator("#saveBtn")).hasText("Create survey");
+        assertThat(page.locator("#surveyList")).containsText("No surveys yet. Create one above.");
+    }
+
     @When("以首次使用者身分開啟後台維護頁")
     public void openAdminPageFirstTime() {
         // 換一個沒有「已看過引導」紀錄的全新瀏覽器環境
         ctx.close();
-        ctx = sharedBrowser().newContext();
+        ctx = newUiContext();
         ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "')");
         page = ctx.newPage();
         page.navigate(base() + "/");

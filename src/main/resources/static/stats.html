@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>時間調查 - 全站使用統計</title>
+<title data-i18n="st.title">時間調查 - 全站使用統計</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; margin: 0; background: #f0f2f5; color: #333; }
@@ -79,56 +79,60 @@
 </head>
 <body>
 <header>
-  <h1>📊 時間調查 - 全站使用統計</h1>
+  <h1 data-i18n="st.header">📊 時間調查 - 全站使用統計</h1>
   <div class="hdr-actions" style="display:flex; align-items:center; gap:14px">
-    <a href="/">← 回後台維護</a>
+    <a href="/" data-i18n="st.backAdmin">← 回後台維護</a>
   </div>
 </header>
 <div class="container">
 
   <div class="card">
-    <h2>總覽 <span class="muted" id="genAt" style="float:right;font-weight:400"></span></h2>
+    <h2><span data-i18n="st.overview">總覽</span> <span class="muted" id="genAt" style="float:right;font-weight:400"></span></h2>
     <div class="stats" id="totArea"></div>
   </div>
 
   <!-- 啟用 Entra ID 登入時才顯示：登入者的使用量統計與趨勢 -->
   <div class="card" id="usageCard" style="display:none">
-    <h2>使用量統計（Entra ID 登入者）</h2>
+    <h2 data-i18n="st.usageTitle">使用量統計（Entra ID 登入者）</h2>
     <div class="usage-bar">
       <span class="seg" id="usagePeriods">
-        <button data-p="2w">近兩週</button><button data-p="1m">近一個月</button><button data-p="3m">近三個月</button><button data-p="6m">近半年</button>
+        <button data-p="2w" data-i18n="st.p2w">近兩週</button><button data-p="1m" data-i18n="st.p1m">近一個月</button><button data-p="3m" data-i18n="st.p3m">近三個月</button><button data-p="6m" data-i18n="st.p6m">近半年</button>
       </span>
-      <select id="usageUser" title="選擇整體或個人統計"></select>
+      <select id="usageUser" data-i18n-title="st.userSelTitle" title="選擇整體或個人統計"></select>
     </div>
     <div class="stats" id="usageTiles" style="margin:16px 0 14px"></div>
     <div class="trend-wrap" id="usageTrend"></div>
     <div class="chart-tip" id="chartTip"></div>
     <table id="usageTable">
       <thead>
-        <tr><th>姓名</th><th>Email</th><th class="num">發出調查</th><th class="num">回覆時間</th>
-            <th class="num">開啟次數</th><th>佔比</th><th>最近使用</th></tr>
+        <tr><th data-i18n="st.thUser">姓名</th><th>Email</th><th class="num" data-i18n="st.thCreates">發出調查</th><th class="num" data-i18n="st.thReplies">回覆時間</th>
+            <th class="num" data-i18n="st.thOpens">開啟次數</th><th data-i18n="st.thShare">佔比</th><th data-i18n="st.thLastUse">最近使用</th></tr>
       </thead>
       <tbody></tbody>
     </table>
-    <p class="muted">每次以 Microsoft 帳號登入者開啟本系統任一頁面即記錄一筆；點選列可切換為該員的個人趨勢。</p>
+    <p class="muted" data-i18n="st.usageNote">每次以 Microsoft 帳號登入者開啟本系統任一頁面即記錄一筆；點選列可切換為該員的個人趨勢。</p>
   </div>
 
   <div class="card">
-    <h2>各調查統計 <button onclick="load()">重新整理</button></h2>
+    <h2><span data-i18n="st.perSurvey">各調查統計</span> <button onclick="load()" data-i18n="st.reload">重新整理</button></h2>
     <table id="statTable">
       <thead>
-        <tr><th>調查名稱</th><th>調查期間</th><th>狀態</th><th class="num">開啟次數</th>
-            <th class="num">使用人數（不重複 IP）</th><th class="num">已回覆 / 應回覆</th><th>回覆率</th></tr>
+        <tr><th data-i18n="st.thSurveyName">調查名稱</th><th data-i18n="st.thPeriod">調查期間</th><th data-i18n="st.thStatus">狀態</th><th class="num" data-i18n="st.thOpens">開啟次數</th>
+            <th class="num" data-i18n="st.thUniqueIps">使用人數（不重複 IP）</th><th class="num" data-i18n="st.thResponded">已回覆 / 應回覆</th><th data-i18n="st.thRate">回覆率</th></tr>
       </thead>
       <tbody></tbody>
     </table>
-    <p class="muted">使用人數以不重複來源 IP 估算：同一網路出口（NAT）的多位使用者會被算成一人，同一人切換網路則會被算成多人。</p>
+    <p class="muted" data-i18n="st.ipNote">使用人數以不重複來源 IP 估算：同一網路出口（NAT）的多位使用者會被算成一人，同一人切換網路則會被算成多人。</p>
   </div>
 
 </div>
+<script src="/i18n/zh-TW.js"></script>
+<script src="/i18n/en.js"></script>
+<script src="/i18n.js"></script>
 <script src="/entra.js"></script>
 <script>
 const $ = id => document.getElementById(id);
+I18N.apply();
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -150,16 +154,16 @@ async function load() {
   const d = await res.json();
 
   $('totArea').innerHTML =
-      tile(d.totalSurveys, '調查總數') +
-      tile(d.totalVisits, '調查頁開啟總次數') +
-      tile(d.totalUniqueIps, '全站使用人數（不重複 IP）') +
-      tile(d.totalResponded, '已回覆總人次');
-  $('genAt').textContent = '統計時間：' + String(d.generatedAt).replace('T', ' ').slice(0, 19);
+      tile(d.totalSurveys, I18N.t('st.totalSurveys')) +
+      tile(d.totalVisits, I18N.t('st.totalVisits')) +
+      tile(d.totalUniqueIps, I18N.t('st.totalUniqueIps')) +
+      tile(d.totalResponded, I18N.t('st.totalResponded'));
+  $('genAt').textContent = I18N.t('st.genAt', String(d.generatedAt).replace('T', ' ').slice(0, 19));
 
   const tbody = $('statTable').querySelector('tbody');
   tbody.innerHTML = '';
   if (d.surveys.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="muted">尚無調查。</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">' + I18N.t('st.noSurveys') + '</td></tr>';
     return;
   }
   for (const s of d.surveys) {
@@ -168,7 +172,7 @@ async function load() {
     tr.innerHTML =
         '<td>' + esc(s.name) + '</td>' +
         '<td>' + fmtYmd(s.startDate) + ' ~ ' + fmtYmd(s.endDate) + '</td>' +
-        '<td><span class="st ' + (s.closed ? 'st-closed' : 'st-open') + '">' + (s.closed ? '已結束' : '進行中') + '</span></td>' +
+        '<td><span class="st ' + (s.closed ? 'st-closed' : 'st-open') + '">' + (s.closed ? I18N.t('st.stClosed') : I18N.t('st.stOpen')) + '</span></td>' +
         '<td class="num">' + s.visits + '</td>' +
         '<td class="num">' + s.uniqueIps + '</td>' +
         '<td class="num">' + s.responded + ' / ' + s.total + '</td>' +
@@ -190,9 +194,9 @@ function fmtDt(s) {
    超過兩個月改以「週」為單位彙總，圖面才不會擠成一團 */
 function renderTrend(trend) {
   let pts = trend.map(t => ({ label: t.date, count: t.count, creates: t.creates || 0, replies: t.replies || 0 }));
-  let unit = '日';
+  let unit = I18N.t('st.unitDay');
   if (pts.length > 62) {
-    unit = '週';
+    unit = I18N.t('st.unitWeek');
     const wk = new Map();
     for (const t of trend) {
       const d = new Date(t.date + 'T00:00:00');
@@ -209,7 +213,7 @@ function renderTrend(trend) {
   const max = Math.max(1, ...pts.map(p => Math.max(p.count, p.creates, p.replies)));
   const bw = (W - padL) / pts.length;
   const plotH = H - padB - padT;
-  const suf = unit === '週' ? ' 起一週' : '';
+  const suf = unit === I18N.t('st.unitWeek') ? I18N.t('st.weekFrom') : '';
   const cx = i => padL + i * bw + bw / 2;                  // 該點（折線）在圖上的 x
   const cy = v => H - padB - (v / max) * plotH;            // 值 v 對應的 y
 
@@ -250,14 +254,14 @@ function renderTrend(trend) {
       '<text class="trend-axis" x="' + (padL - 6) + '" y="' + (H - padB) + '" text-anchor="end">0</text>';
   const legend =
       '<div class="trend-legend">' +
-      '<span><i class="lg-bar"></i>頁面開啟次數</span>' +
-      '<span><i class="lg-line lg-create"></i>發起調查次數</span>' +
-      '<span><i class="lg-line lg-reply"></i>參與調查人次</span>' +
+      '<span><i class="lg-bar"></i>' + I18N.t('st.legendOpens') + '</span>' +
+      '<span><i class="lg-line lg-create"></i>' + I18N.t('st.legendCreates') + '</span>' +
+      '<span><i class="lg-line lg-reply"></i>' + I18N.t('st.legendReplies') + '</span>' +
       '</div>';
   $('usageTrend').innerHTML =
-      '<div class="muted" style="margin-bottom:4px">使用量趨勢（每' + unit + '）</div>' +
+      '<div class="muted" style="margin-bottom:4px">' + I18N.t('st.trendTitle', unit) + '</div>' +
       legend +
-      '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="使用量趨勢圖">' +
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="' + I18N.t('st.trendAria') + '">' +
       grid + bars + lines + labels + '</svg>';
 }
 
@@ -274,9 +278,9 @@ async function loadUsage() {
 
   // 人員下拉：以本期間出現過的登入者重建選項
   const sel = $('usageUser');
-  sel.innerHTML = '<option value="">整體（所有登入者）</option>' + d.users.map(u =>
+  sel.innerHTML = '<option value="">' + I18N.t('st.allUsers') + '</option>' + d.users.map(u =>
       '<option value="' + esc(u.email) + '">' + esc(u.name || u.email) +
-      '（' + u.opens + ' 次）</option>').join('');
+      I18N.t('st.opensSuffix', u.opens) + '</option>').join('');
   sel.value = usageUser;
   if (sel.value !== usageUser) {   // 該員在此期間無紀錄 → 退回整體
     usageUser = '';
@@ -286,20 +290,20 @@ async function loadUsage() {
   const days = Math.max(1, d.trend.length);
   const me = usageUser ? d.users.find(u => (u.email || '').toLowerCase() === usageUser.toLowerCase()) : null;
   $('usageTiles').innerHTML =
-      tile(d.totalOpens, usageUser ? '個人頁面開啟次數' : '頁面開啟次數') +
-      (usageUser ? '' : tile(d.totalUsers, '使用人數（登入者）')) +
-      tile(usageUser ? d.createOpens : d.createUsers, usageUser ? '發出調查次數' : '發出調查人數') +
-      tile(usageUser ? d.replyOpens : d.replyUsers, usageUser ? '回覆時間次數' : '回覆時間人數') +
-      tile((d.totalOpens / days).toFixed(1), '日平均開啟次數') +
+      tile(d.totalOpens, usageUser ? I18N.t('st.myOpens') : I18N.t('st.opens')) +
+      (usageUser ? '' : tile(d.totalUsers, I18N.t('st.users'))) +
+      tile(usageUser ? d.createOpens : d.createUsers, usageUser ? I18N.t('st.myCreates') : I18N.t('st.createUsers')) +
+      tile(usageUser ? d.replyOpens : d.replyUsers, usageUser ? I18N.t('st.myReplies') : I18N.t('st.replyUsers')) +
+      tile((d.totalOpens / days).toFixed(1), I18N.t('st.dailyAvg')) +
       tile('<span style="font-size:19px;line-height:2">' + (me ? fmtDt(me.lastAt) : fmtDt(d.users[0] && d.users.reduce(
-          (a, u) => u.lastAt > a ? u.lastAt : a, ''))) + '</span>', '最近使用時間');
+          (a, u) => u.lastAt > a ? u.lastAt : a, ''))) + '</span>', I18N.t('st.lastUse'));
 
   renderTrend(d.trend);
 
   const tbody = $('usageTable').querySelector('tbody');
   tbody.innerHTML = '';
   if (d.users.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="muted">此期間尚無登入者的使用紀錄。</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">' + I18N.t('st.noUsage') + '</td></tr>';
     return;
   }
   const sum = d.users.reduce((a, u) => a + u.opens, 0);
@@ -307,9 +311,9 @@ async function loadUsage() {
     const pct = sum > 0 ? Math.round(u.opens * 100 / sum) : 0;
     const tr = document.createElement('tr');
     if (usageUser && (u.email || '').toLowerCase() === usageUser.toLowerCase()) tr.className = 'sel';
-    tr.title = '點選查看「' + (u.name || u.email) + '」的個人趨勢';
+    tr.title = I18N.t('st.rowTip', u.name || u.email);
     tr.innerHTML =
-        '<td>' + esc(u.name || '（無姓名）') + '</td>' +
+        '<td>' + esc(u.name || I18N.t('st.noName')) + '</td>' +
         '<td>' + esc(u.email) + '</td>' +
         '<td class="num">' + u.createOpens + '</td>' +
         '<td class="num">' + u.replyOpens + '</td>' +
@@ -335,9 +339,9 @@ async function loadUsage() {
     const b = bar.dataset;
     tip.innerHTML =
         '<div class="ctt-head">' + esc(b.title) + '</div>' +
-        row('#9cc2f0', '頁面開啟次數', b.count) +
-        row('#e8873a', '發起調查次數', b.creates) +
-        row('#28a745', '參與調查人次', b.replies);
+        row('#9cc2f0', I18N.t('st.legendOpens'), b.count) +
+        row('#e8873a', I18N.t('st.legendCreates'), b.creates) +
+        row('#28a745', I18N.t('st.legendReplies'), b.replies);
     tip.style.display = 'block';
     // 置於游標右上，夾在視窗內；右／上放不下時翻到左／下
     let left = e.clientX + 14;
