@@ -241,6 +241,12 @@
                               padding: 10px 12px; font-size: 12px; }
   .submit-bar .submit-main:hover,
   .submit-bar .submit-caret:hover { background: #1a68d1; }
+  .submit-bar .submit-main:disabled { opacity: .55; cursor: not-allowed; }
+  .submit-bar .submit-main:disabled:hover { background: #2c7be5; }
+  .spin { display: inline-block; width: 14px; height: 14px;
+          border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%;
+          animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .submit-menu { display: none; position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 1100;
                  background: #fff; border: 1px solid #e4e8ec; border-radius: 8px; padding: 4px;
                  min-width: 220px; box-shadow: 0 6px 20px rgba(0,0,0,.16); }
@@ -2016,19 +2022,35 @@ async function submitResponse() {
   if (selected.size === 0) {
     return toast('請先勾選至少一個可出席時段；若沒有可出席時間，請從右側選單選擇「沒有我可以出席的時間」');
   }
-  const res = await fetch('/api/surveys/' + surveyId + '/responses', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ participantName: name, slots: [...selected].sort().join(',') })
-  });
-  if (res.ok) {
-    myDecline = null;
-    myNoTime = null;
-    showDone(name);
-  } else {
-    let msg = '送出失敗，請稍後再試';
-    try { msg = (await res.json()).message || msg; } catch (e) {}
-    toast(msg);
+  // 送出期間停用按鈕並顯示執行中效果，避免連點造成重複送出
+  const btn = $('submitBtn');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const btnIcon = btn.querySelector('.btn-icon'), btnText = btn.querySelector('.btn-text');
+  const origIcon = btnIcon.innerHTML, origText = btnText.textContent;
+  btnIcon.innerHTML = '<span class="spin"></span>';
+  btnText.textContent = '送出中…';
+  try {
+    const res = await fetch('/api/surveys/' + surveyId + '/responses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participantName: name, slots: [...selected].sort().join(',') })
+    });
+    if (res.ok) {
+      myDecline = null;
+      myNoTime = null;
+      showDone(name);
+    } else {
+      let msg = '送出失敗，請稍後再試';
+      try { msg = (await res.json()).message || msg; } catch (e) {}
+      toast(msg);
+    }
+  } catch (e) {
+    toast('送出失敗，請稍後再試');
+  } finally {
+    btn.disabled = false;
+    btnIcon.innerHTML = origIcon;
+    btnText.textContent = origText;
   }
 }
 

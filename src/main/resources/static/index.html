@@ -41,6 +41,12 @@
            font-weight: 600; font-family: inherit; letter-spacing: .02em; transition: background .15s, box-shadow .15s; }
   .btn-primary { background: #2c7be5; color: #fff; box-shadow: 0 1px 2px rgba(44,123,229,.3); }
   .btn-primary:hover { background: #1a68d1; box-shadow: 0 3px 8px rgba(44,123,229,.32); }
+  .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-primary:disabled:hover { background: #2c7be5; box-shadow: 0 1px 2px rgba(44,123,229,.3); }
+  .spin { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px;
+          border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%;
+          animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
   .btn-sm { padding: 4px 10px; font-size: 13px; margin-right: 4px; }
   /* 清單操作的圖示按鈕：平時淺底彩色線條圖示，滑過時填滿動作色 */
   .ops { display: flex; gap: 6px; }
@@ -1145,6 +1151,11 @@ async function saveSurvey() {
   }
 
   const editId = $('editId').value;
+  // 送出期間停用按鈕並顯示執行中效果，避免連點造成重複建立
+  const saveBtn = $('saveBtn');
+  if (saveBtn.disabled) return;
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<span class="spin"></span>' + (editId ? '儲存中…' : '建立中…');
   try {
     const saved = await api(editId ? '/api/surveys/' + editId : '/api/surveys', {
       method: editId ? 'PUT' : 'POST',
@@ -1171,6 +1182,10 @@ async function saveSurvey() {
     if (!editId && !localStorage.getItem('copyLinkOnboarded')) startLinkOnb(saved.id);
   } catch (e) {
     toast(e.message);
+  } finally {
+    saveBtn.disabled = false;
+    // 成功時 resetForm 已清掉 editId，依目前狀態決定按鈕文字（失敗時維持原本的編輯/建立字樣）
+    saveBtn.textContent = $('editId').value ? '儲存修改' : '建立調查';
   }
 }
 
