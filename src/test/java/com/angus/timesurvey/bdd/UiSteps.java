@@ -866,7 +866,8 @@ public class UiSteps {
     @When("切換語言為英文")
     public void switchLanguageToEnglish() {
         page.locator(".i18n-switch").waitFor();
-        page.selectOption(".i18n-switch", "en");
+        page.locator(".i18n-switch").click();
+        page.locator(".i18n-option[data-lang='en']").click();
         page.waitForFunction("() => document.documentElement.lang === 'en'");
         page.locator("#surveyList").waitFor();
     }

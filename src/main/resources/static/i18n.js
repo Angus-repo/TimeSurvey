@@ -142,43 +142,152 @@ window.I18N = (function () {
     const wrap = document.createElement('span');
     wrap.className = 'i18n-control';
     wrap.title = t('lang.label');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'i18n-switch';
+    btn.setAttribute('aria-label', t('lang.label'));
+    btn.setAttribute('aria-haspopup', 'listbox');
+    btn.setAttribute('aria-expanded', 'false');
+    const icon = document.createElement('span');
+    icon.className = 'i18n-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '🌐';
     const badge = document.createElement('span');
     badge.className = 'i18n-badge';
-    badge.setAttribute('aria-hidden', 'true');
     badge.textContent = current.shortName;
-    const sel = document.createElement('select');
-    sel.className = 'i18n-switch';
-    sel.setAttribute('aria-label', t('lang.label'));
-    for (const l of SUPPORTED) {
-      const opt = document.createElement('option');
-      opt.value = l.code;
-      opt.textContent = l.name;
-      sel.appendChild(opt);
+    btn.appendChild(icon);
+    btn.appendChild(badge);
+    const menu = document.createElement('div');
+    menu.className = 'i18n-menu';
+    menu.setAttribute('role', 'listbox');
+    menu.setAttribute('aria-label', t('lang.label'));
+    menu.hidden = true;
+    const optionButtons = [];
+
+    function closeMenu() {
+      wrap.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+      menu.hidden = true;
     }
-    sel.value = lang;
-    sel.addEventListener('change', () => {
-      localStorage.setItem('lang', sel.value);
+
+    function openMenu() {
+      wrap.classList.add('open');
+      btn.setAttribute('aria-expanded', 'true');
+      menu.hidden = false;
+      const activeOption = optionButtons.find(opt => opt.getAttribute('aria-selected') === 'true') || optionButtons[0];
+      if (activeOption) activeOption.focus();
+    }
+
+    function toggleMenu() {
+      if (menu.hidden) openMenu();
+      else closeMenu();
+    }
+
+    function chooseLanguage(code) {
+      if (code === lang) {
+        closeMenu();
+        btn.focus();
+        return;
+      }
+      localStorage.setItem('lang', code);
       location.reload();
+    }
+
+    for (const l of SUPPORTED) {
+      const opt = document.createElement('button');
+      opt.type = 'button';
+      opt.className = 'i18n-option';
+      opt.dataset.lang = l.code;
+      opt.setAttribute('role', 'option');
+      opt.setAttribute('aria-selected', String(l.code === lang));
+      const code = document.createElement('span');
+      code.className = 'i18n-option-code';
+      code.textContent = l.shortName;
+      const name = document.createElement('span');
+      name.className = 'i18n-option-name';
+      name.textContent = l.name;
+      opt.appendChild(code);
+      opt.appendChild(name);
+      opt.addEventListener('click', () => chooseLanguage(l.code));
+      opt.addEventListener('keydown', ev => {
+        const idx = optionButtons.indexOf(opt);
+        if (ev.key === 'ArrowDown') {
+          ev.preventDefault();
+          optionButtons[(idx + 1) % optionButtons.length].focus();
+        } else if (ev.key === 'ArrowUp') {
+          ev.preventDefault();
+          optionButtons[(idx - 1 + optionButtons.length) % optionButtons.length].focus();
+        } else if (ev.key === 'Home') {
+          ev.preventDefault();
+          optionButtons[0].focus();
+        } else if (ev.key === 'End') {
+          ev.preventDefault();
+          optionButtons[optionButtons.length - 1].focus();
+        } else if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          chooseLanguage(l.code);
+        } else if (ev.key === 'Escape') {
+          ev.preventDefault();
+          closeMenu();
+          btn.focus();
+        } else if (ev.key === 'Tab') {
+          closeMenu();
+        }
+      });
+      optionButtons.push(opt);
+      menu.appendChild(opt);
+    }
+
+    btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      toggleMenu();
     });
-    wrap.appendChild(badge);
-    wrap.appendChild(sel);
+    btn.addEventListener('keydown', ev => {
+      if (ev.key === 'ArrowDown' || ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        openMenu();
+      } else if (ev.key === 'Escape') {
+        closeMenu();
+      }
+    });
+    menu.addEventListener('click', ev => ev.stopPropagation());
+    document.addEventListener('click', ev => {
+      if (!wrap.contains(ev.target)) closeMenu();
+    });
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
 
     const st = document.createElement('style');
     st.textContent =
-      '.i18n-control { display: inline-flex; align-items: center; gap: 8px; min-width: 150px; max-width: 190px;' +
-      ' height: 38px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.35);' +
+      '.i18n-control { display: inline-flex; align-items: center; width: 78px; min-width: 78px; max-width: 78px;' +
+      ' height: 38px; padding: 0; border-radius: 999px; border: 1px solid rgba(255,255,255,.35);' +
       ' background: rgba(255,255,255,.12); color: #fff; flex: 0 0 auto; position: relative;' +
       ' transition: background .15s, border-color .15s, box-shadow .15s; }' +
-      '.i18n-control:hover { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.6); }' +
+      '.i18n-control:hover, .i18n-control.open { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.6); }' +
       '.i18n-control:focus-within { box-shadow: 0 0 0 3px rgba(255,255,255,.28); border-color: rgba(255,255,255,.75); }' +
-      '.i18n-control::after { content: "⌄"; margin-left: auto; font-size: 15px; line-height: 1; opacity: .9; pointer-events: none; }' +
-      '.i18n-badge { min-width: 32px; height: 22px; padding: 0 7px; border-radius: 999px;' +
-      ' display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.2);' +
-      ' color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .04em; line-height: 1; }' +
-      '.i18n-switch { min-width: 0; flex: 1 1 auto; height: 100%; padding: 0 10px 0 0; border: 0;' +
-      ' background: transparent; color: inherit; font-size: 13px; font-family: inherit; cursor: pointer; line-height: 1;' +
+      '.i18n-switch { width: 100%; height: 100%; padding: 0 7px 0 8px; border: 0; border-radius: inherit;' +
+      ' display: inline-flex; align-items: center; justify-content: space-between; gap: 3px;' +
+      ' background: transparent; color: inherit; font-size: 13px; font-family: inherit; font-weight: 700; cursor: pointer; line-height: 1;' +
       ' appearance: none; -webkit-appearance: none; outline: none; }' +
-      '.i18n-switch option { color: #333; background: #fff; }' +
+      '.i18n-switch::after { content: "⌄"; font-size: 14px; font-weight: 700; line-height: 1; opacity: .9; }' +
+      '.i18n-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px;' +
+      ' font-size: 14px; line-height: 1; pointer-events: none; }' +
+      '.i18n-control.open .i18n-icon { display: none; }' +
+      '.i18n-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 26px;' +
+      ' color: inherit; white-space: nowrap; line-height: 1; pointer-events: none; }' +
+      '.i18n-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 1000; min-width: 162px;' +
+      ' padding: 6px; border: 1px solid #dde3ea; border-radius: 10px; background: #fff;' +
+      ' box-shadow: 0 10px 26px rgba(16,24,40,.2); }' +
+      '.i18n-menu[hidden] { display: none; }' +
+      '.i18n-option { width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 9px;' +
+      ' border: 0; border-radius: 8px; background: transparent; color: #2f3b48; font-size: 13px;' +
+      ' font-family: inherit; line-height: 1.35; text-align: left; white-space: nowrap; cursor: pointer; }' +
+      '.i18n-option:hover, .i18n-option:focus { background: #f2f5f8; outline: none; }' +
+      '.i18n-option-code { min-width: 38px; height: 22px; padding: 0 7px; border-radius: 999px;' +
+      ' display: inline-flex; align-items: center; justify-content: center; background: #e7ecf1;' +
+      ' border: 1px solid #d8dfe7; color: #324253; box-shadow: inset 0 1px 0 rgba(255,255,255,.8);' +
+      ' font-size: 12px; font-weight: 800; letter-spacing: .04em; line-height: 1; }' +
+      '.i18n-option[aria-selected="true"] .i18n-option-name { font-weight: 700; }' +
       '.i18n-control.fixed { position: fixed; top: 14px; right: 14px; z-index: 900;' +
       ' background: #fff; color: #333; border-color: #ccc; }';
     document.head.appendChild(st);
