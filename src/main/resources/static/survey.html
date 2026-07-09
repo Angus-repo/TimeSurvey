@@ -286,14 +286,16 @@
   .onb-pop button:hover { background: #008f70; }
 
   /* 表格操作說明（分兩步）：先講左半邊快速鈕／複製鈕，再講右半邊小時勾勾／30分鐘方格。
-     說明視窗貼近左右半的交界（位置由 positionGridOnbPop 計算）：
-     講左半邊時視窗在交界右側、箭頭指左；講右半邊時視窗在交界左側、箭頭指右 */
-  .onb-pop-grid { position: absolute; top: 20px; width: 330px; max-width: calc(100% - 60px); z-index: 1003; }
+     兩步都貼近左右半交界，箭頭指回正在說明的那一半（位置由 positionGridOnbPop 計算） */
+  .onb-pop-grid { position: absolute; top: 20px; width: 330px; max-width: calc(100vw - 24px); z-index: 1003; }
   /* 只突顯正在說明的那一半：把「另一半」再蓋一層與引導遮罩同色的壓暗層 */
   #onbHalfDim { position: absolute; z-index: 1002; background: rgba(0,0,0,.55); pointer-events: none; }
-  .onb-pop-grid::before { bottom: auto; top: 22px; border: 9px solid transparent; }
-  .onb-pop-grid.at-right::before { left: auto; right: 100%; border-right-color: #fff; }
+  .onb-pop-grid::before { bottom: auto; top: var(--grid-arrow-top, 50%); transform: translateY(-50%);
+                           border: 9px solid transparent; }
   .onb-pop-grid.at-left::before { left: 100%; right: auto; border-left-color: #fff; }
+  .onb-pop-grid.at-right::before { right: 100%; left: auto; border-right-color: #fff; }
+  /* 行事曆引導泡泡以功能鈕列為定位基準，箭頭對準「同意讀取我的行事曆」鈕 */
+  #actionBar { position: relative; }
   .onb-grid-cols { margin-bottom: 10px; }
   .onb-step-dot { float: right; font-size: 12px; color: #999; }
   .onb-col-title { font-weight: 700; color: #00a884; margin-bottom: 6px; font-size: 15px; }
@@ -384,6 +386,10 @@
     <button id="btnCal" class="topbtn" onclick="loadMyCalendar()" style="display:none; background:#0a7d57"
             data-i18n="sv.btnCal" data-i18n-title="sv.btnCalTitle"
             title="同意讀取您的行事曆後，會把調查期間已有的會議以灰色顯示在下方時段表，方便對照填寫">📅 同意讀取我的行事曆</button>
+    <div class="onb-pop" id="onbPopCal" style="display:none">
+      <span data-i18n="sv.onbCalHtml">📅 點「<b>同意讀取我的行事曆</b>」，會把調查期間您已有的會議以灰色載入下方時段表，方便對照填寫。</span>
+      <div><button onclick="endCalOnboarding()" data-i18n="common.gotIt">知道了</button></div>
+    </div>
   </div>
   <div class="grid-outer" id="gridOuter">
     <div class="card gridwrap" id="gridCard"></div>
@@ -820,26 +826,61 @@ function setGridOnbStep(step) {
   $('onbColLeft').style.display = step === 1 ? '' : 'none';
   $('onbColRight').style.display = step === 2 ? '' : 'none';
   $('onbGridBtn').textContent = step === 1 ? I18N.t('sv.onbNext') : I18N.t('common.gotIt');
-  // 視窗停在「另一半」上方，箭頭指向正在說明的那一半
+  // 泡泡停在左右半交界旁邊：講左半邊時在右側且箭頭指左；講右半邊時在左側且箭頭指右
   $('onbPopGrid').classList.toggle('at-right', step === 1);
   $('onbPopGrid').classList.toggle('at-left', step === 2);
+  centerGridOnbFocus(step);
   positionGridOnbPop(step);
 }
 
-/* 讓說明視窗貼近左右半的交界（日期＋快速鈕欄的右緣），不要離被說明的區域太遠：
-   講左半邊時視窗左緣貼在交界右側，講右半邊時視窗右緣貼在交界左側；放不下時夾回容器內。
+function gridOnbFocusEl(step) {
+  return step === 1
+      ? document.querySelector('#gridCard th.datecell')
+      : document.querySelector('#gridCard td.hourcell .hbox');
+}
+
+function centerGridOnbFocus(step) {
+  const target = gridOnbFocusEl(step);
+  if (!target) return;
+  const r = target.getBoundingClientRect();
+  const targetCenterY = window.scrollY + r.top + r.height / 2;
+  window.scrollTo({ top: Math.max(0, targetCenterY - window.innerHeight / 2), behavior: 'auto' });
+}
+
+/* 視窗貼近左右半交界：講左半邊時放在交界右側，講右半邊時放在交界左側，放不下時夾回容器內。
    同時把「另一半」蓋上壓暗層（#onbHalfDim），讓突顯只落在正在說明的那一半 */
 function positionGridOnbPop(step) {
   const pop = $('onbPopGrid');
   const datecell = document.querySelector('#gridCard th.datecell');
   if (!datecell) return;
-  const outer = $('gridOuter').getBoundingClientRect();
+  const outerEl = $('gridOuter');
+  const outer = outerEl.getBoundingClientRect();
   const split = datecell.getBoundingClientRect().right - outer.left;   // 交界的 x 座標
-  const gap = 16;                                                      // 留給箭頭的空隙
-  let left = step === 1 ? split + gap : split - gap - pop.offsetWidth;
-  left = Math.max(14, Math.min(left, outer.width - pop.offsetWidth - 14));
-  pop.style.left = left + 'px';
-  pop.style.right = 'auto';
+  if (step === 1) {
+    const gap = 12;                                                    // 留給箭頭的空隙
+    let left = split + gap;
+    left = Math.max(14, Math.min(left, outer.width - pop.offsetWidth - 14));
+    pop.style.left = left + 'px';
+    pop.style.right = 'auto';
+  } else {
+    const gap = 12;
+    let left = split - gap - pop.offsetWidth;
+    left = Math.max(14, Math.min(left, outer.width - pop.offsetWidth - 14));
+    pop.style.left = left + 'px';
+    pop.style.right = 'auto';
+  }
+
+  const focus = gridOnbFocusEl(step) || datecell;
+  const focusRect = focus.getBoundingClientRect();
+  const focusCenter = focusRect.top + focusRect.height / 2 - outer.top;
+  let top = focusCenter - pop.offsetHeight / 2;
+  const viewportTop = -outer.top + 12;
+  const viewportBottom = window.innerHeight - outer.top - pop.offsetHeight - 12;
+  if (viewportBottom >= viewportTop) top = Math.max(viewportTop, Math.min(top, viewportBottom));
+  else top = Math.max(12, top);
+  pop.style.top = top + 'px';
+  const arrowTop = Math.max(18, Math.min(focusCenter - top, pop.offsetHeight - 18));
+  pop.style.setProperty('--grid-arrow-top', arrowTop + 'px');
 
   // 壓暗「另一半」：講左半邊時暗右半、講右半邊時暗左半（圓角只留在卡片外側）
   const dim = $('onbHalfDim');
@@ -858,6 +899,11 @@ function positionGridOnbPop(step) {
   dim.style.display = '';
 }
 
+['resize', 'scroll'].forEach(ev =>
+  window.addEventListener(ev, () => {
+    if ($('onbPopGrid').style.display !== 'none') positionGridOnbPop(gridOnbStep);
+  }, true));
+
 /* 第 1 步按「下一步」進到右半邊說明，第 2 步按「知道了」結束引導 */
 function nextGridOnboarding() {
   if (gridOnbStep === 1) setGridOnbStep(2);
@@ -872,21 +918,46 @@ function endGridOnboarding() {
   $('gridCard').classList.remove('onb-spot');
 }
 
+/* 姓名確定後的引導入口：啟用 Entra ID 登入時先提示「同意讀取我的行事曆」
+   可把已有會議載入時段表對照（只顯示一次），結束後再接著顯示表格操作說明；
+   沒有行事曆鈕（未啟用 Entra）或已看過時，直接進表格操作說明 */
+function maybeShowCalOnboarding() {
+  if (readOnly) return;
+  const btn = $('btnCal');
+  if (localStorage.getItem('surveyCalOnboarded') || btn.style.display === 'none')
+    return maybeShowGridOnboarding();
+  $('onbMask').style.display = '';
+  $('onbPopCal').style.display = '';
+  $('onbPopCal').style.left = btn.offsetLeft + 'px';   // 泡泡（含箭頭）對準行事曆鈕
+  btn.classList.add('onb-spot');
+}
+
+function endCalOnboarding() {
+  localStorage.setItem('surveyCalOnboarded', '1');
+  $('onbMask').style.display = 'none';
+  $('onbPopCal').style.display = 'none';
+  $('btnCal').classList.remove('onb-spot');
+  maybeShowGridOnboarding();
+}
+
 /* 點擊遮罩時，依目前顯示中的是哪一個引導泡泡決定要結束哪一個 */
 function dismissOnboarding() {
-  if ($('onbPopGrid').style.display !== 'none') endGridOnboarding();
+  if ($('onbPopCal').style.display !== 'none') endCalOnboarding();
+  else if ($('onbPopGrid').style.display !== 'none') endGridOnboarding();
   else endOnboarding();
 }
 
-/* 重新顯示新手引導：清除「看過」紀錄，讓兩段引導（先選姓名／表格操作）再次出現。
-   已選好姓名（含 Entra ID 登入自動帶入）就直接重看表格操作說明，否則從「先選姓名」開始。 */
+/* 重新顯示新手引導：清除「看過」紀錄，讓各段引導（先選姓名／行事曆／表格操作）再次出現。
+   已選好姓名（含 Entra ID 登入自動帶入）就從行事曆引導（無行事曆鈕則表格操作）重看，
+   否則從「先選姓名」開始。 */
 function resetOnboarding() {
   localStorage.removeItem('surveyOnboarded');
   localStorage.removeItem('surveyGridOnboarded');
+  localStorage.removeItem('surveyCalOnboarded');
   if (readOnly) return toast(I18N.t('sv.onbClosedRo'));
   if ($('main').style.display === 'none') return toast(I18N.t('sv.onbNotLoaded'));
   if (entraLocked && !whoValue) return toast(I18N.t('sv.onbNotInvited'));
-  if (whoValue) maybeShowGridOnboarding();
+  if (whoValue) maybeShowCalOnboarding();
   else startOnboarding();
   toast(I18N.t('sv.onbReset'));
 }
@@ -1102,7 +1173,7 @@ async function loadMyResponse() {
         toast(readOnly ? I18N.t('sv.prevLoadedRo') : I18N.t('sv.prevLoaded'));
       }
     }
-    maybeShowGridOnboarding();
+    maybeShowCalOnboarding();
   }
   refreshAll();
   refreshCopyButtons();
@@ -1148,6 +1219,7 @@ let busyMap = {};   // "yyyy-MM-ddTHH:mm" -> [{ subject, organizer }]，同意�
    讀到的會議會覆蓋到調查期間的時段表：忙碌時段以灰色顯示、同一時段多個會議註明數量 */
 async function loadMyCalendar() {
   const btn = $('btnCal');
+  if ($('onbPopCal').style.display !== 'none') endCalOnboarding();   // 照引導按下按鈕即完成引導
   const orig = btn.textContent;
   btn.disabled = true;
   btn.textContent = I18N.t('sv.btnCalLoading');

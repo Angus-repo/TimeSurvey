@@ -209,6 +209,7 @@
     'sv.onbRightDesc': 'Click the <b>✓</b> at the top-right of an hour box to select the whole hour;<br>or click individual <b>30-minute</b> cells for finer control.',
     'sv.onbRightDescHtml': 'Click the <b>✓</b> at the top-right of an hour box to select the whole hour;<br>or click individual <b>30-minute</b> cells for finer control.',
     'sv.onbNext': 'Next →',
+    'sv.onbCalHtml': '📅 Click "<b>Allow reading my calendar</b>" to load your existing meetings during the survey period into the grid below in gray, for easy reference while filling in.',
     'sv.ownLinkLead': 'Want to survey everyone\'s availability? ',
     'sv.ownLink': 'You can start your own meeting time survey →',
     'sv.doneTitle': '✅ Submitted! Thank you',

@@ -78,6 +78,7 @@ public class UiSteps {
             "localStorage.setItem('ownerToken', '" + OWNER + "');" +
             "localStorage.setItem('surveyOnboarded', '1');" +
             "localStorage.setItem('surveyGridOnboarded', '1');" +
+            "localStorage.setItem('surveyCalOnboarded', '1');" +
             "localStorage.setItem('meetHoursOnboarded', '1');" +
             "localStorage.setItem('dragSlotOnboarded', '1');" +
             "localStorage.setItem('dateRangeOnboarded', '1');" +
@@ -415,6 +416,7 @@ public class UiSteps {
         ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
                 "localStorage.setItem('surveyOnboarded', '1');" +
                 "localStorage.setItem('surveyGridOnboarded', '1');" +
+                "localStorage.setItem('surveyCalOnboarded', '1');" +
                 "localStorage.setItem('meetHoursOnboarded', '1');" +
                 "localStorage.setItem('dragSlotOnboarded', '1');" +
                 "localStorage.setItem('copyLinkOnboarded', '1');");
@@ -439,6 +441,71 @@ public class UiSteps {
     public void gridOnboardingShown() {
         assertThat(page.locator("#onbPopGrid")).isVisible();
         assertThat(page.locator("#onbMask")).isVisible();
+    }
+
+    @Then("表格操作引導的左半邊說明應靠近左半邊且垂直置中")
+    public void gridOnboardingLeftPopAligned() {
+        assertThat(page.locator("#onbPopGrid")).isVisible();
+        assertThat(page.locator("#onbColLeft")).isVisible();
+        var pop = page.locator("#onbPopGrid").boundingBox();
+        var leftHalf = page.locator("#gridCard th.datecell").first().boundingBox();
+        var vp = page.viewportSize();
+        double gap = pop.x - (leftHalf.x + leftHalf.width);
+        double leftHalfCenterY = leftHalf.y + leftHalf.height / 2.0;
+        double popCenterY = pop.y + pop.height / 2.0;
+        org.junit.jupiter.api.Assertions.assertTrue(gap >= 4 && gap <= 28,
+                "左半邊說明應貼近左半邊，實際間距：" + gap);
+        org.junit.jupiter.api.Assertions.assertEquals(leftHalfCenterY, popCenterY, 28,
+                "左半邊與說明應位於相同垂直中心線");
+        org.junit.jupiter.api.Assertions.assertEquals(vp.height / 2.0, leftHalfCenterY, 70,
+                "左半邊應接近畫面垂直中央");
+        org.junit.jupiter.api.Assertions.assertEquals(vp.height / 2.0, popCenterY, 70,
+                "左半邊說明應接近畫面垂直中央");
+        Boolean arrowPointsLeft = (Boolean) page.locator("#onbPopGrid").evaluate(
+                "el => el.classList.contains('at-right') && " +
+                "getComputedStyle(el, '::before').borderRightColor !== 'rgba(0, 0, 0, 0)'");
+        org.junit.jupiter.api.Assertions.assertTrue(arrowPointsLeft,
+                "左半邊說明應顯示指向左半邊的小箭頭");
+    }
+
+    @When("按下表格操作引導的按鈕")
+    public void clickGridOnboardingButton() {
+        page.click("#onbGridBtn");
+    }
+
+    /** Entra ID 登入模擬需在重建瀏覽器環境「之後」掛 route，因此與首次使用者開頁合為一步 */
+    @When("模擬已啟用 Entra ID 登入且登入者為 {string} 並以首次使用者身分開啟調查 {string} 的填寫頁")
+    public void openSurveyPageFirstTimeWithEntra(String name, String surveyName) {
+        ctx.close();
+        ctx = newUiContext();
+        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "')");
+        mockEntraSignedIn(name);
+        page = ctx.newPage();
+        page.navigate(base() + "/s/" + surveyIds.get(surveyName));
+        page.locator(".slot").first().waitFor();
+    }
+
+    @Then("應顯示同意讀取行事曆的新手引導")
+    public void calOnboardingShown() {
+        assertThat(page.locator("#onbPopCal")).isVisible();
+        assertThat(page.locator("#onbMask")).isVisible();
+    }
+
+    @When("按下行事曆引導的知道了")
+    public void clickCalOnboardingGotIt() {
+        page.click("#onbPopCal button");
+    }
+
+    @Then("行事曆引導應消失")
+    public void calOnboardingGone() {
+        // 只驗證行事曆引導泡泡消失；遮罩可能因緊接著的表格操作引導而繼續顯示
+        assertThat(page.locator("#onbPopCal")).isHidden();
+    }
+
+    @Then("表格操作引導應消失")
+    public void gridOnboardingGone() {
+        assertThat(page.locator("#onbPopGrid")).isHidden();
+        assertThat(page.locator("#onbMask")).isHidden();
     }
 
     @When("選擇姓名 {string}")
