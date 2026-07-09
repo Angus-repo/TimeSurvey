@@ -179,6 +179,17 @@ public class EntraApiController {
         return graph.calendarView(requireUser(request).userId(), start, end);
     }
 
+    /** 組織中某使用者（被邀請者）信箱設定的時區，供比較邀請者與被邀請者的時差；
+     *  查不到（權限不足、對方無信箱等）回 204，前端不顯示時差提示 */
+    @GetMapping("/api/entra/timezone")
+    public ResponseEntity<Map<String, String>> timezone(@RequestParam String userId, HttpServletRequest request) {
+        Map<String, String> tz = graph.userTimeZone(requireUser(request).userId(), userId);
+        if (tz == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(tz);
+    }
+
     /** 登入者個人資料（帳號資訊卡） */
     @GetMapping("/api/entra/profile")
     public Map<String, Object> profile(HttpServletRequest request) {

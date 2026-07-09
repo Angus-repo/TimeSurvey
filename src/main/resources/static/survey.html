@@ -106,6 +106,8 @@
   .gridwrap.readonly .copybtn { cursor: not-allowed; }   /* 調查已結束：仍可點擊，但會跓出提示並不會真的修改 */
   .closed-banner { display: flex; align-items: center; gap: 8px; background: #fff7e6; border: 1px solid #ffd591;
                    color: #ad6800; border-radius: 8px; padding: 12px 18px; margin-bottom: 16px; font-size: 14px; }
+  .tz-banner { display: flex; align-items: center; gap: 8px; background: #e8f1fd; border: 1px solid #b7d3f5;
+               color: #2c5586; border-radius: 8px; padding: 12px 18px; margin-bottom: 16px; font-size: 14px; line-height: 1.6; }
   .topbar { display: flex; gap: 10px; flex-wrap: wrap; }
   .topbtn { background: #2c7be5; color: #fff; border: none; border-radius: 6px; padding: 8px 18px;
             font-size: 14px; cursor: pointer; font-family: inherit; }
@@ -333,6 +335,7 @@
 </header>
 <div class="container" id="main" style="display:none">
   <div class="closed-banner" id="closedBanner" style="display:none" data-i18n="sv.closedBanner">📋 本調查已結束，您僅能查看先前填寫的時段，無法再修改。</div>
+  <div class="tz-banner" id="tzBanner" style="display:none"></div>
   <div class="card" id="whoCard">
     <div class="who-main">
       <label data-i18n="sv.yourName">您的姓名：</label>
@@ -655,6 +658,48 @@ function within1Month(a, b) {
   return new Date(b + 'T00:00:00') <= max;
 }
 
+/* ---------- 時區（調查時段以發起者的時區為準） ---------- */
+
+/* IANA 時區於指定時刻的 UTC 偏移（分鐘）；瀏覽器不認得該時區時回傳 null */
+function zoneOffsetMinutes(tz, at) {
+  if (!tz) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
+        .formatToParts(at || new Date());
+    const name = (parts.find(p => p.type === 'timeZoneName') || {}).value || '';
+    if (name === 'GMT' || name === 'UTC') return 0;
+    const m = name.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+    if (!m) return null;
+    return (m[1] === '-' ? -1 : 1) * ((+m[2]) * 60 + (m[3] ? +m[3] : 0));
+  } catch (e) {
+    return null;
+  }
+}
+
+/* 480 -> "UTC+8"、330 -> "UTC+5:30"、-240 -> "UTC-4" */
+function fmtUtcOffset(min) {
+  const sign = min < 0 ? '-' : '+';
+  const abs = Math.abs(min);
+  const h = Math.floor(abs / 60), m = abs % 60;
+  return 'UTC' + sign + h + (m ? ':' + String(m).padStart(2, '0') : '');
+}
+
+/* 發起者（邀請者）與填寫者的時區不同時，於頁面頂部提示調查時段以發起者的時區為準。
+   以調查起日中午的偏移比較（涵蓋日光節約時間），偏移相同就不打擾填寫者 */
+function showTimeZoneHint() {
+  if (!survey.timeZone) return;   // 舊調查沒有記錄發起者時區
+  const at = new Date(survey.startDate + 'T12:00:00');
+  const ownerOff = zoneOffsetMinutes(survey.timeZone, at);
+  let myZone = '';
+  try { myZone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+  const myOff = zoneOffsetMinutes(myZone, at);
+  if (ownerOff == null || myOff == null || ownerOff === myOff) return;
+  const el = $('tzBanner');
+  el.textContent = I18N.t('sv.tzBanner',
+      survey.timeZone, fmtUtcOffset(ownerOff), myZone, fmtUtcOffset(myOff));
+  el.style.display = '';
+}
+
 /* 該日期所屬週的週一作為分組鍵，用來判斷是否進入新的一週 */
 function weekKey(ds) {
   const dt = new Date(ds + 'T00:00:00');
@@ -675,6 +720,7 @@ async function init() {
   $('subtitle').textContent = I18N.t('sv.subtitle', fmtMd(survey.startDate), fmtMd(survey.endDate),
       survey.startTime.slice(0,5), survey.endTime.slice(0,5)) +
       (readOnly ? I18N.t('sv.subtitleClosed') : '');
+  showTimeZoneHint();   // 發起者與您的時區不同時，提示調查時段以發起者的時區為準
 
   buildWhoMenu();
   refreshWhoTrigger();

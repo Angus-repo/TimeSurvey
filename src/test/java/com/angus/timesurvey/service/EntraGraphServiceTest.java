@@ -222,6 +222,32 @@ class EntraGraphServiceTest {
     }
 
     @Test
+    void 查詢使用者時區並把Windows時區名稱轉成IANA() {
+        when(repo.findById("oid-1")).thenReturn(Optional.of(row("oid-1", "rt-1")));
+        tokenResponse = "{\"access_token\":\"at-1\",\"expires_in\":3600}";
+        graphResponse = "{\"value\":\"Taipei Standard Time\"}";
+
+        var tz = service.userTimeZone("oid-1", "target-1");
+
+        assertNotNull(tz);
+        assertEquals("Taipei Standard Time", tz.get("timeZone"));
+        assertEquals("Asia/Taipei", tz.get("iana"));
+        assertTrue(graphPaths.get(0).contains("/users/target-1/mailboxSettings/timeZone"));
+
+        service.userTimeZone("oid-1", "target-1");
+        assertEquals(1, graphPaths.size(), "同一使用者的時區應使用快取，不重複呼叫 Graph");
+    }
+
+    @Test
+    void 讀不到使用者時區時回傳null不視為錯誤() {
+        when(repo.findById("oid-1")).thenReturn(Optional.of(row("oid-1", "rt-1")));
+        tokenResponse = "{\"access_token\":\"at-1\",\"expires_in\":3600}";
+        graphStatus = 403;   // 委派權限通常只允許讀自己的信箱設定
+
+        assertNull(service.userTimeZone("oid-1", "target-1"));
+    }
+
+    @Test
     void 資料庫沒有refreshToken時視為未登入() {
         when(repo.findById("oid-x")).thenReturn(Optional.empty());
         assertThrows(NotSignedInException.class, () -> service.searchUsers("oid-x", "王小明"));

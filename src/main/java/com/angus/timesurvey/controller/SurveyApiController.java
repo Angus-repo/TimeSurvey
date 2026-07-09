@@ -134,6 +134,8 @@ public class SurveyApiController {
         // 每日時間固定 09:00~17:30，不由前端提供
         survey.setStartTime(FIXED_START_TIME);
         survey.setEndTime(FIXED_END_TIME);
+        // 發起者時區由瀏覽器帶入；無效值不擋建立，僅略過不存（填寫頁就不會提示時差）
+        survey.setTimeZone(sanitizeTimeZone(survey.getTimeZone()));
         validate(survey);
         survey.setId(UUID.randomUUID().toString());
         survey.setOwnerToken(owner);
@@ -155,6 +157,11 @@ public class SurveyApiController {
         // 每日時間固定 09:00~17:30，不由前端提供
         existing.setStartTime(FIXED_START_TIME);
         existing.setEndTime(FIXED_END_TIME);
+        // 編輯時發起者可能換了所在地：有帶有效時區就更新，沒帶（舊版前端）維持原值
+        String tz = sanitizeTimeZone(survey.getTimeZone());
+        if (tz != null) {
+            existing.setTimeZone(tz);
+        }
         existing.setParticipants(survey.getParticipants());
         existing.setExcludedDates(survey.getExcludedDates());
         existing.setAllowAddParticipant(survey.isAllowAddParticipant());
@@ -379,6 +386,16 @@ public class SurveyApiController {
             }
         }
         return saved;
+    }
+
+    /** 檢查是否為有效的 IANA 時區識別碼（例如 Asia/Taipei）；空值或無效回傳 null */
+    private static String sanitizeTimeZone(String tz) {
+        if (tz == null || tz.isBlank()) return null;
+        try {
+            return java.time.ZoneId.of(tz.trim()).getId();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** "yyyy-MM-dd" -> LocalDate；空值回傳 null，格式錯誤回 400 */

@@ -37,6 +37,11 @@ public class Survey {
     @Column(nullable = false)
     private LocalTime endTime = LocalTime.of(17, 30);
 
+    /** 發起者（邀請者）的 IANA 時區（例如 Asia/Taipei），由瀏覽器於建立時帶入；
+     *  調查時段一律以此時區為準，填寫者時區不同時填寫頁會提示。舊資料為 null */
+    @Column(length = 64)
+    private String timeZone;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "survey_participant", joinColumns = @JoinColumn(name = "survey_id"))
     @OrderColumn(name = "sort_order")
@@ -94,6 +99,9 @@ public class Survey {
 
     public LocalTime getEndTime() { return endTime; }
     public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
+
+    public String getTimeZone() { return timeZone; }
+    public void setTimeZone(String timeZone) { this.timeZone = timeZone; }
 
     public List<String> getParticipants() { return participants; }
     public void setParticipants(List<String> participants) { this.participants = participants; }

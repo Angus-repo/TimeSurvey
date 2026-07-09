@@ -161,6 +161,51 @@ public class SurveySteps {
         }
     }
 
+    @When("{string} 建立調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，時區 {string}")
+    public void createSurveyWithTimeZone(String owner, String name, String sd, String ed, String st, String et,
+                                         String participants, String timeZone) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", name);
+        body.put("startDate", sd);
+        body.put("endDate", ed);
+        body.put("startTime", st);
+        body.put("endTime", et);
+        body.put("participants", participants.isBlank() ? List.of() : Arrays.asList(participants.split(",")));
+        body.put("timeZone", timeZone);
+        last = rest.exchange("/api/surveys", HttpMethod.POST, new HttpEntity<>(body, headers(owner)), String.class);
+        if (last.getStatusCode().is2xxSuccessful()) {
+            surveyIds.put(name, json(last.getBody()).get("id").asText());
+        }
+    }
+
+    @When("{string} 以時區 {string} 更新調查 {string}")
+    public void updateSurveyTimeZone(String owner, String timeZone, String surveyName) {
+        JsonNode cur = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", cur.get("name").asText());
+        body.put("startDate", cur.get("startDate").asText());
+        body.put("endDate", cur.get("endDate").asText());
+        List<String> ps = new ArrayList<>();
+        cur.get("participants").forEach(p -> ps.add(p.asText()));
+        body.put("participants", ps);
+        body.put("timeZone", timeZone);
+        last = rest.exchange("/api/surveys/" + surveyId(surveyName), HttpMethod.PUT,
+                new HttpEntity<>(body, headers(owner)), String.class);
+    }
+
+    @Then("調查 {string} 的發起者時區應為 {string}")
+    public void timeZoneIs(String surveyName, String expected) {
+        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        assertEquals(expected, s.path("timeZone").asText(null), "發起者時區不符：" + s);
+    }
+
+    @Then("調查 {string} 應未記錄發起者時區")
+    public void timeZoneAbsent(String surveyName) {
+        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        assertTrue(s.path("timeZone").isNull() || s.path("timeZone").isMissingNode(),
+                "無效時區不應被儲存：" + s);
+    }
+
     @Then("調查 {string} 的挖空日期應包含 {string}")
     public void excludedContains(String surveyName, String date) {
         JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
@@ -431,6 +476,11 @@ public class SurveySteps {
     @When("未登入時查詢姓名建議")
     public void queryEntraSuggestWithoutLogin() {
         last = rest.getForEntity("/api/entra/suggest?name=an", String.class);
+    }
+
+    @When("未登入時查詢使用者時區")
+    public void queryEntraTimezoneWithoutLogin() {
+        last = rest.getForEntity("/api/entra/timezone?userId=some-user-id", String.class);
     }
 
     /* ---------- 共用斷言 ---------- */

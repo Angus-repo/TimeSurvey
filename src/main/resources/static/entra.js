@@ -17,6 +17,7 @@
  *   Entra.attachSuggest(input, onPick)  把人名建議下拉掛到輸入框（輸入 2 個字以上顯示）
  *   Entra.verifyName(name)          查組織 + 同名多筆時彈出選擇視窗，回傳
  *                                   { status: 'disabled'|'ok'|'notfound'|'cancelled', user }
+ *   Entra.userTimeZone(userId)      查某使用者信箱設定的時區，回傳 { timeZone, iana } 或 null
  *   Entra.myCalendar(startIso, endIso)  讀取登入者行事曆，回傳事件陣列
  */
 window.Entra = (function () {
@@ -531,6 +532,23 @@ window.Entra = (function () {
     return picked ? { status: 'ok', user: picked } : { status: 'cancelled' };
   }
 
+  /* 各使用者信箱時區的快取（null 也快取：查過但取不到就不再重查） */
+  const tzCache = {};
+
+  /* 查某使用者（Graph 使用者 id）信箱設定的時區，回傳 { timeZone, iana } 或 null。
+     查不到（後端回 204：權限不足、對方無信箱等）與查詢失敗都回 null，不打擾使用者 */
+  async function userTimeZone(userId) {
+    if (!userId) return null;
+    if (userId in tzCache) return tzCache[userId];
+    let tz = null;
+    try {
+      const res = await fetch('/api/entra/timezone?userId=' + encodeURIComponent(userId));
+      if (res.status === 200) tz = await res.json();
+    } catch (e) { /* 時區僅是輔助資訊，查不到就略過 */ }
+    tzCache[userId] = tz;
+    return tz;
+  }
+
   /* 讀取登入者行事曆。startIso / endIso 形如 "2026-07-06T00:00:00"；
      回傳事件陣列（時間為台北時區），每筆含 subject、organizer、start、end */
   async function myCalendar(startIso, endIso) {
@@ -552,6 +570,7 @@ window.Entra = (function () {
     suggestUsers,
     attachSuggest,
     verifyName,
+    userTimeZone,
     myCalendar
   };
 })();

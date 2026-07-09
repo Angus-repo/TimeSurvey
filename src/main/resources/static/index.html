@@ -119,6 +119,8 @@
           transition: background .15s, border-color .15s; }
   .ptag:hover { border-color: #00a884; }
   .ptag .note { color: #999; margin-left: 2px; }
+  .ptag .tz { display: inline-flex; align-items: center; gap: 3px; background: #fff3cd; border: 1px solid #ffe08a;
+              color: #8a6d1a; border-radius: 10px; padding: 0 8px; font-size: 12px; line-height: 18px; cursor: help; }
   .ptag .x { color: #999; font-weight: 700; line-height: 1; cursor: pointer; }
   .ptag .x:hover { color: #e74c3c; }
   /* Entra ID 組織目錄檢查：查無此人／同名未指定的名牌以粉紅底警示 */
@@ -971,6 +973,68 @@ let plist = [];   // 人員名單
 let pNotes = {};  // 名單中每位人員的來源說明（例如「由 X 邀請加入」），只讀，由後端經邀請/換員紀錄
 let pVerify = {}; // 姓名 -> { status: 'checking'|'ok'|'notfound'|'cancelled', user }（僅啟用 Entra ID 時使用）
 
+/* ---------- 時區工具（比較邀請者與被邀請者的時差） ---------- */
+
+/* 目前瀏覽器（邀請者）的 IANA 時區 */
+function myTimeZone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; }
+}
+
+/* IANA 時區於指定時刻的 UTC 偏移（分鐘）；瀏覽器不認得該時區時回傳 null */
+function zoneOffsetMinutes(tz, at) {
+  if (!tz) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
+        .formatToParts(at || new Date());
+    const name = (parts.find(p => p.type === 'timeZoneName') || {}).value || '';
+    if (name === 'GMT' || name === 'UTC') return 0;
+    const m = name.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+    if (!m) return null;
+    return (m[1] === '-' ? -1 : 1) * ((+m[2]) * 60 + (m[3] ? +m[3] : 0));
+  } catch (e) {
+    return null;
+  }
+}
+
+/* 480 -> "UTC+8"、330 -> "UTC+5:30"、-240 -> "UTC-4" */
+function fmtUtcOffset(min) {
+  const sign = min < 0 ? '-' : '+';
+  const abs = Math.abs(min);
+  const h = Math.floor(abs / 60), m = abs % 60;
+  return 'UTC' + sign + h + (m ? ':' + String(m).padStart(2, '0') : '');
+}
+
+/* 名牌上的時區差異徽章：被邀請者信箱設定的時區與邀請者（您）不同時，
+   顯示對方的 UTC 偏移；滑鼠移上徽章顯示完整的時區資訊與時差 */
+function tzBadgeEl(name) {
+  const v = pVerify[name];
+  const tz = v && v.status === 'ok' && v.tz;
+  if (!tz || !tz.iana) return null;
+  const myZone = myTimeZone();
+  const myOff = zoneOffsetMinutes(myZone);
+  const theirOff = zoneOffsetMinutes(tz.iana);
+  if (myOff == null || theirOff == null || myOff === theirOff) return null;
+  const el = document.createElement('span');
+  el.className = 'tz';
+  el.textContent = '🌐 ' + fmtUtcOffset(theirOff);
+  const diff = (theirOff - myOff) / 60;
+  const diffTxt = (diff > 0 ? '+' : '') + (Math.round(diff * 10) / 10);
+  const theirZone = tz.timeZone + (tz.iana !== tz.timeZone ? '（' + tz.iana + '）' : '');
+  el.title = I18N.t('idx.tzInfoTitle', name, theirZone, fmtUtcOffset(theirOff),
+      myZone, fmtUtcOffset(myOff), diffTxt);
+  return el;
+}
+
+/* 背景查被邀請者信箱設定的時區（僅啟用 Entra ID 時；查不到就不顯示徽章） */
+async function fetchUserTz(name, userId) {
+  if (!userId) return;
+  const tz = await Entra.userTimeZone(userId);
+  const v = pVerify[name];
+  if (!tz || !v || v.status !== 'ok' || !plist.includes(name)) return;
+  v.tz = tz;
+  renderTags();
+}
+
 /* 名牌上的組織目錄檢查結果：姓名正確維持原本顏色且不顯示文字（滑上可看 email），
    查無此人／同名未指定則以粉紅底警示 */
 function verifyNoteEl(tag, name) {
@@ -1009,6 +1073,8 @@ async function verifyNames(names) {
       if (r.status === 'disabled') { delete pVerify[name]; return; }
       pVerify[name] = r;
       if (r.status === 'notfound') toast(I18N.t('idx.verifyNotFoundTitle', name));
+      // 通過組織檢查後，背景查對方的時區；與您不同時名牌會出現時差徽章
+      if (r.status === 'ok' && r.user && r.user.id) fetchUserTz(name, r.user.id);
     } catch (e) {
       delete pVerify[name];   // 查詢失敗（網路、權限等）不擋操作，僅不顯示檢查結果
     }
@@ -1034,6 +1100,8 @@ function renderTags() {
     }
     const vEl = verifyNoteEl(tag, name);
     if (vEl) label.appendChild(vEl);
+    const tzEl = tzBadgeEl(name);
+    if (tzEl) label.appendChild(tzEl);
     const x = document.createElement('span');
     x.className = 'x';
     x.textContent = '×';
@@ -1110,6 +1178,7 @@ if (window.Entra) Entra.ready.then(on => {
   Entra.attachSuggest($('pInput'), u => {
     pVerify[u.displayName] = { status: 'ok', user: u };   // 建議來自組織目錄，免再查一次
     addNames(u.displayName);
+    fetchUserTz(u.displayName, u.id);   // 背景查對方的時區，與您不同時名牌會出現時差徽章
     $('pInput').value = '';
     $('pInput').focus();
   });
@@ -1127,7 +1196,9 @@ function readForm() {
     excludedDates: [...calExcluded].sort(),
     participants: [...plist],
     allowAddParticipant: $('fAllowAdd').checked,
-    allowReplaceParticipant: $('fAllowSwap').checked
+    allowReplaceParticipant: $('fAllowSwap').checked,
+    // 發起者（邀請者）的時區：調查時段以此為準，填寫者時區不同時填寫頁會提示
+    timeZone: myTimeZone()
   };
 }
 

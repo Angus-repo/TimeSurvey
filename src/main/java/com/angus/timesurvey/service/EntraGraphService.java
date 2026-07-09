@@ -56,8 +56,9 @@ public class EntraGraphService {
     public record SignedInUser(String userId, String displayName, String username)
             implements java.io.Serializable {}
 
-    /** 登入時請求的權限：offline_access 才拿得到 refresh token */
-    static final String SCOPES = "openid profile email offline_access User.Read User.ReadBasic.All Calendars.Read";
+    /** 登入時請求的權限：offline_access 才拿得到 refresh token；
+     *  MailboxSettings.Read 用於讀取信箱設定的時區（比較邀請者與被邀請者的時差） */
+    static final String SCOPES = "openid profile email offline_access User.Read User.ReadBasic.All Calendars.Read MailboxSettings.Read";
 
     private static final Logger log = LoggerFactory.getLogger(EntraGraphService.class);
 
@@ -276,6 +277,37 @@ public class EntraGraphService {
             }
             String next = d.path("@odata.nextLink").asText("");
             path = next.isEmpty() ? null : next.replace(graphBase, "");
+        }
+        return out;
+    }
+
+    /** 各使用者信箱時區的快取（key＝Graph 使用者 id；空字串＝查過但取不到，避免重複呼叫 Graph） */
+    private final Map<String, String> mailboxTzCache = new ConcurrentHashMap<>();
+
+    /** 查詢組織中某使用者信箱設定的時區，回傳 {@code {timeZone, iana}}（iana 查無對應時省略）。
+     *  Graph 回傳的多為 Windows 時區名稱（例如 "Taipei Standard Time"），一併轉成 IANA
+     *  識別碼供前端計算時差。委派權限的租戶原則可能僅允許讀取登入者自己的信箱設定，
+     *  讀不到（權限不足、對方無 Exchange 信箱等）回傳 null、不視為錯誤 */
+    public Map<String, String> userTimeZone(String userId, String targetUserId) {
+        String raw = mailboxTzCache.get(targetUserId);
+        if (raw == null) {
+            try {
+                JsonNode d = graphGet(userId, "/users/" + enc(targetUserId) + "/mailboxSettings/timeZone", null);
+                raw = d.path("value").asText("");
+            } catch (GraphException e) {
+                log.debug("[Entra] 讀取使用者 {} 的信箱時區失敗：{}", targetUserId, e.getMessage());
+                raw = "";
+            }
+            mailboxTzCache.put(targetUserId, raw);
+        }
+        if (raw.isEmpty()) {
+            return null;
+        }
+        Map<String, String> out = new LinkedHashMap<>();
+        out.put("timeZone", raw);
+        String iana = WindowsTimeZones.toIana(raw);
+        if (iana != null) {
+            out.put("iana", iana);
         }
         return out;
     }

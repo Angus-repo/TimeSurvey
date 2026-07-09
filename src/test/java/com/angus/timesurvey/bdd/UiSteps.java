@@ -73,17 +73,30 @@ public class UiSteps {
         return sharedBrowser().newContext(new Browser.NewContextOptions().setLocale("zh-TW"));
     }
 
+    /** 預設視為已看過新手引導，避免遮罩擋住一般場景；引導本身由專屬場景測試 */
+    private static final String INIT_SCRIPT =
+            "localStorage.setItem('ownerToken', '" + OWNER + "');" +
+            "localStorage.setItem('surveyOnboarded', '1');" +
+            "localStorage.setItem('surveyGridOnboarded', '1');" +
+            "localStorage.setItem('meetHoursOnboarded', '1');" +
+            "localStorage.setItem('dragSlotOnboarded', '1');" +
+            "localStorage.setItem('dateRangeOnboarded', '1');" +
+            "localStorage.setItem('copyLinkOnboarded', '1');";
+
     @Before("@ui")
     public void openBrowserContext() {
         ctx = newUiContext();
-        // 預設視為已看過新手引導，避免遮罩擋住一般場景；引導本身由專屬場景測試
-        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
-                "localStorage.setItem('surveyOnboarded', '1');" +
-                "localStorage.setItem('surveyGridOnboarded', '1');" +
-                "localStorage.setItem('meetHoursOnboarded', '1');" +
-                "localStorage.setItem('dragSlotOnboarded', '1');" +
-                "localStorage.setItem('dateRangeOnboarded', '1');" +
-                "localStorage.setItem('copyLinkOnboarded', '1');");
+        ctx.addInitScript(INIT_SCRIPT);
+        page = ctx.newPage();
+    }
+
+    /** 重建瀏覽器環境並固定時區，讓時區相關場景不受測試機器所在時區影響（需在開啟頁面前使用） */
+    @Given("瀏覽器時區為 {string}")
+    public void browserTimeZone(String tz) {
+        ctx.close();
+        ctx = sharedBrowser().newContext(new Browser.NewContextOptions()
+                .setLocale("zh-TW").setTimezoneId(tz));
+        ctx.addInitScript(INIT_SCRIPT);
         page = ctx.newPage();
     }
 
@@ -326,6 +339,15 @@ public class UiSteps {
         s.setCreatedAt(LocalDateTime.now());
         surveyRepo.save(s);
         surveyIds.put(name, s.getId());
+    }
+
+    @Given("存在調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，發起者時區 {string}")
+    public void surveyExistsWithTimeZone(String name, String startDate, String endDate,
+                                         String startTime, String endTime, String people, String timeZone) {
+        surveyExists(name, startDate, endDate, startTime, endTime, people);
+        Survey s = surveyRepo.findById(surveyIds.get(name)).orElseThrow();
+        s.setTimeZone(timeZone);
+        surveyRepo.save(s);
     }
 
     @Given("存在調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，允許成員加寄")
@@ -658,6 +680,17 @@ public class UiSteps {
         assertThat(page.locator("#closedBanner")).containsText("已結束");
     }
 
+    @Then("應顯示發起者時區的提示橫幅，內容包含 {string}")
+    public void tzBannerShown(String text) {
+        assertThat(page.locator("#tzBanner")).isVisible();
+        assertThat(page.locator("#tzBanner")).containsText(text);
+    }
+
+    @Then("不應顯示發起者時區的提示橫幅")
+    public void tzBannerHidden() {
+        assertThat(page.locator("#tzBanner")).isHidden();
+    }
+
     @Then("填寫頁不應顯示帶入行事曆按鈕")
     public void calendarButtonHidden() {
         assertThat(page.locator("#btnCal")).isHidden();
@@ -693,6 +726,79 @@ public class UiSteps {
                 .setBody("{\"displayName\":\"" + name + "\",\"username\":\"" + name + "@test.local\"}")));
         ctx.route("**/api/entra/photo", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
                 .setStatus(404)));
+    }
+
+    /* ---------- Entra ID 時區模擬（後台維護頁名牌的時差徽章） ---------- */
+
+    /** 模擬的組織目錄使用者：姓名 → Graph 使用者 id；id → [Windows 時區名稱, IANA 識別碼] */
+    private final Map<String, String> entraTzUserIds = new HashMap<>();
+    private final Map<String, String[]> entraTzByUserId = new HashMap<>();
+
+    /** 以 route 攔截模擬「組織目錄查得到此人（含 Graph 使用者 id）且其信箱時區為指定值」：
+     *  名牌的時差徽章需先通過組織檢查（/users 回傳 id）再查時區（/timezone） */
+    @Given("模擬組織目錄中 {string} 的信箱時區為 {string}，IANA 為 {string}")
+    public void mockEntraUserTimeZone(String name, String windowsTz, String iana) {
+        if (entraTzUserIds.isEmpty()) {
+            // 首次呼叫才掛 route。人名建議回空陣列，避免建議下拉干擾名牌輸入流程
+            ctx.route("**/api/entra/suggest*", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+                    .setStatus(200).setContentType("application/json").setBody("[]")));
+            // 組織目錄精確查詢：回傳含 Graph 使用者 id 的單筆結果（前端需以 id 查時區）
+            ctx.route("**/api/entra/users*", r -> {
+                String q = java.net.URLDecoder.decode(
+                        r.request().url().replaceAll(".*[?&]name=([^&]*).*", "$1"),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                String id = entraTzUserIds.get(q);
+                r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+                        .setStatus(200).setContentType("application/json")
+                        .setBody(id == null ? "[]"
+                                : "[{\"id\":\"" + id + "\",\"displayName\":\"" + q + "\",\"mail\":\"" + id + "@test.local\"}]"));
+            });
+            // 信箱時區查詢：依 userId 回傳 Windows 時區名稱與對應的 IANA 識別碼
+            ctx.route("**/api/entra/timezone*", r -> {
+                String uid = r.request().url().replaceAll(".*[?&]userId=([^&]*).*", "$1");
+                String[] tz = entraTzByUserId.get(uid);
+                if (tz == null) {
+                    r.fulfill(new com.microsoft.playwright.Route.FulfillOptions().setStatus(204));
+                } else {
+                    r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+                            .setStatus(200).setContentType("application/json")
+                            .setBody("{\"timeZone\":\"" + tz[0] + "\",\"iana\":\"" + tz[1] + "\"}"));
+                }
+            });
+        }
+        String id = "tz-user-" + (entraTzUserIds.size() + 1);
+        entraTzUserIds.put(name, id);
+        entraTzByUserId.put(id, new String[]{windowsTz, iana});
+    }
+
+    /** 依姓名取得受調查人員名牌 */
+    private com.microsoft.playwright.Locator participantTag(String name) {
+        return page.locator("#pTags .ptag")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(name));
+    }
+
+    @Then("受調查人員名牌 {string} 應顯示時差徽章 {string}")
+    public void tagShowsTzBadge(String name, String badgeText) {
+        var badge = participantTag(name).locator(".tz");
+        assertThat(badge).isVisible();
+        assertThat(badge).containsText(badgeText);
+    }
+
+    @Then("受調查人員名牌 {string} 的時差徽章滑上說明應包含 {string}")
+    public void tzBadgeTitleContains(String name, String expected) {
+        var badge = participantTag(name).locator(".tz");
+        badge.hover();   // 完整時區資訊放在 title（原生 tooltip），滑上後驗證其內容
+        String title = badge.getAttribute("title");
+        org.junit.jupiter.api.Assertions.assertTrue(title != null && title.contains(expected),
+                "時差徽章滑上說明應包含「" + expected + "」，實際為：" + title);
+    }
+
+    @Then("受調查人員名牌 {string} 不應顯示時差徽章")
+    public void tagNoTzBadge(String name) {
+        var tag = participantTag(name);
+        // 先等組織檢查完成（檢查中名牌會顯示「查詢組織中」），再確認沒有時差徽章
+        assertThat(tag).not().containsText("查詢組織中");
+        assertThat(tag.locator(".tz")).hasCount(0);
     }
 
     @Then("姓名應自動帶入 {string} 且不開放自行選擇")
