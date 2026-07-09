@@ -9,6 +9,7 @@ import com.angus.timesurvey.repo.SurveyVisitRepository;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
+import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
 import io.cucumber.java.After;
@@ -443,29 +444,62 @@ public class UiSteps {
         assertThat(page.locator("#onbMask")).isVisible();
     }
 
-    @Then("表格操作引導的左半邊說明應靠近左半邊且垂直置中")
-    public void gridOnboardingLeftPopAligned() {
+    @Then("表格操作引導的左半段應完整顯示在畫面上")
+    public void gridOnboardingLeftFullyVisible() {
         assertThat(page.locator("#onbPopGrid")).isVisible();
         assertThat(page.locator("#onbColLeft")).isVisible();
-        var pop = page.locator("#onbPopGrid").boundingBox();
-        var leftHalf = page.locator("#gridCard th.datecell").first().boundingBox();
-        var vp = page.viewportSize();
-        double gap = pop.x - (leftHalf.x + leftHalf.width);
-        double leftHalfCenterY = leftHalf.y + leftHalf.height / 2.0;
-        double popCenterY = pop.y + pop.height / 2.0;
-        org.junit.jupiter.api.Assertions.assertTrue(gap >= 4 && gap <= 28,
-                "左半邊說明應貼近左半邊，實際間距：" + gap);
-        org.junit.jupiter.api.Assertions.assertEquals(leftHalfCenterY, popCenterY, 28,
-                "左半邊與說明應位於相同垂直中心線");
-        org.junit.jupiter.api.Assertions.assertEquals(vp.height / 2.0, leftHalfCenterY, 70,
-                "左半邊應接近畫面垂直中央");
-        org.junit.jupiter.api.Assertions.assertEquals(vp.height / 2.0, popCenterY, 70,
-                "左半邊說明應接近畫面垂直中央");
+        assertInsideViewport(page.locator("#onbPopGrid"), "左半段引導泡泡");
+        assertInsideViewport(page.locator("#gridCard th.datecell").first(), "左半段快速操作區");
         Boolean arrowPointsLeft = (Boolean) page.locator("#onbPopGrid").evaluate(
                 "el => el.classList.contains('at-right') && " +
                 "getComputedStyle(el, '::before').borderRightColor !== 'rgba(0, 0, 0, 0)'");
         org.junit.jupiter.api.Assertions.assertTrue(arrowPointsLeft,
-                "左半邊說明應顯示指向左半邊的小箭頭");
+                "左半段說明應顯示指向左半段的小箭頭");
+    }
+
+    @Then("表格操作引導的右半段應完整顯示在畫面上")
+    public void gridOnboardingRightFullyVisible() {
+        assertThat(page.locator("#onbPopGrid")).isVisible();
+        assertThat(page.locator("#onbColRight")).isVisible();
+        assertInsideViewport(page.locator("#onbPopGrid"), "右半段引導泡泡");
+        assertInsideViewport(page.locator("#gridCard td.hourcell .hbox").first(), "右半段時段操作區");
+        Boolean arrowPointsRight = (Boolean) page.locator("#onbPopGrid").evaluate(
+                "el => el.classList.contains('at-left') && " +
+                "getComputedStyle(el, '::before').borderLeftColor !== 'rgba(0, 0, 0, 0)'");
+        org.junit.jupiter.api.Assertions.assertTrue(arrowPointsRight,
+                "右半段說明應顯示指向右半段的小箭頭");
+    }
+
+    @Then("表格操作引導的表格區應停在操作列下方的理想高度")
+    public void gridOnboardingCardAtIdealHeight() {
+        var box = page.locator("#gridCard").boundingBox();
+        org.junit.jupiter.api.Assertions.assertNotNull(box, "表格區應可取得位置");
+        var actionBar = page.locator("#actionBar").boundingBox();
+        if (actionBar != null) {
+            double gap = box.y - (actionBar.y + actionBar.height);
+            org.junit.jupiter.api.Assertions.assertTrue(actionBar.y >= -4,
+                    "操作列應保留在畫面上方，實際 y=" + actionBar.y);
+            org.junit.jupiter.api.Assertions.assertTrue(gap >= 8 && gap <= 36,
+                    "表格區應停在操作列下方約一個卡片間隔，實際間距=" + gap);
+        } else {
+            org.junit.jupiter.api.Assertions.assertTrue(box.y >= 56 && box.y <= 150,
+                    "沒有操作列時表格區應停在畫面上方但不貼頂，實際 y=" + box.y);
+        }
+    }
+
+    private void assertInsideViewport(Locator locator, String label) {
+        var box = locator.boundingBox();
+        org.junit.jupiter.api.Assertions.assertNotNull(box, label + "應可取得位置");
+        var vp = page.viewportSize();
+        double tolerance = 1.0;
+        org.junit.jupiter.api.Assertions.assertTrue(box.x >= -tolerance,
+                label + "左側不應超出畫面，實際 x=" + box.x);
+        org.junit.jupiter.api.Assertions.assertTrue(box.y >= -tolerance,
+                label + "上方不應超出畫面，實際 y=" + box.y);
+        org.junit.jupiter.api.Assertions.assertTrue(box.x + box.width <= vp.width + tolerance,
+                label + "右側不應超出畫面，實際 right=" + (box.x + box.width));
+        org.junit.jupiter.api.Assertions.assertTrue(box.y + box.height <= vp.height + tolerance,
+                label + "下方不應超出畫面，實際 bottom=" + (box.y + box.height));
     }
 
     @When("按下表格操作引導的按鈕")

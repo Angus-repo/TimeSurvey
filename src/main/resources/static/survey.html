@@ -270,6 +270,7 @@
   .onb-mask { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 1000; }
   #whoCard { position: relative; }
   .grid-outer { position: relative; }
+  .grid-outer.onb-grid-active { padding-bottom: 80vh; }
   .onb-spot { position: relative; z-index: 1001; animation: onbpulse 1.6s ease-in-out infinite; }
   @keyframes onbpulse {
     0%, 100% { box-shadow: 0 0 0 4px rgba(0,168,132,.95), 0 8px 30px rgba(0,0,0,.45); }
@@ -286,7 +287,7 @@
   .onb-pop button:hover { background: #008f70; }
 
   /* 表格操作說明（分兩步）：先講左半邊快速鈕／複製鈕，再講右半邊小時勾勾／30分鐘方格。
-     兩步都貼近左右半交界，箭頭指回正在說明的那一半（位置由 positionGridOnbPop 計算） */
+     兩步都把正在說明的區塊捲入可視範圍，箭頭指回正在說明的那一半（位置由 positionGridOnbPop 計算） */
   .onb-pop-grid { position: absolute; top: 20px; width: 330px; max-width: calc(100vw - 24px); z-index: 1003; }
   /* 只突顯正在說明的那一半：把「另一半」再蓋一層與引導遮罩同色的壓暗層 */
   #onbHalfDim { position: absolute; z-index: 1002; background: rgba(0,0,0,.55); pointer-events: none; }
@@ -817,6 +818,7 @@ function maybeShowGridOnboarding() {
   if (readOnly || localStorage.getItem('surveyGridOnboarded')) return;
   $('onbMask').style.display = '';
   $('onbPopGrid').style.display = '';
+  $('gridOuter').classList.add('onb-grid-active');
   $('gridCard').classList.add('onb-spot');
   setGridOnbStep(1);
 }
@@ -826,7 +828,7 @@ function setGridOnbStep(step) {
   $('onbColLeft').style.display = step === 1 ? '' : 'none';
   $('onbColRight').style.display = step === 2 ? '' : 'none';
   $('onbGridBtn').textContent = step === 1 ? I18N.t('sv.onbNext') : I18N.t('common.gotIt');
-  // 泡泡停在左右半交界旁邊：講左半邊時在右側且箭頭指左；講右半邊時在左側且箭頭指右
+  // 泡泡停在正在說明的半段旁邊：講左半邊時在右側且箭頭指左；講右半邊時在左側且箭頭指右
   $('onbPopGrid').classList.toggle('at-right', step === 1);
   $('onbPopGrid').classList.toggle('at-left', step === 2);
   centerGridOnbFocus(step);
@@ -842,12 +844,41 @@ function gridOnbFocusEl(step) {
 function centerGridOnbFocus(step) {
   const target = gridOnbFocusEl(step);
   if (!target) return;
-  const r = target.getBoundingClientRect();
-  const targetCenterY = window.scrollY + r.top + r.height / 2;
-  window.scrollTo({ top: Math.max(0, targetCenterY - window.innerHeight / 2), behavior: 'auto' });
+  const grid = $('gridCard');
+  const pad = 16;
+  if (grid) {
+    if (step === 1) {
+      grid.scrollLeft = 0;
+    } else {
+      const gridRect = grid.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      let nextLeft = grid.scrollLeft;
+      if (targetRect.left < gridRect.left + pad) {
+        nextLeft += targetRect.left - gridRect.left - pad;
+      } else if (targetRect.right > gridRect.right - pad) {
+        nextLeft += targetRect.right - gridRect.right + pad;
+      }
+      const maxLeft = Math.max(0, grid.scrollWidth - grid.clientWidth);
+      grid.scrollLeft = Math.max(0, Math.min(nextLeft, maxLeft));
+    }
+  }
+  const gridRect = (grid || target).getBoundingClientRect();
+  const targetTop = gridOnbTargetTop();
+  const maxTop = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+  const top = Math.max(0, Math.min(window.scrollY + gridRect.top - targetTop, maxTop));
+  window.scrollTo({ top, behavior: 'auto' });
 }
 
-/* 視窗貼近左右半交界：講左半邊時放在交界右側，講右半邊時放在交界左側，放不下時夾回容器內。
+function gridOnbTargetTop() {
+  const actionBar = $('actionBar');
+  if (actionBar && actionBar.style.display !== 'none') {
+    const h = actionBar.getBoundingClientRect().height;
+    return Math.min(h + 44, Math.max(140, window.innerHeight * 0.22));
+  }
+  return Math.max(72, Math.min(128, window.innerHeight * 0.14));
+}
+
+/* 視窗貼近左右半段：講左半邊時放在日期欄右側，講右半邊時放在時段欄左側，放不下時夾回畫面內。
    同時把「另一半」蓋上壓暗層（#onbHalfDim），讓突顯只落在正在說明的那一半 */
 function positionGridOnbPop(step) {
   const pop = $('onbPopGrid');
@@ -855,45 +886,49 @@ function positionGridOnbPop(step) {
   if (!datecell) return;
   const outerEl = $('gridOuter');
   const outer = outerEl.getBoundingClientRect();
-  const split = datecell.getBoundingClientRect().right - outer.left;   // 交界的 x 座標
-  if (step === 1) {
-    const gap = 12;                                                    // 留給箭頭的空隙
-    let left = split + gap;
-    left = Math.max(14, Math.min(left, outer.width - pop.offsetWidth - 14));
-    pop.style.left = left + 'px';
-    pop.style.right = 'auto';
-  } else {
-    const gap = 12;
-    let left = split - gap - pop.offsetWidth;
-    left = Math.max(14, Math.min(left, outer.width - pop.offsetWidth - 14));
-    pop.style.left = left + 'px';
-    pop.style.right = 'auto';
-  }
-
   const focus = gridOnbFocusEl(step) || datecell;
+  const dateRect = datecell.getBoundingClientRect();
   const focusRect = focus.getBoundingClientRect();
+  const split = dateRect.right - outer.left;   // 日期欄與時段欄交界的 x 座標
+  const gap = 12;
+  const viewportPad = 12;
+  const minLeft = viewportPad - outer.left;
+  const maxLeft = window.innerWidth - outer.left - pop.offsetWidth - viewportPad;
+  const clamp = (v, min, max) => Math.max(min, Math.min(v, Math.max(min, max)));
+  let left;
+  if (step === 1) {
+    left = dateRect.right - outer.left + gap;
+  } else {
+    left = focusRect.left - outer.left - gap - pop.offsetWidth;
+  }
+  left = clamp(left, minLeft, maxLeft);
+  pop.style.left = left + 'px';
+  pop.style.right = 'auto';
+
   const focusCenter = focusRect.top + focusRect.height / 2 - outer.top;
   let top = focusCenter - pop.offsetHeight / 2;
-  const viewportTop = -outer.top + 12;
-  const viewportBottom = window.innerHeight - outer.top - pop.offsetHeight - 12;
-  if (viewportBottom >= viewportTop) top = Math.max(viewportTop, Math.min(top, viewportBottom));
-  else top = Math.max(12, top);
+  const viewportTop = viewportPad - outer.top;
+  const viewportBottom = window.innerHeight - outer.top - pop.offsetHeight - viewportPad;
+  top = clamp(top, viewportTop, viewportBottom);
   pop.style.top = top + 'px';
-  const arrowTop = Math.max(18, Math.min(focusCenter - top, pop.offsetHeight - 18));
+  const arrowTop = clamp(focusCenter - top, 18, pop.offsetHeight - 18);
   pop.style.setProperty('--grid-arrow-top', arrowTop + 'px');
 
   // 壓暗「另一半」：講左半邊時暗右半、講右半邊時暗左半（圓角只留在卡片外側）
   const dim = $('onbHalfDim');
   const card = $('gridCard').getBoundingClientRect();
+  const cardLeft = card.left - outer.left;
+  const cardRight = card.right - outer.left;
+  const visibleSplit = clamp(split, cardLeft, cardRight);
   dim.style.top = (card.top - outer.top) + 'px';
   dim.style.height = card.height + 'px';
   if (step === 1) {
-    dim.style.left = split + 'px';
-    dim.style.width = (card.right - outer.left - split) + 'px';
+    dim.style.left = visibleSplit + 'px';
+    dim.style.width = Math.max(0, cardRight - visibleSplit) + 'px';
     dim.style.borderRadius = '0 8px 8px 0';
   } else {
-    dim.style.left = (card.left - outer.left) + 'px';
-    dim.style.width = (split - (card.left - outer.left)) + 'px';
+    dim.style.left = cardLeft + 'px';
+    dim.style.width = Math.max(0, visibleSplit - cardLeft) + 'px';
     dim.style.borderRadius = '8px 0 0 8px';
   }
   dim.style.display = '';
@@ -915,6 +950,7 @@ function endGridOnboarding() {
   $('onbMask').style.display = 'none';
   $('onbPopGrid').style.display = 'none';
   $('onbHalfDim').style.display = 'none';
+  $('gridOuter').classList.remove('onb-grid-active');
   $('gridCard').classList.remove('onb-spot');
 }
 
