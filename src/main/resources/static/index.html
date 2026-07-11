@@ -484,6 +484,7 @@
 <script src="/i18n/zh-TW.js"></script>
 <script src="/i18n/en.js"></script>
 <script src="/i18n.js"></script>
+<script src="/common.js"></script>
 <script src="/date-range-calendar.js"></script>
 <script src="/entra.js"></script>
 <script>
@@ -547,17 +548,6 @@ const ICONS = {
   teams: '<svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>'
 };
 
-/* "2026-06-10" -> "2026/6/10" */
-function fmtYmd(d) {
-  const [y, m, dd] = d.split('-');
-  return y + '/' + (+m) + '/' + (+dd);
-}
-/* "2026-06-10" -> "6/10" */
-function fmtMd(d) {
-  const [, m, dd] = d.split('-');
-  return (+m) + '/' + (+dd);
-}
-
 /* 自動刪除倒數提示：housekeeping 批次會在「迄日經過 7 天」後刪除調查 */
 function deleteHint(s) {
   const del = new Date(s.endDate + 'T00:00:00');
@@ -569,10 +559,13 @@ function deleteHint(s) {
 }
 
 async function loadSurveys() {
-  surveys = await api('/api/surveys');
-  // 一次取得各調查的填寫狀況（surveyId -> { done, hasCommonSlot }），避免對每筆調查各發一次請求
-  // （原本的 N+1 會隨調查數增加而變慢，是後台操作偶發卡頓的主因之一）
-  const statusMap = await api('/api/surveys/response-counts').catch(() => ({}));
+  // 清單與填寫狀況（surveyId -> { done, hasCommonSlot }）各一次請求就撈齊且並行發出，
+  // 避免對每筆調查各發一次請求（原本的 N+1 會隨調查數增加而變慢，是後台操作偶發卡頓的主因之一）
+  let statusMap;
+  [surveys, statusMap] = await Promise.all([
+    api('/api/surveys'),
+    api('/api/surveys/response-counts').catch(() => ({}))
+  ]);
   const tbody = $('surveyList');
   tbody.innerHTML = '';
   if (surveys.length === 0) {
@@ -609,10 +602,6 @@ async function loadSurveys() {
     tbody.appendChild(tr);
   });
   if (linkOnbSid) spotLinkBtn();   // 清單重繪會洗掉打亮效果，引導進行中就重新套上
-}
-
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 /* 調查清單「共同時段」欄位：只顯示符號，滑鼠移上才顯示說明文字（自製提示，不用原生 title 的延遲）。
@@ -760,37 +749,12 @@ async function teamsShare(id) {
 function copyLink(id) {
   if (linkOnbSid) endLinkOnb();   // 照著引導按下複製，代表已學會，結束引導
   const url = surveyUrl(id);
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(url).then(() => toast(I18N.t('idx.linkCopied', url)));
-  } else {
-    const ta = document.createElement('textarea');
-    ta.value = url;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    toast(I18N.t('idx.linkCopied', url));
-  }
-}
-
-/* Date -> "yyyy-MM-dd" */
-function ymd(d) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  copyText(url, () => toast(I18N.t('idx.linkCopied', url)));
 }
 
 /* ---------- Agoda 風格的日期範圍選擇日曆 ---------- */
 let calStart = null, calEnd = null;        // 起日 / 迄日，皆為 "yyyy-MM-dd" 或 null
 let calExcluded = new Set();               // 範圍內被挖空（不調查）的日期
-
-function todayYmd() { const d = new Date(); d.setHours(0, 0, 0, 0); return ymd(d); }
-function isWeekend(s) { const g = new Date(s + 'T00:00:00').getDay(); return g === 0 || g === 6; }
-
-/* 起日 a 到迄日 b 的跨度是否在一個月內 */
-function within1Month(a, b) {
-  const sd = new Date(a + 'T00:00:00');
-  const max = new Date(sd); max.setMonth(max.getMonth() + 1);
-  return new Date(b + 'T00:00:00') <= max;
-}
 
 /* 把日曆狀態同步到隱藏欄位，供 readForm / saveSurvey 使用 */
 function syncCalInputs() {
@@ -798,9 +762,6 @@ function syncCalInputs() {
   $('fEndDate').value = calEnd || calStart || '';   // 只選了起日時當作單日調查
   updateCalTrigger();
 }
-
-/* "2026-06-15" -> "06/15" */
-function md2(ds) { return fmtMd(ds); }
 
 /* 日期範圍旁的「跳過幾天不調查」提示徽章（只顯示符號，滑鼠移上才顯示被跳過的日期） */
 function excludedBadgeHtml(excludedDates) {
@@ -821,7 +782,7 @@ function updateCalTrigger() {
     if (t) t.classList.add('empty');
   } else {
     const end = calEnd || calStart;
-    const html = esc(md2(calStart) + '～' + md2(end)) + excludedBadgeHtml([...calExcluded]);
+    const html = esc(fmtMd(calStart) + '～' + fmtMd(end)) + excludedBadgeHtml([...calExcluded]);
     el.innerHTML = html;
     if (t) t.classList.remove('empty');
   }
@@ -973,36 +934,7 @@ let plist = [];   // 人員名單
 let pNotes = {};  // 名單中每位人員的來源說明（例如「由 X 邀請加入」），只讀，由後端經邀請/換員紀錄
 let pVerify = {}; // 姓名 -> { status: 'checking'|'ok'|'notfound'|'cancelled', user }（僅啟用 Entra ID 時使用）
 
-/* ---------- 時區工具（比較邀請者與被邀請者的時差） ---------- */
-
-/* 目前瀏覽器（邀請者）的 IANA 時區 */
-function myTimeZone() {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { return ''; }
-}
-
-/* IANA 時區於指定時刻的 UTC 偏移（分鐘）；瀏覽器不認得該時區時回傳 null */
-function zoneOffsetMinutes(tz, at) {
-  if (!tz) return null;
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
-        .formatToParts(at || new Date());
-    const name = (parts.find(p => p.type === 'timeZoneName') || {}).value || '';
-    if (name === 'GMT' || name === 'UTC') return 0;
-    const m = name.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
-    if (!m) return null;
-    return (m[1] === '-' ? -1 : 1) * ((+m[2]) * 60 + (m[3] ? +m[3] : 0));
-  } catch (e) {
-    return null;
-  }
-}
-
-/* 480 -> "UTC+8"、330 -> "UTC+5:30"、-240 -> "UTC-4" */
-function fmtUtcOffset(min) {
-  const sign = min < 0 ? '-' : '+';
-  const abs = Math.abs(min);
-  const h = Math.floor(abs / 60), m = abs % 60;
-  return 'UTC' + sign + h + (m ? ':' + String(m).padStart(2, '0') : '');
-}
+/* ---------- 時區工具（比較邀請者與被邀請者的時差；函式在 common.js） ---------- */
 
 /* 名牌上的時區差異徽章：被邀請者信箱設定的時區與邀請者（您）不同時，
    顯示對方的 UTC 偏移；滑鼠移上徽章顯示完整的時區資訊與時差 */
@@ -1143,18 +1075,7 @@ function commitPInput() {
 
 function copyParticipants() {
   if (plist.length === 0) return toast(I18N.t('idx.emptyList'));
-  const text = plist.join(';');
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(text).then(() => toast(I18N.t('idx.namesCopied', plist.length)));
-  } else {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    toast(I18N.t('idx.namesCopied', plist.length));
-  }
+  copyText(plist.join(';'), () => toast(I18N.t('idx.namesCopied', plist.length)));
 }
 
 $('pInput').addEventListener('keydown', e => {
@@ -1346,36 +1267,6 @@ async function reopenSurvey(id) {
 }
 
 /* ---------- 結果檢視 ---------- */
-function dateList(start, end, excluded) {
-  const ex = new Set(excluded || []);
-  const out = [];
-  let d = new Date(start + 'T00:00:00');
-  const e = new Date(end + 'T00:00:00');
-  while (d <= e) {
-    const ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    // 跳過週六(6)、週日(0) 與被挖空的日期
-    if (d.getDay() !== 0 && d.getDay() !== 6 && !ex.has(ds)) {
-      out.push(ds);
-    }
-    d.setDate(d.getDate() + 1);
-  }
-  return out;
-}
-
-function timeSlots(startTime, endTime) {
-  const out = [];
-  let [h, m] = startTime.slice(0,5).split(':').map(Number);
-  const [eh, em] = endTime.slice(0,5).split(':').map(Number);
-  while (h * 60 + m < eh * 60 + em) {
-    const t = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
-    // 12:00~13:00 為午休，不列入調查時段
-    if (t < '12:00' || t >= '13:00') out.push(t);
-    m += 30;
-    if (m >= 60) { m -= 60; h++; }
-  }
-  return out;
-}
-
 let detailOpen = false;   // 調查明細表預設隱藏
 
 async function showResult(id) {
@@ -1611,20 +1502,12 @@ function computeBestPartialWindows(ps, sets, dates, times, need) {
   return { best, bestCount };
 }
 
-/* "10:30" + 30分 -> "11:00" */
-function plus30(t) {
-  let h = +t.slice(0,2), m = +t.slice(3,5) + 30;
-  if (m >= 60) { m -= 60; h++; }
-  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
-}
-
 /* ---------- 產生會通（Outlook 網頁版） ---------- */
 /* 由按鈕的 data-date / data-from 取得會議起迄：自區塊開頭起算「會議時間」長度 */
 function meetingRange(el) {
   const date = el.dataset.date, from = el.dataset.from;
   const meetHours = parseFloat($('meetHours').value) || 1;
-  let end = from;
-  for (let i = 0; i < Math.max(1, Math.round(meetHours * 2)); i++) end = plus30(end);
+  const end = addSlots(from, Math.max(1, Math.round(meetHours * 2)));
   return { date, from, end };
 }
 
@@ -1828,13 +1711,6 @@ function renderResult() {
   html += '</div>';
   $('resultArea').innerHTML = html;
   initTimeBars();
-}
-
-/* "09:00" + n 個 30 分鐘格 -> 之後的時刻 */
-function addSlots(t, n) {
-  let r = t;
-  for (let i = 0; i < n; i++) r = plus30(r);
-  return r;
 }
 
 /* ---------- 調查結論：可拖曳會議時段的時間軸 ---------- */

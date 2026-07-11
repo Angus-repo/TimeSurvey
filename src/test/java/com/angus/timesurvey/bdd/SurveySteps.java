@@ -111,8 +111,8 @@ public class SurveySteps {
 
     /* ---------- 建立 / 編輯 / 清單 ---------- */
 
-    @When("{string} 建立調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}")
-    public void createSurvey(String owner, String name, String sd, String ed, String st, String et, String participants) {
+    /** 建立調查的共同欄位；各建立步驟再補上自己的額外欄位 */
+    private Map<String, Object> surveyBody(String name, String sd, String ed, String st, String et, String participants) {
         Map<String, Object> body = new HashMap<>();
         body.put("name", name);
         body.put("startDate", sd);
@@ -120,67 +120,55 @@ public class SurveySteps {
         body.put("startTime", st);
         body.put("endTime", et);
         body.put("participants", participants.isBlank() ? List.of() : Arrays.asList(participants.split(",")));
+        return body;
+    }
+
+    /** 送出建立調查請求，成功時記下調查 id 供後續步驟以名稱查找 */
+    private void postSurvey(String owner, String name, Map<String, Object> body) {
         last = rest.exchange("/api/surveys", HttpMethod.POST, new HttpEntity<>(body, headers(owner)), String.class);
         if (last.getStatusCode().is2xxSuccessful()) {
             surveyIds.put(name, json(last.getBody()).get("id").asText());
         }
+    }
+
+    /** 依名稱取得調查目前的完整 JSON */
+    private JsonNode getSurvey(String surveyName) {
+        return json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+    }
+
+    @When("{string} 建立調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}")
+    public void createSurvey(String owner, String name, String sd, String ed, String st, String et, String participants) {
+        postSurvey(owner, name, surveyBody(name, sd, ed, st, et, participants));
     }
 
     @When("{string} 建立調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，挖空日期 {string}")
     public void createSurveyWithExcluded(String owner, String name, String sd, String ed, String st, String et,
                                          String participants, String excluded) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("name", name);
-        body.put("startDate", sd);
-        body.put("endDate", ed);
-        body.put("startTime", st);
-        body.put("endTime", et);
-        body.put("participants", participants.isBlank() ? List.of() : Arrays.asList(participants.split(",")));
+        Map<String, Object> body = surveyBody(name, sd, ed, st, et, participants);
         body.put("excludedDates", excluded.isBlank() ? List.of() : Arrays.asList(excluded.split(",")));
-        last = rest.exchange("/api/surveys", HttpMethod.POST, new HttpEntity<>(body, headers(owner)), String.class);
-        if (last.getStatusCode().is2xxSuccessful()) {
-            surveyIds.put(name, json(last.getBody()).get("id").asText());
-        }
+        postSurvey(owner, name, body);
     }
 
     @When("{string} 建立調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，允許成員加寄 {string}，允許換員 {string}")
     public void createSurveyWithFlags(String owner, String name, String sd, String ed, String st, String et,
                                       String participants, String allowAdd, String allowSwap) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("name", name);
-        body.put("startDate", sd);
-        body.put("endDate", ed);
-        body.put("startTime", st);
-        body.put("endTime", et);
-        body.put("participants", participants.isBlank() ? List.of() : Arrays.asList(participants.split(",")));
+        Map<String, Object> body = surveyBody(name, sd, ed, st, et, participants);
         body.put("allowAddParticipant", "是".equals(allowAdd));
         body.put("allowReplaceParticipant", "是".equals(allowSwap));
-        last = rest.exchange("/api/surveys", HttpMethod.POST, new HttpEntity<>(body, headers(owner)), String.class);
-        if (last.getStatusCode().is2xxSuccessful()) {
-            surveyIds.put(name, json(last.getBody()).get("id").asText());
-        }
+        postSurvey(owner, name, body);
     }
 
     @When("{string} 建立調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，時區 {string}")
     public void createSurveyWithTimeZone(String owner, String name, String sd, String ed, String st, String et,
                                          String participants, String timeZone) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("name", name);
-        body.put("startDate", sd);
-        body.put("endDate", ed);
-        body.put("startTime", st);
-        body.put("endTime", et);
-        body.put("participants", participants.isBlank() ? List.of() : Arrays.asList(participants.split(",")));
+        Map<String, Object> body = surveyBody(name, sd, ed, st, et, participants);
         body.put("timeZone", timeZone);
-        last = rest.exchange("/api/surveys", HttpMethod.POST, new HttpEntity<>(body, headers(owner)), String.class);
-        if (last.getStatusCode().is2xxSuccessful()) {
-            surveyIds.put(name, json(last.getBody()).get("id").asText());
-        }
+        postSurvey(owner, name, body);
     }
 
     @When("{string} 以時區 {string} 更新調查 {string}")
     public void updateSurveyTimeZone(String owner, String timeZone, String surveyName) {
-        JsonNode cur = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        JsonNode cur = getSurvey(surveyName);
         Map<String, Object> body = new HashMap<>();
         body.put("name", cur.get("name").asText());
         body.put("startDate", cur.get("startDate").asText());
@@ -195,20 +183,20 @@ public class SurveySteps {
 
     @Then("調查 {string} 的發起者時區應為 {string}")
     public void timeZoneIs(String surveyName, String expected) {
-        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        JsonNode s = getSurvey(surveyName);
         assertEquals(expected, s.path("timeZone").asText(null), "發起者時區不符：" + s);
     }
 
     @Then("調查 {string} 應未記錄發起者時區")
     public void timeZoneAbsent(String surveyName) {
-        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        JsonNode s = getSurvey(surveyName);
         assertTrue(s.path("timeZone").isNull() || s.path("timeZone").isMissingNode(),
                 "無效時區不應被儲存：" + s);
     }
 
     @Then("調查 {string} 的挖空日期應包含 {string}")
     public void excludedContains(String surveyName, String date) {
-        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        JsonNode s = getSurvey(surveyName);
         boolean found = false;
         for (JsonNode n : s.get("excludedDates")) {
             if (n.asText().equals(date)) found = true;
@@ -226,7 +214,7 @@ public class SurveySteps {
 
     @When("{string} 將調查 {string} 改名為 {string}")
     public void renameSurvey(String owner, String surveyName, String newName) {
-        JsonNode cur = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        JsonNode cur = getSurvey(surveyName);
         Map<String, Object> body = new HashMap<>();
         body.put("name", newName);
         body.put("startDate", cur.get("startDate").asText());
@@ -416,7 +404,7 @@ public class SurveySteps {
 
     @Then("調查 {string} 的人員名單應包含 {string}")
     public void participantListContains(String surveyName, String participant) {
-        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        JsonNode s = getSurvey(surveyName);
         boolean found = false;
         for (JsonNode n : s.get("participants")) if (n.asText().equals(participant)) found = true;
         assertTrue(found, "人員名單應包含「" + participant + "」，實際：" + s.get("participants"));
@@ -424,7 +412,7 @@ public class SurveySteps {
 
     @Then("調查 {string} 的人員名單應不包含 {string}")
     public void participantListNotContains(String surveyName, String participant) {
-        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        JsonNode s = getSurvey(surveyName);
         for (JsonNode n : s.get("participants")) {
             assertNotEquals(participant, n.asText(), "人員名單不應包含「" + participant + "」");
         }
@@ -432,7 +420,7 @@ public class SurveySteps {
 
     @Then("調查 {string} 中 {string} 的來源說明應包含 {string}")
     public void participantNoteContains(String surveyName, String participant, String expected) {
-        JsonNode s = json(rest.getForEntity("/api/surveys/" + surveyId(surveyName), String.class).getBody());
+        JsonNode s = getSurvey(surveyName);
         JsonNode notes = s.get("participantNotes");
         assertNotNull(notes, "調查回應不包含 participantNotes：" + s);
         JsonNode note = notes.get(participant);

@@ -8,6 +8,7 @@ import com.angus.timesurvey.repo.SurveyResponseRepository;
 import com.angus.timesurvey.repo.SurveyVisitRepository;
 import com.angus.timesurvey.repo.UserActivityRepository;
 import com.angus.timesurvey.service.EntraGraphService;
+import com.angus.timesurvey.service.SurveyService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 /** 全站使用統計：供獨立統計頁（/stats）查詢所有調查的開啟次數、使用人數與回覆狀況 */
 @RestController
@@ -48,15 +50,19 @@ public class StatsApiController {
         all.sort(Comparator.comparing(Survey::getCreatedAt,
                 Comparator.nullsLast(Comparator.naturalOrder())).reversed());
 
+        // 各調查的造訪數、IP 數、回覆各以一次查詢撈齊，避免逐筆調查各查三次
+        Map<String, Long> visitCounts = countMap(visitRepo.countGroupBySurveyId());
+        Map<String, Long> ipCounts = countMap(visitRepo.countDistinctIpGroupBySurveyId());
+        Map<String, List<SurveyResponse>> responsesBySurvey = responseRepo.findAll().stream()
+                .collect(Collectors.groupingBy(SurveyResponse::getSurveyId));
+
         List<Map<String, Object>> rows = new ArrayList<>();
         long totalVisits = 0;
         long totalResponded = 0;
         for (Survey s : all) {
-            long visits = visitRepo.countBySurveyId(s.getId());
-            long responded = responseRepo.findBySurveyId(s.getId()).stream()
-                    .map(SurveyResponse::getParticipantName)
-                    .filter(s.getParticipants()::contains)
-                    .distinct().count();
+            long visits = visitCounts.getOrDefault(s.getId(), 0L);
+            long responded = SurveyService.respondedCount(s,
+                    responsesBySurvey.getOrDefault(s.getId(), List.of()));
             Map<String, Object> row = new HashMap<>();
             row.put("id", s.getId());
             row.put("name", s.getName());
@@ -65,7 +71,7 @@ public class StatsApiController {
             row.put("closed", s.getClosedAt() != null);
             row.put("createdAt", s.getCreatedAt());
             row.put("visits", visits);
-            row.put("uniqueIps", visitRepo.countDistinctIpBySurveyId(s.getId()));
+            row.put("uniqueIps", ipCounts.getOrDefault(s.getId(), 0L));
             row.put("responded", responded);
             row.put("total", s.getParticipants().size());
             rows.add(row);
@@ -161,6 +167,15 @@ public class StatsApiController {
         result.put("trend", trend);
         result.put("generatedAt", LocalDateTime.now());
         return result;
+    }
+
+    /** GROUP BY 查詢結果（[surveyId, count] 列）轉成 Map */
+    private static Map<String, Long> countMap(List<Object[]> rows) {
+        Map<String, Long> m = new HashMap<>();
+        for (Object[] r : rows) {
+            m.put((String) r[0], (Long) r[1]);
+        }
+        return m;
     }
 
     /** 發出調查的頁面：首頁（建立與管理調查） */

@@ -22,7 +22,6 @@
     'common.none': '(none)',
     'common.apiFail': 'Operation failed',
     'common.removeName': 'Remove {0}',
-    'common.checked': 'confirmed',
     'common.wd0': 'Su', 'common.wd1': 'Mo', 'common.wd2': 'Tu', 'common.wd3': 'We',
     'common.wd4': 'Th', 'common.wd5': 'Fr', 'common.wd6': 'Sa',
     'common.pickRange': 'Select a date range',

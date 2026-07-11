@@ -1,9 +1,8 @@
 package com.angus.timesurvey.job;
 
 import com.angus.timesurvey.repo.SurveyRepository;
-import com.angus.timesurvey.repo.SurveyResponseRepository;
-import com.angus.timesurvey.repo.SurveyVisitRepository;
 import com.angus.timesurvey.repo.UserActivityRepository;
+import com.angus.timesurvey.service.SurveyService;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -18,8 +17,8 @@ class HousekeepingJobTest {
     private final UserActivityRepository activityRepo = mock(UserActivityRepository.class);
 
     private HousekeepingJob job(int retentionMonths) {
-        return new HousekeepingJob(mock(SurveyRepository.class), mock(SurveyResponseRepository.class),
-                mock(SurveyVisitRepository.class), activityRepo, retentionMonths);
+        return new HousekeepingJob(mock(SurveyRepository.class), mock(SurveyService.class),
+                activityRepo, retentionMonths);
     }
 
     @Test

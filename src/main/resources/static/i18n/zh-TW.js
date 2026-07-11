@@ -22,7 +22,6 @@
     'common.none': '（無）',
     'common.apiFail': '操作失敗',
     'common.removeName': '移除 {0}',
-    'common.checked': '已確認',
     'common.wd0': '日', 'common.wd1': '一', 'common.wd2': '二', 'common.wd3': '三',
     'common.wd4': '四', 'common.wd5': '五', 'common.wd6': '六',
     'common.pickRange': '請選擇日期範圍',

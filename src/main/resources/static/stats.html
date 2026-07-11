@@ -105,7 +105,7 @@
     <div class="chart-tip" id="chartTip"></div>
     <table id="usageTable">
       <thead>
-        <tr><th data-i18n="st.thUser">姓名</th><th>Email</th><th class="num" data-i18n="st.thCreates">發出調查</th><th class="num" data-i18n="st.thReplies">回覆時間</th>
+        <tr><th data-i18n="st.thUser">姓名</th><th data-i18n="st.thEmail">Email</th><th class="num" data-i18n="st.thCreates">發出調查</th><th class="num" data-i18n="st.thReplies">回覆時間</th>
             <th class="num" data-i18n="st.thOpens">開啟次數</th><th data-i18n="st.thShare">佔比</th><th data-i18n="st.thLastUse">最近使用</th></tr>
       </thead>
       <tbody></tbody>
@@ -129,20 +129,11 @@
 <script src="/i18n/zh-TW.js"></script>
 <script src="/i18n/en.js"></script>
 <script src="/i18n.js"></script>
+<script src="/common.js"></script>
 <script src="/entra.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 I18N.apply();
-
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-/* "2026-06-10" -> "2026/6/10" */
-function fmtYmd(d) {
-  const [y, m, dd] = String(d).split('-');
-  return y + '/' + (+m) + '/' + (+dd);
-}
 
 function tile(num, label) {
   return '<div class="stat"><div class="num">' + num + '</div><div class="lbl">' + label + '</div></div>';

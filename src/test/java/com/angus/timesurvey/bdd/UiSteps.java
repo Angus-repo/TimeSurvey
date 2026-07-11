@@ -74,16 +74,35 @@ public class UiSteps {
         return sharedBrowser().newContext(new Browser.NewContextOptions().setLocale("zh-TW"));
     }
 
+    /** 新手引導的「已看過」旗標清單；新增引導時只需在此補上一筆 */
+    private static final String[] ONBOARDING_FLAGS = {
+            "surveyOnboarded", "surveyGridOnboarded", "surveyCalOnboarded",
+            "meetHoursOnboarded", "dragSlotOnboarded", "dateRangeOnboarded", "copyLinkOnboarded"};
+
+    /** 組出設定 ownerToken 與指定「已看過引導」旗標的 init script */
+    private static String initScript(String... onboardedFlags) {
+        StringBuilder sb = new StringBuilder("localStorage.setItem('ownerToken', '" + OWNER + "');");
+        for (String f : onboardedFlags) {
+            sb.append("localStorage.setItem('").append(f).append("', '1');");
+        }
+        return sb.toString();
+    }
+
+    /** 除了指定旗標之外的所有引導旗標（模擬「只剩某個引導沒看過」） */
+    private static String[] onboardedExcept(String skip) {
+        return Arrays.stream(ONBOARDING_FLAGS).filter(f -> !f.equals(skip)).toArray(String[]::new);
+    }
+
     /** 預設視為已看過新手引導，避免遮罩擋住一般場景；引導本身由專屬場景測試 */
-    private static final String INIT_SCRIPT =
-            "localStorage.setItem('ownerToken', '" + OWNER + "');" +
-            "localStorage.setItem('surveyOnboarded', '1');" +
-            "localStorage.setItem('surveyGridOnboarded', '1');" +
-            "localStorage.setItem('surveyCalOnboarded', '1');" +
-            "localStorage.setItem('meetHoursOnboarded', '1');" +
-            "localStorage.setItem('dragSlotOnboarded', '1');" +
-            "localStorage.setItem('dateRangeOnboarded', '1');" +
-            "localStorage.setItem('copyLinkOnboarded', '1');";
+    private static final String INIT_SCRIPT = initScript(ONBOARDING_FLAGS);
+
+    /** 換一個全新瀏覽器環境；onboardedFlags 列出「已看過」的引導旗標，未列出的引導會再次出現。
+     *  init script 每次載頁都會執行、無法事後移除，所以只能整個環境重建。 */
+    private void freshContext(String... onboardedFlags) {
+        ctx.close();
+        ctx = newUiContext();
+        ctx.addInitScript(initScript(onboardedFlags));
+    }
 
     @Before("@ui")
     public void openBrowserContext() {
@@ -324,23 +343,14 @@ public class UiSteps {
     @Given("存在調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，挖空日期 {string}")
     public void surveyExistsWithExcluded(String name, String startDate, String endDate,
                                          String startTime, String endTime, String people, String excluded) {
-        Survey s = new Survey();
-        s.setId(UUID.randomUUID().toString());
-        s.setName(name);
-        s.setStartDate(LocalDate.parse(startDate));
-        s.setEndDate(LocalDate.parse(endDate));
-        s.setStartTime(LocalTime.parse(startTime));
-        s.setEndTime(LocalTime.parse(endTime));
-        s.setParticipants(new ArrayList<>(Arrays.asList(people.split(","))));
+        surveyExists(name, startDate, endDate, startTime, endTime, people);
+        Survey s = surveyRepo.findById(surveyIds.get(name)).orElseThrow();
         List<LocalDate> ex = new ArrayList<>();
         if (!excluded.isBlank()) {
             for (String d : excluded.split(",")) ex.add(LocalDate.parse(d.trim()));
         }
         s.setExcludedDates(ex);
-        s.setOwnerToken(OWNER);
-        s.setCreatedAt(LocalDateTime.now());
         surveyRepo.save(s);
-        surveyIds.put(name, s.getId());
     }
 
     @Given("存在調查 {string}，日期 {string} 到 {string}，時間 {string} 到 {string}，人員 {string}，發起者時區 {string}")
@@ -399,10 +409,7 @@ public class UiSteps {
 
     @When("以首次使用者身分開啟調查 {string} 的填寫頁")
     public void openSurveyPageFirstTime(String surveyName) {
-        // 換一個沒有「已看過引導」紀錄的全新瀏覽器環境（init script 每次載頁都會執行，無法事後移除）
-        ctx.close();
-        ctx = newUiContext();
-        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "')");
+        freshContext();   // 沒有任何「已看過引導」紀錄
         page = ctx.newPage();
         page.navigate(base() + "/s/" + surveyIds.get(surveyName));
         page.locator(".slot").first().waitFor();
@@ -412,15 +419,7 @@ public class UiSteps {
     public void openSurveyPageWithoutDateRangeOnboarding(String surveyName) {
         // 只清掉 dateRangeOnboarded，模擬「index / survey 都沒用過大日曆」；
         // 其他填寫頁教學維持已看過，避免遮罩干擾本場景。
-        ctx.close();
-        ctx = newUiContext();
-        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "');" +
-                "localStorage.setItem('surveyOnboarded', '1');" +
-                "localStorage.setItem('surveyGridOnboarded', '1');" +
-                "localStorage.setItem('surveyCalOnboarded', '1');" +
-                "localStorage.setItem('meetHoursOnboarded', '1');" +
-                "localStorage.setItem('dragSlotOnboarded', '1');" +
-                "localStorage.setItem('copyLinkOnboarded', '1');");
+        freshContext(onboardedExcept("dateRangeOnboarded"));
         page = ctx.newPage();
         page.navigate(base() + "/s/" + surveyIds.get(surveyName));
         page.locator(".slot").first().waitFor();
@@ -510,9 +509,7 @@ public class UiSteps {
     /** Entra ID 登入模擬需在重建瀏覽器環境「之後」掛 route，因此與首次使用者開頁合為一步 */
     @When("模擬已啟用 Entra ID 登入且登入者為 {string} 並以首次使用者身分開啟調查 {string} 的填寫頁")
     public void openSurveyPageFirstTimeWithEntra(String name, String surveyName) {
-        ctx.close();
-        ctx = newUiContext();
-        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "')");
+        freshContext();
         mockEntraSignedIn(name);
         page = ctx.newPage();
         page.navigate(base() + "/s/" + surveyIds.get(surveyName));
@@ -1088,10 +1085,7 @@ public class UiSteps {
 
     @When("以首次使用者身分開啟後台維護頁")
     public void openAdminPageFirstTime() {
-        // 換一個沒有「已看過引導」紀錄的全新瀏覽器環境
-        ctx.close();
-        ctx = newUiContext();
-        ctx.addInitScript("localStorage.setItem('ownerToken', '" + OWNER + "')");
+        freshContext();   // 沒有任何「已看過引導」紀錄
         page = ctx.newPage();
         page.navigate(base() + "/");
         page.locator("#surveyList").waitFor();
@@ -1379,26 +1373,29 @@ public class UiSteps {
                 .hasAttribute("aria-label", "在 Teams 分享調查連結");
     }
 
+    /** 調查清單中名稱含指定文字的那一列 */
+    private com.microsoft.playwright.Locator surveyRow(String surveyName) {
+        return page.locator("#surveyList tr")
+                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+    }
+
     @Then("調查清單中 {string} 應顯示共同時段徽章 {string}")
     public void listShowsSlotBadge(String surveyName, String badgeText) {
-        var row = page.locator("#surveyList tr")
-                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+        var row = surveyRow(surveyName);
         // 共同時段徽章位於「填寫狀況」欄位（.prog）內，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
         assertDataTipContains(row.locator(".prog .slotbadge"), badgeText);
     }
 
     @Then("調查清單中 {string} 不應顯示共同時段徽章")
     public void listShowsNoSlotBadge(String surveyName) {
-        var row = page.locator("#surveyList tr")
-                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+        var row = surveyRow(surveyName);
         // 只有「無共同時段」（⚠️）才顯示徽章，其餘狀況（有共同時段／尚未確定）不顯示任何符號
         assertThat(row.locator(".prog .slotbadge")).hasCount(0);
     }
 
     @When("點擊調查 {string} 的編輯")
     public void clickEditForSurvey(String surveyName) {
-        var row = page.locator("#surveyList tr")
-                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+        var row = surveyRow(surveyName);
         row.locator(".btn-ic.edit").click();
     }
 
@@ -1415,16 +1412,14 @@ public class UiSteps {
 
     @Then("調查清單中 {string} 的日期範圍應顯示挖空天數徽章 {string}")
     public void listDateRangeShowsExcludedBadge(String surveyName, String tipContains) {
-        var row = page.locator("#surveyList tr")
-                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+        var row = surveyRow(surveyName);
         // 挖空天數只顯示符號，說明文字放在 data-tip（滑鼠移上才顯示），故檢查該屬性內容
         assertDataTipContains(row.locator(".skipbadge"), tipContains);
     }
 
     @Then("調查清單中 {string} 的日期範圍挖空徽章應使用粉紅底即時提示")
     public void listDateRangeSkipBadgeUsesSharedStyle(String surveyName) {
-        var row = page.locator("#surveyList tr")
-                .filter(new com.microsoft.playwright.Locator.FilterOptions().setHasText(surveyName));
+        var row = surveyRow(surveyName);
         assertSharedSkipBadgeStyle(row.locator(".skipbadge"));
     }
 

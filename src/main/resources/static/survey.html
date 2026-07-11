@@ -556,6 +556,7 @@
 <script src="/i18n/zh-TW.js"></script>
 <script src="/i18n/en.js"></script>
 <script src="/i18n.js"></script>
+<script src="/common.js"></script>
 <script src="/date-range-calendar.js"></script>
 <script src="/entra.js"></script>
 <script>
@@ -590,36 +591,6 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-function dateList(start, end, excluded) {
-  const ex = new Set(excluded || []);
-  const out = [];
-  let d = new Date(start + 'T00:00:00');
-  const e = new Date(end + 'T00:00:00');
-  while (d <= e) {
-    const ds = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-    // 跳過週六(6)、週日(0) 與被挖空的日期
-    if (d.getDay() !== 0 && d.getDay() !== 6 && !ex.has(ds)) {
-      out.push(ds);
-    }
-    d.setDate(d.getDate() + 1);
-  }
-  return out;
-}
-
-function timeSlots(startTime, endTime) {
-  const out = [];
-  let [h, m] = startTime.slice(0,5).split(':').map(Number);
-  const [eh, em] = endTime.slice(0,5).split(':').map(Number);
-  while (h * 60 + m < eh * 60 + em) {
-    const t = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
-    // 12:00~13:00 為午休，不列入調查時段
-    if (t < '12:00' || t >= '13:00') out.push(t);
-    m += 30;
-    if (m >= 60) { m -= 60; h++; }
-  }
-  return out;
-}
-
 const WHO_HINT_ACTION_KEYS = ['sv.chipAllDay', 'sv.chipAmPm', 'sv.chipHourChk', 'sv.chip30min'];
 
 function whoHintHtml(message) {
@@ -636,60 +607,7 @@ function setWhoHint(message) {
   hint.style.display = '';
 }
 
-/* "2026-07-06" -> "7/6" */
-function fmtMd(d) {
-  const [, m, dd] = d.split('-');
-  return (+m) + '/' + (+dd);
-}
-
-/* Date -> "yyyy-MM-dd" */
-function ymd(d) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
-function todayYmd() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return ymd(d);
-}
-
-function isWeekend(s) {
-  const g = new Date(s + 'T00:00:00').getDay();
-  return g === 0 || g === 6;
-}
-
-function within1Month(a, b) {
-  const sd = new Date(a + 'T00:00:00');
-  const max = new Date(sd);
-  max.setMonth(max.getMonth() + 1);
-  return new Date(b + 'T00:00:00') <= max;
-}
-
-/* ---------- 時區（調查時段以發起者的時區為準） ---------- */
-
-/* IANA 時區於指定時刻的 UTC 偏移（分鐘）；瀏覽器不認得該時區時回傳 null */
-function zoneOffsetMinutes(tz, at) {
-  if (!tz) return null;
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
-        .formatToParts(at || new Date());
-    const name = (parts.find(p => p.type === 'timeZoneName') || {}).value || '';
-    if (name === 'GMT' || name === 'UTC') return 0;
-    const m = name.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
-    if (!m) return null;
-    return (m[1] === '-' ? -1 : 1) * ((+m[2]) * 60 + (m[3] ? +m[3] : 0));
-  } catch (e) {
-    return null;
-  }
-}
-
-/* 480 -> "UTC+8"、330 -> "UTC+5:30"、-240 -> "UTC-4" */
-function fmtUtcOffset(min) {
-  const sign = min < 0 ? '-' : '+';
-  const abs = Math.abs(min);
-  const h = Math.floor(abs / 60), m = abs % 60;
-  return 'UTC' + sign + h + (m ? ':' + String(m).padStart(2, '0') : '');
-}
+/* ---------- 時區（調查時段以發起者的時區為準；工具函式在 common.js） ---------- */
 
 /* 發起者（邀請者）與填寫者的時區不同時，於頁面頂部提示調查時段以發起者的時區為準。
    以調查起日中午的偏移比較（涵蓋日光節約時間），偏移相同就不打擾填寫者 */
@@ -697,8 +615,7 @@ function showTimeZoneHint() {
   if (!survey.timeZone) return;   // 舊調查沒有記錄發起者時區
   const at = new Date(survey.startDate + 'T12:00:00');
   const ownerOff = zoneOffsetMinutes(survey.timeZone, at);
-  let myZone = '';
-  try { myZone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+  const myZone = myTimeZone();
   const myOff = zoneOffsetMinutes(myZone, at);
   if (ownerOff == null || myOff == null || ownerOff === myOff) return;
   const el = $('tzBanner');
@@ -990,6 +907,7 @@ function resetOnboarding() {
   localStorage.removeItem('surveyOnboarded');
   localStorage.removeItem('surveyGridOnboarded');
   localStorage.removeItem('surveyCalOnboarded');
+  localStorage.removeItem('dateRangeOnboarded');   // 「完全沒有可出席的時段」的建議日期日曆引導
   if (readOnly) return toast(I18N.t('sv.onbClosedRo'));
   if ($('main').style.display === 'none') return toast(I18N.t('sv.onbNotLoaded'));
   if (entraLocked && !whoValue) return toast(I18N.t('sv.onbNotInvited'));
@@ -1872,14 +1790,7 @@ function closeLinkPrompt() {
 }
 
 function copySurveyLink() {
-  const url = $('linkPromptUrl').value;
-  if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(url).then(() => toast(I18N.t('sv.linkCopied')));
-  } else {
-    $('linkPromptUrl').select();
-    document.execCommand('copy');
-    toast(I18N.t('sv.linkCopied'));
-  }
+  copyText($('linkPromptUrl').value, () => toast(I18N.t('sv.linkCopied')));
 }
 
 /* ---------- 不參加此會議：輸入原因（必填）後送出，發起人會在結果頁看到姓名與原因 ---------- */
@@ -2218,18 +2129,6 @@ async function submitResponse() {
 
 /* ---------- 送出後的完成畫面 ---------- */
 const toMin = t => (+t.slice(0,2)) * 60 + (+t.slice(3,5));
-
-/* "10:30" + 30分 -> "11:00" */
-function plus30(t) {
-  let h = +t.slice(0,2), m = +t.slice(3,5) + 30;
-  if (m >= 60) { m -= 60; h++; }
-  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
-}
-
-/* 簡易 HTML 逸出：原因等自由輸入的文字要放進 innerHTML 前先處理 */
-function escHtml(s) {
-  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-}
 
 /* 隱藏填寫表單，改顯示這次送出的內容摘要（連續時段合併為區間）；
    extra.decline＝不參加此會議的原因、extra.noTime＝完全無可出席時段的原因與建議日期區間 */

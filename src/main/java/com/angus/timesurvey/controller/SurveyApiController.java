@@ -4,7 +4,7 @@ import com.angus.timesurvey.model.Survey;
 import com.angus.timesurvey.model.SurveyResponse;
 import com.angus.timesurvey.repo.SurveyRepository;
 import com.angus.timesurvey.repo.SurveyResponseRepository;
-import com.angus.timesurvey.repo.SurveyVisitRepository;
+import com.angus.timesurvey.service.SurveyService;
 import com.angus.timesurvey.ws.NotifyWebSocketHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
@@ -34,16 +34,16 @@ public class SurveyApiController {
 
     private final SurveyRepository surveyRepo;
     private final SurveyResponseRepository responseRepo;
-    private final SurveyVisitRepository visitRepo;
+    private final SurveyService surveyService;
     private final NotifyWebSocketHandler notifier;
     private final ObjectMapper objectMapper;
 
     public SurveyApiController(SurveyRepository surveyRepo, SurveyResponseRepository responseRepo,
-                               SurveyVisitRepository visitRepo,
+                               SurveyService surveyService,
                                NotifyWebSocketHandler notifier, ObjectMapper objectMapper) {
         this.surveyRepo = surveyRepo;
         this.responseRepo = responseRepo;
-        this.visitRepo = visitRepo;
+        this.surveyService = surveyService;
         this.notifier = notifier;
         this.objectMapper = objectMapper;
     }
@@ -275,13 +275,10 @@ public class SurveyApiController {
     }
 
     @DeleteMapping("/{id}")
-    @Transactional
     public ResponseEntity<Void> delete(@PathVariable String id,
                                        @RequestHeader(value = "X-Owner-Token", required = false) String owner) {
         getOwned(id, owner);
-        responseRepo.deleteBySurveyId(id);
-        visitRepo.deleteBySurveyId(id);
-        surveyRepo.deleteById(id);
+        surveyService.deleteSurveyCascade(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -314,14 +311,14 @@ public class SurveyApiController {
         if (!survey.getParticipants().contains(name)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "此姓名不在受調查人員名單中");
         }
-        boolean isNew = responseRepo.findBySurveyIdAndParticipantName(id, name).isEmpty();
-        SurveyResponse resp = responseRepo.findBySurveyIdAndParticipantName(id, name)
-                .orElseGet(() -> {
-                    SurveyResponse r = new SurveyResponse();
-                    r.setSurveyId(id);
-                    r.setParticipantName(name);
-                    return r;
-                });
+        var existing = responseRepo.findBySurveyIdAndParticipantName(id, name);
+        boolean isNew = existing.isEmpty();
+        SurveyResponse resp = existing.orElseGet(() -> {
+            SurveyResponse r = new SurveyResponse();
+            r.setSurveyId(id);
+            r.setParticipantName(name);
+            return r;
+        });
         // 三種互斥的回覆型態：不參加此會議 / 完全無可出席時段（附建議日期區間）/ 一般勾選時段
         String declineReason = body.getOrDefault("declineReason", "").trim();
         String noTimeReason = body.getOrDefault("noTimeReason", "").trim();
@@ -361,10 +358,7 @@ public class SurveyApiController {
 
         // 每次填寫（含覆寫）都推播進度，讓後台清單即時更新；全員首次到齊時另發完成通知
         if (survey.getOwnerToken() != null) {
-            long done = responseRepo.findBySurveyId(id).stream()
-                    .map(SurveyResponse::getParticipantName)
-                    .filter(survey.getParticipants()::contains)
-                    .distinct().count();
+            long done = SurveyService.respondedCount(survey, responseRepo.findBySurveyId(id));
             try {
                 notifier.notifyOwner(survey.getOwnerToken(), objectMapper.writeValueAsString(Map.of(
                         "type", "responseUpdated",

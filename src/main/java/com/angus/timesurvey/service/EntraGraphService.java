@@ -150,9 +150,7 @@ public class EntraGraphService {
     /** 登出：刪除資料庫中的 refresh token 與快取的 access token */
     public void signOut(String userId) {
         tokenCache.remove(userId);
-        if (repo.existsById(userId)) {
-            repo.deleteById(userId);
-        }
+        repo.deleteById(userId);
     }
 
     /* ---------- access token：快取 → 過期以 refresh token 換新 ---------- */
