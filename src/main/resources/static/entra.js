@@ -83,8 +83,12 @@ window.Entra = (function () {
       .entra-chip-abs { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); }
       .entra-chip-abs:hover { transform: translateY(-50%) scale(1.06); }
       .entra-chip-fixed { position: fixed; right: 14px; top: 14px; z-index: 900; }
+      /* 已登入時把頁首的常用工具收進姓名資訊卡；未啟用 Entra 時仍維持原本頁首操作。 */
+      .entra-signed-in header #resetOnbBtn,
+      .entra-signed-in header #feedbackBtn { display: none !important; }
       .entra-panel { position: fixed; z-index: 5300; width: 300px; background: #fff; border-radius: 12px;
                      box-shadow: 0 10px 34px rgba(0,0,0,.3); padding: 18px 20px; color: #1f2733;
+                     max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto;
                      font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; font-size: 14px; }
       .entra-panel-head { display: flex; align-items: center; gap: 12px; padding-bottom: 12px;
                           border-bottom: 1px solid #eef1f5; margin-bottom: 10px; }
@@ -97,6 +101,13 @@ window.Entra = (function () {
       .entra-panel-row { display: flex; gap: 8px; margin: 6px 0; font-size: 13px; line-height: 1.6; }
       .entra-panel-row .k { flex: none; width: 62px; color: #8a94a0; }
       .entra-panel-row .v { color: #1f2733; word-break: break-all; }
+      .entra-panel-actions { margin-top: 12px; padding-top: 10px; border-top: 1px solid #eef1f5; }
+      .entra-panel-actions-title { color: #8a94a0; font-size: 12px; margin: 0 0 6px; }
+      .entra-account-action { width: 100%; display: flex; align-items: center; gap: 9px; padding: 8px 10px;
+                              border: none; border-radius: 7px; background: transparent; color: #334155;
+                              font-size: 13.5px; font-family: inherit; text-align: left; cursor: pointer; }
+      .entra-account-action:hover, .entra-account-action:focus { background: #f0f5fa; outline: none; }
+      .entra-account-action .label { flex: 1; }
       .entra-panel-foot { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eef1f5; text-align: right; }
       .entra-logout { background: #eceff1; color: #3b4654; border: none; border-radius: 6px; float: none;
                       padding: 7px 18px; font-size: 13px; cursor: pointer; font-family: inherit;
@@ -189,6 +200,7 @@ window.Entra = (function () {
   let panelEl = null;     // 帳號資訊卡（展開中才存在）
   let photoUrl = null;    // Graph 取得的大頭照（blob URL；無照片維持 null）
   let profile = null;     // Graph /me 的個人資料（首次展開時載入）
+  let feedbackConfigPromise = null; // 意見回饋設定（未設定時 resolve null）
 
   function applyAvatar(el, name) {
     if (photoUrl) {
@@ -208,6 +220,7 @@ window.Entra = (function () {
      否則靠頁首右緣絕對定位（填寫頁、統計頁），沒有頁首時固定在視窗右上角 */
   async function showUserChip() {
     if (!account) return;
+    document.documentElement.classList.add('entra-signed-in');
     const name = accountName();
     chipEl = document.createElement('button');
     chipEl.type = 'button';
@@ -247,6 +260,58 @@ window.Entra = (function () {
     } catch (e) { /* 取不到照片就維持縮寫 */ }
   }
 
+  function positionPanel() {
+    if (!chipEl || !panelEl) return;
+    const r = chipEl.getBoundingClientRect();
+    const top = Math.max(8, Math.min(r.bottom + 8, window.innerHeight - panelEl.offsetHeight - 8));
+    panelEl.style.top = top + 'px';
+    panelEl.style.left = Math.max(8,
+        Math.min(r.right - panelEl.offsetWidth, window.innerWidth - panelEl.offsetWidth - 8)) + 'px';
+  }
+
+  function accountAction(action, icon, label, onClick) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'entra-account-action';
+    btn.dataset.action = action;
+    btn.innerHTML = '<span aria-hidden="true">' + icon + '</span><span class="label"></span>';
+    btn.querySelector('.label').textContent = label;
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  function accountActionLabel(key) {
+    return t(key).replace(/^[^\w\u3400-\u9fff]+/, '');
+  }
+
+  function loadFeedbackConfig() {
+    if (!feedbackConfigPromise) {
+      feedbackConfigPromise = fetch('/api/feedback-config')
+          .then(res => res.status === 200 ? res.json() : null)
+          .catch(() => null);
+    }
+    return feedbackConfigPromise;
+  }
+
+  /* 姓名資訊卡內只收合重新顯示引導與意見回饋；多國語系維持在頁首。 */
+  async function mountAccountActions(actions) {
+    const resetSource = document.getElementById('resetOnbBtn');
+    if (resetSource) {
+      actions.appendChild(accountAction('onboarding', '🧭', accountActionLabel('idx.resetOnb'), () => {
+        closePanel();
+        resetSource.click();
+      }));
+    }
+
+    const feedback = await loadFeedbackConfig();
+    if (!feedback || !panelEl || !actions.isConnected) return;
+    actions.appendChild(accountAction('feedback', '💬', accountActionLabel('idx.feedback'), () => {
+      location.href = 'mailto:' + encodeURIComponent(feedback.recipient) +
+          '?subject=' + encodeURIComponent(feedback.subject);
+    }));
+    positionPanel();
+  }
+
   /* 展開帳號資訊卡：顯示姓名、email，並從 Graph 載入職稱、部門等詳細資料 */
   async function openPanel() {
     if (!chipEl || panelEl) return;
@@ -273,6 +338,13 @@ window.Entra = (function () {
     const body = document.createElement('div');
     body.innerHTML = '<div class="entra-panel-loading">' + t('auth.loading') + '</div>';
 
+    const actions = document.createElement('div');
+    actions.className = 'entra-panel-actions';
+    const actionsTitle = document.createElement('div');
+    actionsTitle.className = 'entra-panel-actions-title';
+    actionsTitle.textContent = t('auth.actions');
+    actions.appendChild(actionsTitle);
+
     const foot = document.createElement('div');
     foot.className = 'entra-panel-foot';
     const out = document.createElement('button');
@@ -284,13 +356,12 @@ window.Entra = (function () {
     });
     foot.appendChild(out);
 
-    panelEl.append(head, body, foot);
+    panelEl.append(head, body, actions, foot);
     document.body.appendChild(panelEl);
+    mountAccountActions(actions);
 
     // 資訊卡對齊頭像下方、靠右緣，並夾在視窗內
-    const r = chipEl.getBoundingClientRect();
-    panelEl.style.top = Math.min(r.bottom + 8, window.innerHeight - panelEl.offsetHeight - 8) + 'px';
-    panelEl.style.left = Math.max(8, Math.min(r.right - panelEl.offsetWidth, window.innerWidth - panelEl.offsetWidth - 8)) + 'px';
+    positionPanel();
 
     // 首次展開時向後端取個人資料，之後直接沿用
     try {
@@ -325,8 +396,12 @@ window.Entra = (function () {
       if (shown === 0) {
         body.innerHTML = '<div class="entra-panel-loading">' + t('auth.noInfo') + '</div>';
       }
+      positionPanel();
     } catch (e) {
-      if (panelEl) body.innerHTML = '<div class="entra-panel-loading">' + t('auth.loadFail') + '</div>';
+      if (panelEl) {
+        body.innerHTML = '<div class="entra-panel-loading">' + t('auth.loadFail') + '</div>';
+        positionPanel();
+      }
     }
   }
 

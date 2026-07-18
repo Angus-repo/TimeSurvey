@@ -391,6 +391,7 @@
     'auth.chipTitle': '{0}（點選查看帳號資訊）',
     'auth.chipAria': '登入者：{0}，點選查看帳號資訊',
     'auth.loading': '載入帳號資訊中…',
+    'auth.actions': '常用功能',
     'auth.logout': '登出',
     'auth.jobTitle': '職稱', 'auth.department': '部門', 'auth.office': '辦公室',
     'auth.mobile': '手機', 'auth.phone': '公司電話',

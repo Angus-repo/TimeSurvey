@@ -26,7 +26,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -123,14 +125,25 @@ public class UiSteps {
 
     /* ---------- UI 測試截圖與 PDF 報告 ---------- */
 
-    private record Shot(String title, boolean failed, byte[] png) {}
+    private record FeatureInfo(String key, String name, int order) {}
+    private record Shot(int sequence, String featureKey, String featureName, int featureOrder,
+                        boolean mobile, String title, boolean failed, byte[] png) {}
+    private record PageRange(int first, int last) {}
+    private record SummaryPageIndex(Map<Integer, PageRange> cases, Map<String, PageRange> groups) {}
+    private record PdfImageLayout(int total, int chunkPx, float drawWidth) {}
     private static final List<Shot> shots = java.util.Collections.synchronizedList(new ArrayList<>());
     /** 總覽頁截圖（在瀏覽器關閉前產生，內容含中文，故以瀏覽器渲染後轉圖片） */
     private static byte[] summaryPng;
+    /** 各程式功能群組的封面截圖；PDF 依此分段，封面後固定先放電腦版再放手機版。 */
+    private static final Map<String, byte[]> groupCoverPng = new LinkedHashMap<>();
 
     /** 頁面標題橫幅與 PDF 頂端色條同色：通過為綠底，失敗為紅底 */
     private static final java.awt.Color PASS_COLOR = new java.awt.Color(0x1d7a35);
     private static final java.awt.Color FAIL_COLOR = new java.awt.Color(0xc0392b);
+    private static final float PDF_PAGE_W = org.apache.pdfbox.pdmodel.common.PDRectangle.A4.getWidth();
+    private static final float PDF_PAGE_H = org.apache.pdfbox.pdmodel.common.PDRectangle.A4.getHeight();
+    private static final float PDF_BAR_H = 26f;
+    private static final float PDF_IMAGE_AREA_H = PDF_PAGE_H - PDF_BAR_H;
 
     private static java.awt.Color caseColor(int caseNo, boolean failed) {
         return failed ? FAIL_COLOR : PASS_COLOR;
@@ -140,22 +153,46 @@ public class UiSteps {
         return String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
     }
 
+    private static FeatureInfo featureInfo(io.cucumber.java.Scenario scenario) {
+        String uri = scenario.getUri().toString();
+        if (uri.endsWith("ui_admin_page.feature")) return new FeatureInfo("ui_admin_page", "後台維護頁", 10);
+        if (uri.endsWith("ui_survey_page.feature")) return new FeatureInfo("ui_survey_page", "調查填寫頁", 20);
+        if (uri.endsWith("ui_stats_page.feature")) return new FeatureInfo("ui_stats_page", "全站統計頁", 30);
+        String file = uri.substring(uri.lastIndexOf('/') + 1).replaceFirst("\\.feature$", "");
+        return new FeatureInfo(file, file, 99);
+    }
+
+    private static List<Shot> orderedShots() {
+        synchronized (shots) {
+            return shots.stream()
+                    .sorted(Comparator.comparingInt(Shot::featureOrder)
+                            .thenComparing(Shot::featureKey)
+                            .thenComparing(Shot::mobile)
+                            .thenComparingInt(Shot::sequence))
+                    .toList();
+        }
+    }
+
     /** 每個 @ui 場景結束：在頁面頂端壓上場景標題橫幅後截圖（瀏覽器渲染中文，PDF 端不需字型） */
     @After("@ui")
     public void captureAndClose(io.cucumber.java.Scenario scenario) {
         try {
             if (page != null) {
-                int caseNo = shots.size() + 1;
+                int sequence = shots.size() + 1;
+                FeatureInfo feature = featureInfo(scenario);
+                boolean mobile = page.viewportSize() != null && page.viewportSize().width <= 720;
+                String layout = mobile ? "手機版" : "電腦版";
                 String time = "截圖時間:" + LocalDateTime.now()
                         .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                page.evaluate("([no, title, status, time, color]) => {" +
+                page.evaluate("([group, layout, title, status, time, color]) => {" +
                         // 先凍結 hover 狀態：插入橫幅會使版面下移，Chromium 會對滑鼠所在位置
                         // 重新派發 mouseover，導致 hover 顯示的 UI（如行事曆會議提示框）在截圖前被關掉
                         "document.addEventListener('mouseover', e => e.stopImmediatePropagation(), true);" +
                         "const b = document.createElement('div');" +
+                        "const mobile = layout === '手機版';" +
                         "b.style.cssText = 'display:flex;align-items:center;gap:14px;background:' + color + ';" +
-                        "color:#fff;padding:14px 20px;font-family:sans-serif;';" +
-                        "const n = document.createElement('span'); n.textContent = '場景 ' + no;" +
+                        "color:#fff;padding:14px 20px;font-family:sans-serif;min-width:0;';" +
+                        "const n = document.createElement('span'); n.textContent = group + ' · ' + layout;" +
                         "n.style.cssText = 'background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.6);" +
                         "border-radius:16px;padding:4px 16px;font-size:16px;font-weight:700;white-space:nowrap;';" +
                         "const t = document.createElement('span'); t.textContent = title;" +
@@ -164,17 +201,27 @@ public class UiSteps {
                         "s.style.cssText = 'font-size:16px;font-weight:700;white-space:nowrap;';" +
                         "const c = document.createElement('span'); c.textContent = time;" +
                         "c.style.cssText = 'font-size:13px;opacity:.9;white-space:nowrap;';" +
+                        "if (mobile) {" +
+                        "  b.style.display = 'grid'; b.style.gridTemplateColumns = 'minmax(0,1fr) auto'; b.style.gap = '8px 10px';" +
+                        "  n.style.whiteSpace = 'normal'; n.style.fontSize = '13px'; n.style.padding = '3px 9px';" +
+                        "  t.style.gridColumn = '1 / -1'; t.style.fontSize = '18px'; t.style.overflowWrap = 'anywhere';" +
+                        "  s.style.fontSize = '13px'; c.style.display = 'none';" +
+                        // 手機表格引導為了平滑捲動會保留 80vh 的尾端空間；截圖時移除，避免 PDF 多出空白頁。
+                        "  const gridSpacer = document.querySelector('.grid-outer.onb-grid-active');" +
+                        "  if (gridSpacer) gridSpacer.style.paddingBottom = '0';" +
+                        "}" +
                         "b.append(n, t, s, c); document.body.prepend(b);" +
                         // 行事曆提示框以 fixed 座標貼齊所在時段：版面被橫幅推下後把它一起下移，截圖才對得上
                         "const tip = document.getElementById('calTip');" +
                         "if (tip && tip.style.display === 'block') {" +
                         "  tip.style.top = (parseFloat(tip.style.top) + b.offsetHeight) + 'px';" +
                         "} }",
-                        Arrays.asList(String.valueOf(caseNo), scenario.getName(),
+                        Arrays.asList(feature.name(), layout, scenario.getName(),
                                 scenario.isFailed() ? "✘ 失敗" : "✔ 通過", time,
-                                hex(caseColor(caseNo, scenario.isFailed()))));
+                                hex(caseColor(sequence, scenario.isFailed()))));
                 byte[] png = page.screenshot(new Page.ScreenshotOptions().setFullPage(true));
-                shots.add(new Shot(scenario.getName(), scenario.isFailed(), png));
+                shots.add(new Shot(sequence, feature.key(), feature.name(), feature.order(), mobile,
+                        scenario.getName(), scenario.isFailed(), png));
                 scenario.attach(png, "image/png", scenario.getName());   // 同步嵌入 Cucumber HTML 報告
             }
         } catch (Exception ignored) {
@@ -193,45 +240,153 @@ public class UiSteps {
         writePdfReport();
     }
 
-    /** 在瀏覽器關閉前，用一個獨立頁面渲染「總覽」統計（總數／通過／失敗）並截圖，供 PDF 第一頁使用 */
+    /** 在瀏覽器關閉前渲染功能總覽與群組封面；總覽同步列出每一筆案例的實際 PDF 頁碼。 */
     private static void captureSummaryShot() {
         if (shots.isEmpty()) return;
         try {
-            int total = shots.size();
-            long failed = shots.stream().filter(Shot::failed).count();
-            long passed = total - failed;
-            StringBuilder rows = new StringBuilder();
-            for (int i = 0; i < shots.size(); i++) {
-                Shot s = shots.get(i);
-                rows.append("<div style='display:flex;align-items:center;gap:12px;padding:9px 16px;")
-                        .append(i % 2 == 0 ? "background:#f7f7f7;" : "")
-                        .append("'>")
-                        .append("<span style='width:32px;color:#888;font-weight:700;'>").append(i + 1).append("</span>")
-                        .append("<span style='flex:1;font-size:15px;'>").append(escapeHtml(s.title())).append("</span>")
-                        .append("<span style='font-weight:700;color:").append(hex(caseColor(i + 1, s.failed()))).append(";'>")
-                        .append(s.failed() ? "✘ 失敗" : "✔ 通過").append("</span>")
-                        .append("</div>");
-            }
+            List<Shot> ordered = orderedShots();
+            Map<String, List<Shot>> groups = groupShots(ordered);
             String time = LocalDateTime.now()
                     .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            String html = "<html><body style='margin:0;font-family:sans-serif;width:1240px;'>" +
-                    "<div style='padding:36px 44px;'>" +
-                    "<h1 style='margin:0 0 6px;font-size:30px;'>UI 測試報告總覽</h1>" +
-                    "<div style='color:#666;font-size:14px;margin-bottom:26px;'>產出時間：" + time + "</div>" +
-                    "<div style='display:flex;gap:20px;margin-bottom:30px;'>" +
-                    statCard("測試案例總數", String.valueOf(total), "#333") +
-                    statCard("通過", String.valueOf(passed), hex(PASS_COLOR)) +
-                    statCard("失敗", String.valueOf(failed), hex(FAIL_COLOR)) +
-                    "</div>" +
-                    "<div style='border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;'>" + rows + "</div>" +
-                    "</div></body></html>";
             try (BrowserContext c = browser.newContext(new Browser.NewContextOptions().setLocale("zh-TW"))) {
                 Page p = c.newPage();
-                p.setContent(html);
+                p.setViewportSize(1240, 1696);
+
+                groupCoverPng.clear();
+                for (Map.Entry<String, List<Shot>> entry : groups.entrySet()) {
+                    String cover = buildGroupCoverHtml(entry.getValue());
+                    p.setContent(cover);
+                    groupCoverPng.put(entry.getKey(),
+                            p.screenshot(new Page.ScreenshotOptions().setFullPage(true)));
+                }
+
+                // 先以固定寬度的頁碼欄渲染一次，取得總覽本身的頁數，再計算各案例的真正頁碼。
+                p.setContent(buildSummaryHtml(ordered, Map.of(), Map.of(), time));
+                byte[] draftSummary = p.screenshot(new Page.ScreenshotOptions().setFullPage(true));
+                int summaryPages = imagePageCount(draftSummary, PDF_PAGE_W, PDF_IMAGE_AREA_H);
+                SummaryPageIndex pageIndex = calculateSummaryPageIndex(groups, summaryPages);
+
+                p.setContent(buildSummaryHtml(ordered, pageIndex.cases(), pageIndex.groups(), time));
                 summaryPng = p.screenshot(new Page.ScreenshotOptions().setFullPage(true));
+                int finalSummaryPages = imagePageCount(summaryPng, PDF_PAGE_W, PDF_IMAGE_AREA_H);
+                if (finalSummaryPages != summaryPages) {
+                    pageIndex = calculateSummaryPageIndex(groups, finalSummaryPages);
+                    p.setContent(buildSummaryHtml(ordered, pageIndex.cases(), pageIndex.groups(), time));
+                    summaryPng = p.screenshot(new Page.ScreenshotOptions().setFullPage(true));
+                }
             }
         } catch (Exception ignored) {
         }
+    }
+
+    private static Map<String, List<Shot>> groupShots(List<Shot> ordered) {
+        Map<String, List<Shot>> groups = new LinkedHashMap<>();
+        for (Shot shot : ordered) {
+            groups.computeIfAbsent(shot.featureKey(), key -> new ArrayList<>()).add(shot);
+        }
+        return groups;
+    }
+
+    private static String buildGroupCoverHtml(List<Shot> group) {
+        Shot first = group.get(0);
+        long desktop = group.stream().filter(s -> !s.mobile()).count();
+        long mobile = group.size() - desktop;
+        long groupFailed = group.stream().filter(Shot::failed).count();
+        String coverColor = groupFailed == 0 ? hex(PASS_COLOR) : hex(FAIL_COLOR);
+        return "<html><body style='margin:0;width:1240px;height:1696px;font-family:sans-serif;" +
+                "background:#f4f7fa;color:#243244;display:flex;align-items:center;justify-content:center;'>" +
+                "<div style='width:980px;background:#fff;border-radius:22px;padding:70px 76px;" +
+                "box-shadow:0 18px 55px rgba(37,55,75,.16);border-top:14px solid " + coverColor + ";'>" +
+                "<div style='font-size:18px;color:#718096;font-weight:700;margin-bottom:16px;'>UI 測試功能群組</div>" +
+                "<h1 style='font-size:46px;margin:0 0 12px;'>" + escapeHtml(first.featureName()) + "</h1>" +
+                "<div style='font-size:18px;color:#718096;margin-bottom:50px;'>程式名稱：" +
+                escapeHtml(first.featureKey()) + "</div>" +
+                "<div style='display:flex;gap:22px;margin-bottom:42px;'>" +
+                statCard("全部場景", String.valueOf(group.size()), "#334155") +
+                statCard("電腦版", String.valueOf(desktop), "#2563a6") +
+                statCard("手機版", String.valueOf(mobile), "#8e44ad") +
+                "</div>" +
+                "<div style='padding:22px 26px;background:#edf3f8;border-radius:12px;font-size:18px;line-height:1.8;'>" +
+                "本群組依序顯示：<b>電腦版</b>，再顯示 <b>手機版</b>。<br>" +
+                (groupFailed == 0 ? "所有場景均已通過。" : "有 " + groupFailed + " 個場景失敗，請查看紅色案例。") +
+                "</div></div></body></html>";
+    }
+
+    private static String buildSummaryHtml(List<Shot> ordered, Map<Integer, PageRange> casePages,
+            Map<String, PageRange> groupPages, String time) {
+        int total = ordered.size();
+        long failed = ordered.stream().filter(Shot::failed).count();
+        long passed = total - failed;
+        StringBuilder rows = new StringBuilder();
+        String lastFeature = null;
+        Boolean lastMobile = null;
+        for (int i = 0; i < ordered.size(); i++) {
+            Shot s = ordered.get(i);
+            if (!s.featureKey().equals(lastFeature)) {
+                rows.append("<div style='display:flex;align-items:center;justify-content:space-between;gap:20px;")
+                        .append("padding:14px 16px;background:#334155;color:#fff;font-size:18px;font-weight:800;'>")
+                        .append("<span>功能群組：").append(escapeHtml(s.featureName()))
+                        .append(" <small style='font-size:12px;font-weight:500;opacity:.8;'>（")
+                        .append(escapeHtml(s.featureKey())).append("）</small></span>")
+                        .append("<span style='font-size:13px;white-space:nowrap;'>")
+                        .append(pageRangeLabel(groupPages.get(s.featureKey()))).append("</span></div>");
+                lastFeature = s.featureKey();
+                lastMobile = null;
+            }
+            if (lastMobile == null || lastMobile != s.mobile()) {
+                rows.append("<div style='padding:8px 16px;background:#e8eef5;color:#425466;font-size:13px;font-weight:800;'>")
+                        .append(s.mobile() ? "手機版" : "電腦版").append("</div>");
+                lastMobile = s.mobile();
+            }
+            rows.append("<div style='display:flex;align-items:center;gap:12px;padding:9px 16px;")
+                    .append(i % 2 == 0 ? "background:#f7f7f7;" : "")
+                    .append("'>")
+                    .append("<span style='width:32px;color:#888;font-weight:700;'>").append(i + 1).append("</span>")
+                    .append("<span style='flex:1;font-size:15px;'>").append(escapeHtml(s.title())).append("</span>")
+                    .append("<span style='width:112px;text-align:right;color:#58677a;font-size:13px;white-space:nowrap;'>")
+                    .append(pageRangeLabel(casePages.get(s.sequence()))).append("</span>")
+                    .append("<span style='width:62px;text-align:right;font-weight:700;color:")
+                    .append(hex(caseColor(i + 1, s.failed()))).append(";'>")
+                    .append(s.failed() ? "✘ 失敗" : "✔ 通過").append("</span>")
+                    .append("</div>");
+        }
+        return "<html><body style='margin:0;font-family:sans-serif;width:1240px;'>" +
+                "<div style='padding:36px 44px;'>" +
+                "<h1 style='margin:0 0 6px;font-size:30px;'>UI 測試報告總覽</h1>" +
+                "<div style='color:#666;font-size:14px;margin-bottom:26px;'>產出時間：" + time + "</div>" +
+                "<div style='display:flex;gap:20px;margin-bottom:30px;'>" +
+                statCard("測試案例總數", String.valueOf(total), "#333") +
+                statCard("通過", String.valueOf(passed), hex(PASS_COLOR)) +
+                statCard("失敗", String.valueOf(failed), hex(FAIL_COLOR)) +
+                "</div>" +
+                "<div style='border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;'>" + rows + "</div>" +
+                "</div></body></html>";
+    }
+
+    private static SummaryPageIndex calculateSummaryPageIndex(Map<String, List<Shot>> groups,
+            int summaryPages) throws Exception {
+        Map<Integer, PageRange> cases = new LinkedHashMap<>();
+        Map<String, PageRange> ranges = new LinkedHashMap<>();
+        int cursor = summaryPages + 1;
+        for (Map.Entry<String, List<Shot>> entry : groups.entrySet()) {
+            int groupFirst = cursor;
+            byte[] cover = groupCoverPng.get(entry.getKey());
+            if (cover != null) cursor += imagePageCount(cover, PDF_PAGE_W, PDF_IMAGE_AREA_H);
+            for (Shot shot : entry.getValue()) {
+                int pages = imagePageCount(shot.png(), PDF_PAGE_W, PDF_IMAGE_AREA_H);
+                cases.put(shot.sequence(), new PageRange(cursor, cursor + pages - 1));
+                cursor += pages;
+            }
+            ranges.put(entry.getKey(), new PageRange(groupFirst, cursor - 1));
+        }
+        return new SummaryPageIndex(cases, ranges);
+    }
+
+    private static String pageRangeLabel(PageRange range) {
+        if (range == null) return "PDF 頁碼";
+        return range.first() == range.last()
+                ? "PDF 第 " + range.first() + " 頁"
+                : "PDF 第 " + range.first() + "-" + range.last() + " 頁";
     }
 
     private static String statCard(String label, String value, String color) {
@@ -247,8 +402,8 @@ public class UiSteps {
 
     /**
      * 將本次所有 UI 截圖彙整成 target/ui-test-report.pdf（A4）。
-     * 截圖過長時切成多頁；每頁頂端畫該 test case 專屬顏色的色條與「Case N (頁次/總頁數)」，
-     * 與頁面內的標題橫幅同色，方便快速辨識同一案例的連續頁。
+     * 依程式功能分組，每組插入中文封面，並固定先放電腦版、再放手機版。
+     * 截圖過長時切成多頁；每頁頂端畫通過／失敗色條與「Case N (頁次/總頁數)」。
      */
     private static void writePdfReport() {
         if (shots.isEmpty()) return;
@@ -260,21 +415,34 @@ public class UiSteps {
                 org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD);
         try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument()) {
             int pdfPages = 0;
+            List<Shot> ordered = orderedShots();
             // 第一頁：總覽（測試案例總數／通過／失敗），以瀏覽器渲染的圖片呈現（PDFBox 內建字型不支援中文）
             if (summaryPng != null) {
                 pdfPages += addImagePages(doc, summaryPng, "Summary", new java.awt.Color(0x333333),
                         font, pageW, pageH, barH, imgAreaH);
             }
-            for (int i = 0; i < shots.size(); i++) {
-                Shot s = shots.get(i);
+            String lastFeature = null;
+            int groupNo = 0;
+            for (int i = 0; i < ordered.size(); i++) {
+                Shot s = ordered.get(i);
+                if (!s.featureKey().equals(lastFeature)) {
+                    lastFeature = s.featureKey();
+                    groupNo++;
+                    byte[] cover = groupCoverPng.get(lastFeature);
+                    if (cover != null) {
+                        pdfPages += addImagePages(doc, cover, "Group " + groupNo,
+                                new java.awt.Color(0x334155), font, pageW, pageH, barH, imgAreaH);
+                    }
+                }
                 int caseNo = i + 1;
-                String label = "Case " + caseNo + (s.failed() ? "  [FAILED]" : "");
+                String label = "Case " + caseNo + " - " + (s.mobile() ? "Mobile" : "Desktop") +
+                        (s.failed() ? "  [FAILED]" : "");
                 pdfPages += addImagePages(doc, s.png(), label, caseColor(caseNo, s.failed()),
                         font, pageW, pageH, barH, imgAreaH);
             }
             doc.save("target/ui-test-report.pdf");
             System.out.println("UI 測試截圖報告：target/ui-test-report.pdf（" +
-                    shots.size() + " 個場景，共 " + pdfPages + " 頁）");
+                    ordered.size() + " 個場景、" + groupNo + " 個功能群組，共 " + pdfPages + " 頁）");
         } catch (Exception e) {
             System.err.println("UI 測試 PDF 報告產生失敗：" + e);
         }
@@ -284,13 +452,34 @@ public class UiSteps {
      * 將一張截圖（過長時切成多頁）畫入 PDF，每頁頂端加上同色色條與標籤文字。
      * 回傳實際新增的頁數。
      */
+    private static PdfImageLayout pdfImageLayout(int width, int height, float pageW, float imgAreaH) {
+        int chunkPx = Math.max(1, (int) Math.floor(width * (imgAreaH / pageW)));
+        int total = Math.max(1, (int) Math.ceil(height / (double) chunkPx));
+        float drawW = pageW;
+        // Chromium 的 full-page 截圖偶爾會比整頁倍數多出 1～2px；若直接切頁會產生幾乎全白的尾頁。
+        // 尾段小於單頁 3% 時，將整張圖片等比縮小極少量，合併回前面的頁數。
+        int tailPx = height - (total - 1) * chunkPx;
+        if (total > 1 && tailPx <= Math.max(8, Math.round(chunkPx * 0.03f))) {
+            total--;
+            drawW = Math.min(pageW, total * imgAreaH * width / height);
+            chunkPx = Math.max(1, (int) Math.ceil(height / (double) total));
+        }
+        return new PdfImageLayout(total, chunkPx, drawW);
+    }
+
+    private static int imagePageCount(byte[] png, float pageW, float imgAreaH) throws Exception {
+        var image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
+        return pdfImageLayout(image.getWidth(), image.getHeight(), pageW, imgAreaH).total();
+    }
+
     private static int addImagePages(org.apache.pdfbox.pdmodel.PDDocument doc, byte[] png, String baseLabel,
             java.awt.Color color, org.apache.pdfbox.pdmodel.font.PDType1Font font,
             float pageW, float pageH, float barH, float imgAreaH) throws Exception {
         var full = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(png));
-        // 每頁可容納的截圖高度（像素），以 A4 寬度等比換算
-        int chunkPx = Math.max(1, (int) Math.floor(full.getWidth() * (imgAreaH / pageW)));
-        int total = Math.max(1, (int) Math.ceil(full.getHeight() / (double) chunkPx));
+        PdfImageLayout layout = pdfImageLayout(full.getWidth(), full.getHeight(), pageW, imgAreaH);
+        int chunkPx = layout.chunkPx();
+        int total = layout.total();
+        float drawW = layout.drawWidth();
         for (int p = 0; p < total; p++) {
             int y = p * chunkPx;
             int h = Math.min(chunkPx, full.getHeight() - y);
@@ -310,8 +499,9 @@ public class UiSteps {
                 // 單頁不顯示頁次；切成多頁時才標示 (頁次/總頁數)
                 cs.showText(baseLabel + (total > 1 ? "   (" + (p + 1) + "/" + total + ")" : ""));
                 cs.endText();
-                float drawH = h * (pageW / full.getWidth());
-                cs.drawImage(img, 0, pageH - barH - drawH, pageW, drawH);
+                float drawH = h * (drawW / full.getWidth());
+                float drawX = (pageW - drawW) / 2;
+                cs.drawImage(img, drawX, pageH - barH - drawH, drawW, drawH);
             }
         }
         return total;
@@ -972,6 +1162,17 @@ public class UiSteps {
                 .setBody("{\"displayName\":\"" + name + "\",\"username\":\"" + name + "@test.local\"}")));
         ctx.route("**/api/entra/photo", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
                 .setStatus(404)));
+        ctx.route("**/api/entra/profile", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+                .setStatus(200).setContentType("application/json")
+                .setBody("{\"displayName\":\"" + name + "\",\"mail\":\"" + name +
+                        "@test.local\",\"jobTitle\":\"測試管理者\",\"department\":\"資訊部\"}")));
+    }
+
+    @Given("模擬已啟用意見回饋")
+    public void mockFeedbackEnabled() {
+        ctx.route("**/api/feedback-config", r -> r.fulfill(new com.microsoft.playwright.Route.FulfillOptions()
+                .setStatus(200).setContentType("application/json")
+                .setBody("{\"recipient\":\"feedback@test.local\",\"subject\":\"TimeSurvey 意見回饋\"}")));
     }
 
     /* ---------- Entra ID 時區模擬（後台維護頁名牌的時差徽章） ---------- */
@@ -1213,6 +1414,33 @@ public class UiSteps {
     public void openAdminPage() {
         page.navigate(base() + "/");
         page.locator("#surveyList").waitFor();
+    }
+
+    @When("點擊右上角的登入姓名")
+    public void clickSignedInUserName() {
+        page.locator(".entra-chip").waitFor();
+        page.locator(".entra-chip").click();
+        page.locator(".entra-panel").waitFor();
+    }
+
+    @Then("引導與意見回饋應收合至登入姓名視窗且多國語系留在頁首")
+    public void headerUtilitiesCollapsedIntoAccountPanel() {
+        assertThat(page.locator("header #resetOnbBtn")).isHidden();
+        assertThat(page.locator("header #feedbackBtn")).isHidden();
+        assertThat(page.locator("header .i18n-control")).isVisible();
+        assertThat(page.locator(".entra-chip")).isVisible();
+    }
+
+    @Then("登入姓名視窗應只顯示重新顯示引導與意見回饋")
+    public void accountPanelShowsCommonUtilities() {
+        assertThat(page.locator(".entra-panel [data-action='onboarding']")).containsText("重新顯示引導");
+        assertThat(page.locator(".entra-panel [data-action='feedback']")).containsText("意見回饋");
+        assertThat(page.locator(".entra-panel [data-action='language']")).hasCount(0);
+    }
+
+    @Then("登入姓名視窗應完整顯示在手機畫面內")
+    public void accountPanelFitsMobileViewport() {
+        assertInsideViewport(page.locator(".entra-panel"), "登入姓名視窗");
     }
 
     @When("切換語言為英文")

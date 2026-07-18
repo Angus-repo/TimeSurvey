@@ -386,6 +386,7 @@
     'auth.chipTitle': '{0} (click to view account info)',
     'auth.chipAria': 'Signed in as {0}, click to view account info',
     'auth.loading': 'Loading account info…',
+    'auth.actions': 'Quick actions',
     'auth.logout': 'Sign out',
     'auth.jobTitle': 'Title', 'auth.department': 'Dept.', 'auth.office': 'Office',
     'auth.mobile': 'Mobile', 'auth.phone': 'Phone',
