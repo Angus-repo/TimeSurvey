@@ -210,6 +210,8 @@
   .onb-pop button { margin-top: 10px; background: #2c7be5; color: #fff; border: none; border-radius: 6px;
                     padding: 7px 22px; font-size: 14px; cursor: pointer; font-family: inherit; }
   .onb-pop button:hover { background: #1a68d1; }
+  /* 各引導泡泡的「知道了」一律靠右對齊 */
+  .onb-pop > div:last-child { text-align: right; }
   /* 首次建立調查的新手引導：打亮清單上的「複製連結」按鈕，提示把超連結傳給受調查人員 */
   .btn-ic.onb-spot { z-index: 1001; background: #fff; animation: onbpulse 1.6s ease-in-out infinite; }
   /* 建立調查後：清單第一筆的「複製連結」按鈕高亮閃爍 3 秒，引導使用者複製連結 */
@@ -226,8 +228,11 @@
   #dragOnbPop { position: fixed; top: auto; left: auto; }
   #dragOnbPop::before { left: var(--arrow-left, 36px); }
   #dragOnbPop.above::before { bottom: auto; top: 100%; border-bottom-color: transparent; border-top-color: #fff; }
-  /* 「調查日期範圍」新手引導：首次開啟大日曆時，把日曆抬到遮罩之上並在旁邊放說明泡泡 */
-  #calOnbPop { position: fixed; top: auto; left: auto; }
+  /* 「調查日期範圍」新手引導：首次開啟大日曆時，把日曆抬到遮罩之上並在旁邊放說明泡泡
+     （版面較其他引導精簡：縮小寬度、字級與內距） */
+  #calOnbPop { position: fixed; top: auto; left: auto; max-width: 300px;
+               font-size: 13px; line-height: 1.65; padding: 12px 16px; }
+  #calOnbPop .cal-onb-legend { margin: 8px 0 0; }
   #calOnbPop::before { bottom: auto; top: var(--arrow-top, 50%); left: 100%; transform: translateY(-50%);
                        border-bottom-color: transparent; border-left-color: #fff; }
   /* 窄螢幕左側放不下時，泡泡改放日曆下方／上方，箭頭改為指向日曆中心 */
@@ -524,10 +529,9 @@
 <div class="onb-mask" id="calOnbMask" style="display:none" onclick="endCalOnb(event)"></div>
 <div class="onb-pop" id="calOnbPop" style="display:none">
   <span data-i18n="idx.onbCalHtml">🗓 <b>怎麼選調查日期範圍</b><br>
-  預設已幫你選好「明天起共 7 天」，你也可以自己重選：<br>
-  • 再點一次<b>起日或迄日</b>，會取消目前的選取、重新開始。<br>
-  • 重新選時，先點一個日期當<b>起日</b>，再點另一個日期當<b>迄日</b>，中間整段就是調查範圍。<br>
-  • 點範圍<b>中間</b>的某一天，會把那天<b>挖空</b>，代表調查會跳過該天不排。</span>
+  已預選「明天起共 7 天」，想重選：<br>
+  • 先點<b>起日</b>、再點<b>迄日</b>，中間整段就是範圍。<br>
+  • 點範圍中間的日期可<b>挖空</b>，調查會跳過該天。</span>
   <div class="cal-onb-legend">
     <span><span class="cal-onb-sw range">15</span><span data-i18n="idx.onbCalLegendRange">起訖日</span></span>
     <span><span class="cal-onb-sw skip">16</span><span data-i18n="idx.onbCalLegendSkip">挖空（跳過該天）</span></span>
