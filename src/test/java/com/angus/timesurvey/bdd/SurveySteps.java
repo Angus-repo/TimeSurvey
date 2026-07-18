@@ -1,8 +1,10 @@
 package com.angus.timesurvey.bdd;
 
 import com.angus.timesurvey.job.HousekeepingJob;
+import com.angus.timesurvey.model.EntraToken;
 import com.angus.timesurvey.model.Survey;
 import com.angus.timesurvey.model.SurveyResponse;
+import com.angus.timesurvey.repo.EntraTokenRepository;
 import com.angus.timesurvey.repo.SurveyRepository;
 import com.angus.timesurvey.repo.SurveyResponseRepository;
 import com.angus.timesurvey.repo.SurveyVisitRepository;
@@ -26,6 +28,8 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -49,6 +53,7 @@ public class SurveySteps {
     @Autowired private SurveyResponseRepository responseRepo;
     @Autowired private HousekeepingJob housekeepingJob;
     @Autowired private SurveyVisitRepository visitRepo;
+    @Autowired private EntraTokenRepository entraTokenRepo;
     @Autowired private ObjectMapper om;
     @Value("${local.server.port}") private int port;
 
@@ -469,6 +474,33 @@ public class SurveySteps {
     @When("未登入時查詢使用者時區")
     public void queryEntraTimezoneWithoutLogin() {
         last = rest.getForEntity("/api/entra/timezone?userId=some-user-id", String.class);
+    }
+
+    /* ---------- 記住我（remember-me）cookie ---------- */
+
+    @Given("資料庫已有記住我權杖為 {string} 的登入者 {string}")
+    public void seedRememberToken(String token, String name) throws Exception {
+        EntraToken row = new EntraToken();
+        row.setUserId("bdd-user-" + token);
+        row.setDisplayName(name);
+        row.setUsername(name + "@example.com");
+        row.setRefreshToken("bdd-refresh-token");
+        // 與後端相同：資料庫僅存權杖的 SHA-256 雜湊
+        byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
+        StringBuilder hex = new StringBuilder();
+        for (byte b : digest) {
+            hex.append(String.format("%02x", b));
+        }
+        row.setRememberTokenHash(hex.toString());
+        row.setUpdatedAt(LocalDateTime.now());
+        entraTokenRepo.save(row);
+    }
+
+    @When("帶記住我 cookie {string} 查詢目前登入者")
+    public void queryMeWithRememberCookie(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.COOKIE, "TS_REMEMBER=" + token);
+        last = rest.exchange("/api/entra/me", HttpMethod.GET, new HttpEntity<>(headers), String.class);
     }
 
     /* ---------- 共用斷言 ---------- */

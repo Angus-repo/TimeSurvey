@@ -6,10 +6,13 @@ import com.angus.timesurvey.service.EntraGraphService;
 import com.angus.timesurvey.service.EntraGraphService.GraphException;
 import com.angus.timesurvey.service.EntraGraphService.NotSignedInException;
 import com.angus.timesurvey.service.EntraGraphService.SignedInUser;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +23,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +38,10 @@ import java.util.UUID;
  * 由 {@link EntraGraphService} 用 refresh token 換 access token 呼叫 Graph。
  * 未登入（或 refresh token 失效）一律回 401，前端據此重新走登入流程。
  *
+ * 登入成功另發放長效的「記住我」cookie（{@link #REMEMBER_COOKIE}）：session 失效
+ * （重開瀏覽器、伺服器重啟）時憑此自動還原登入，使用者不必每次都導去微軟登入頁；
+ * 登出時 cookie 與資料庫中的權杖雜湊一併清除。
+ *
  * 設定由 {@code data/entra.properties} 注入（{@link com.angus.timesurvey.config.EntraEnvironmentPostProcessor}）；
  * 未設定 CLIENT_ID／CLIENT_SECRET 時 {@code /api/entra-config} 回 204，前端不啟用登入。
  */
@@ -45,6 +53,11 @@ public class EntraApiController {
     /** session 屬性：授權碼流程的 state 防偽值與登入後要回去的頁面 */
     static final String SESSION_STATE = "entraState";
     static final String SESSION_RETURN = "entraReturn";
+
+    /** 「記住我」cookie：登入成功時發放，session 失效（重開瀏覽器、伺服器重啟）時
+     *  憑此自動還原登入，使用者不必每次都導去微軟登入頁 */
+    static final String REMEMBER_COOKIE = "TS_REMEMBER";
+    static final Duration REMEMBER_MAX_AGE = Duration.ofDays(180);
 
     private final EntraGraphService graph;
     private final UserActivityRepository activityRepo;
@@ -132,13 +145,17 @@ public class EntraApiController {
         try {
             SignedInUser user = graph.redeemCode(code, callbackUri(request));
             session.setAttribute(SESSION_USER, user);
+            String rememberToken = graph.issueRememberToken(user.userId());
+            if (rememberToken != null) {
+                return redirect(returnPath, rememberCookie(rememberToken, REMEMBER_MAX_AGE, request));
+            }
         } catch (GraphException e) {
             return redirect(returnPath + "#entra_error=" + enc(e.getMessage()));
         }
         return redirect(returnPath);
     }
 
-    /** 登出：清除 session 與資料庫中的 refresh token，並導向微軟登出頁 */
+    /** 登出：清除 session、記住我 cookie 與資料庫中的 refresh token，並導向微軟登出頁 */
     @GetMapping("/api/entra/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
@@ -150,7 +167,7 @@ public class EntraApiController {
             session.invalidate();
         }
         String origin = ServletUriComponentsBuilder.fromContextPath(request).build().toUriString();
-        return redirect(graph.logoutUrl(origin));
+        return redirect(graph.logoutUrl(origin), rememberCookie("", Duration.ZERO, request));
     }
 
     /* ---------- Microsoft Graph 代理 ---------- */
@@ -224,9 +241,38 @@ public class EntraApiController {
         HttpSession session = request.getSession(false);
         SignedInUser user = session == null ? null : (SignedInUser) session.getAttribute(SESSION_USER);
         if (user == null) {
-            throw new NotSignedInException("尚未登入，請先以 Microsoft 帳號登入");
+            // session 失效（重開瀏覽器、伺服器重啟）時，憑記住我 cookie 自動還原登入
+            user = graph.userByRememberToken(readRememberCookie(request));
+            if (user == null) {
+                throw new NotSignedInException("尚未登入，請先以 Microsoft 帳號登入");
+            }
+            request.getSession(true).setAttribute(SESSION_USER, user);
         }
         return user;
+    }
+
+    private static String readRememberCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+        for (Cookie c : cookies) {
+            if (REMEMBER_COOKIE.equals(c.getName())) {
+                return c.getValue();
+            }
+        }
+        return null;
+    }
+
+    /** 記住我 cookie（HttpOnly，前端腳本讀不到）；maxAge 為零時代表清除 */
+    private static ResponseCookie rememberCookie(String value, Duration maxAge, HttpServletRequest request) {
+        return ResponseCookie.from(REMEMBER_COOKIE, value)
+                .httpOnly(true)
+                .secure(request.isSecure())
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(maxAge)
+                .build();
     }
 
     /** 回呼網址固定為本站的 /api/entra/callback（需以「Web」平台註冊於 Azure 應用程式） */
@@ -244,6 +290,11 @@ public class EntraApiController {
 
     private static ResponseEntity<Void> redirect(String url) {
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url)).build();
+    }
+
+    private static ResponseEntity<Void> redirect(String url, ResponseCookie cookie) {
+        return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url))
+                .header(HttpHeaders.SET_COOKIE, cookie.toString()).build();
     }
 
     private static String enc(String s) {

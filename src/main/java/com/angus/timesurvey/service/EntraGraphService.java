@@ -16,6 +16,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -147,10 +150,53 @@ public class EntraGraphService {
         return user;
     }
 
-    /** 登出：刪除資料庫中的 refresh token 與快取的 access token */
+    /** 登出：刪除資料庫中的 refresh token（含記住我權杖雜湊）與快取的 access token */
     public void signOut(String userId) {
         tokenCache.remove(userId);
         repo.deleteById(userId);
+    }
+
+    /* ---------- 記住我（remember-me）權杖 ---------- */
+
+    private final SecureRandom random = new SecureRandom();
+
+    /** 登入成功後發放記住我權杖：原始值放進瀏覽器 cookie，資料庫僅存 SHA-256 雜湊，
+     *  資料庫外洩也無法憑雜湊冒用登入。每次登入重新產生，舊 cookie 隨之失效 */
+    public String issueRememberToken(String userId) {
+        EntraToken row = repo.findById(userId).orElse(null);
+        if (row == null) {
+            return null;
+        }
+        byte[] bytes = new byte[32];
+        random.nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        row.setRememberTokenHash(sha256(token));
+        row.setUpdatedAt(LocalDateTime.now());
+        repo.save(row);
+        return token;
+    }
+
+    /** 以記住我權杖還原登入者；查無對應（已登出、權杖已更換）回 null */
+    public SignedInUser userByRememberToken(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        return repo.findByRememberTokenHash(sha256(token))
+                .map(r -> new SignedInUser(r.getUserId(), r.getDisplayName(), r.getUsername()))
+                .orElse(null);
+    }
+
+    static String sha256(String s) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(s.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("JVM 不支援 SHA-256", e);
+        }
     }
 
     /* ---------- access token：快取 → 過期以 refresh token 換新 ---------- */

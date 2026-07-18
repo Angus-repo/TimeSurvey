@@ -252,4 +252,45 @@ class EntraGraphServiceTest {
         when(repo.findById("oid-x")).thenReturn(Optional.empty());
         assertThrows(NotSignedInException.class, () -> service.searchUsers("oid-x", "王小明"));
     }
+
+    @Test
+    void 發放記住我權杖時資料庫僅存雜湊() {
+        EntraToken row = row("oid-1", "rt-1");
+        when(repo.findById("oid-1")).thenReturn(Optional.of(row));
+
+        String token = service.issueRememberToken("oid-1");
+
+        assertNotNull(token);
+        assertNotEquals(token, row.getRememberTokenHash());   // 原始權杖不落地
+        assertEquals(EntraGraphService.sha256(token), row.getRememberTokenHash());
+        verify(repo).save(row);
+    }
+
+    @Test
+    void 尚未登入的使用者不發放記住我權杖() {
+        when(repo.findById("oid-x")).thenReturn(Optional.empty());
+        assertNull(service.issueRememberToken("oid-x"));
+    }
+
+    @Test
+    void 以記住我權杖還原登入者() {
+        EntraToken row = row("oid-1", "rt-1");
+        row.setDisplayName("王小明");
+        row.setUsername("ming@example.com");
+        when(repo.findByRememberTokenHash(EntraGraphService.sha256("tok-1")))
+                .thenReturn(Optional.of(row));
+
+        SignedInUser user = service.userByRememberToken("tok-1");
+
+        assertEquals("oid-1", user.userId());
+        assertEquals("王小明", user.displayName());
+        assertEquals("ming@example.com", user.username());
+    }
+
+    @Test
+    void 記住我權杖查無對應時回傳null() {
+        assertNull(service.userByRememberToken("no-such-token"));
+        assertNull(service.userByRememberToken(null));
+        assertNull(service.userByRememberToken(" "));
+    }
 }

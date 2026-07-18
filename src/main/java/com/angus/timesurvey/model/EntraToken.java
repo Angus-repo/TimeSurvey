@@ -30,6 +30,11 @@ public class EntraToken {
     @Column(nullable = false)
     private String refreshToken;
 
+    /** 「記住我」cookie 權杖的 SHA-256 雜湊（hex）：原始權杖只存在瀏覽器 cookie，
+     *  session 失效（重開瀏覽器、伺服器重啟）時憑此還原登入，免再導去微軟登入頁 */
+    @Column(length = 64)
+    private String rememberTokenHash;
+
     private LocalDateTime updatedAt;
 
     public String getUserId() { return userId; }
@@ -43,6 +48,9 @@ public class EntraToken {
 
     public String getRefreshToken() { return refreshToken; }
     public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
+
+    public String getRememberTokenHash() { return rememberTokenHash; }
+    public void setRememberTokenHash(String rememberTokenHash) { this.rememberTokenHash = rememberTokenHash; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }

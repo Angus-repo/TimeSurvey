@@ -75,6 +75,53 @@ class EntraApiControllerTest {
     }
 
     @Test
+    void 回呼成功時發放記住我cookie() {
+        SignedInUser user = new SignedInUser("u1", "王小明", "ming@example.com");
+        when(graph.redeemCode(anyString(), anyString())).thenReturn(user);
+        when(graph.issueRememberToken("u1")).thenReturn("tok-1");
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.getSession().setAttribute(EntraApiController.SESSION_STATE, "st");
+        req.getSession().setAttribute(EntraApiController.SESSION_RETURN, "/");
+        var res = controller.callback("code-1", "st", null, null, req);
+        String setCookie = res.getHeaders().getFirst(org.springframework.http.HttpHeaders.SET_COOKIE);
+        assertNotNull(setCookie);
+        assertTrue(setCookie.startsWith(EntraApiController.REMEMBER_COOKIE + "=tok-1"));
+        assertTrue(setCookie.contains("HttpOnly"));
+    }
+
+    @Test
+    void session失效時憑記住我cookie自動還原登入() {
+        SignedInUser user = new SignedInUser("u1", "王小明", "ming@example.com");
+        when(graph.userByRememberToken("tok-1")).thenReturn(user);
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setCookies(new jakarta.servlet.http.Cookie(EntraApiController.REMEMBER_COOKIE, "tok-1"));
+        Map<String, Object> me = controller.me("/", req);
+        assertEquals("王小明", me.get("displayName"));
+        assertEquals(user, req.getSession().getAttribute(EntraApiController.SESSION_USER));
+    }
+
+    @Test
+    void 記住我cookie無對應紀錄時仍拋出未登入例外() {
+        when(graph.userByRememberToken(anyString())).thenReturn(null);
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.setCookies(new jakarta.servlet.http.Cookie(EntraApiController.REMEMBER_COOKIE, "bad"));
+        assertThrows(NotSignedInException.class, () -> controller.me("/", req));
+    }
+
+    @Test
+    void 登出時清除記住我cookie() {
+        when(graph.logoutUrl(anyString())).thenReturn("https://login.example/logout");
+        MockHttpServletRequest req = new MockHttpServletRequest();
+        req.getSession().setAttribute(EntraApiController.SESSION_USER,
+                new SignedInUser("u1", "王小明", "ming@example.com"));
+        var res = controller.logout(req);
+        verify(graph).signOut("u1");
+        String setCookie = res.getHeaders().getFirst(org.springframework.http.HttpHeaders.SET_COOKIE);
+        assertNotNull(setCookie);
+        assertTrue(setCookie.contains("Max-Age=0"), "登出應讓記住我 cookie 立即過期：" + setCookie);
+    }
+
+    @Test
     void 未登入呼叫代理API拋出未登入例外() {
         MockHttpServletRequest req = new MockHttpServletRequest();
         assertThrows(NotSignedInException.class, () -> controller.users("王小明", req));
