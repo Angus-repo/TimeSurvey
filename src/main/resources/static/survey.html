@@ -843,9 +843,10 @@ function centerGridOnbFocus(step) {
   if (!target) return;
   const grid = $('gridCard');
   const pad = 16;
+  let targetLeft = null;
   if (grid) {
     if (step === 1) {
-      grid.scrollLeft = 0;
+      targetLeft = 0;
     } else {
       const gridRect = grid.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
@@ -856,14 +857,24 @@ function centerGridOnbFocus(step) {
         nextLeft += targetRect.right - gridRect.right + pad;
       }
       const maxLeft = Math.max(0, grid.scrollWidth - grid.clientWidth);
-      grid.scrollLeft = Math.max(0, Math.min(nextLeft, maxLeft));
+      targetLeft = Math.max(0, Math.min(nextLeft, maxLeft));
     }
+    grid.scrollTo({ left: targetLeft, behavior: 'smooth' });
+    // 瀏覽器忙碌時原生 smooth scroll 偶爾會提早停止；動畫後校準終點，
+    // 並依最終座標重算泡泡與箭頭，避免引導目標只露出一部分。
+    window.setTimeout(() => {
+      if (gridOnbStep !== step || $('onbPopGrid').style.display === 'none') return;
+      if (Math.abs(grid.scrollLeft - targetLeft) > 1) grid.scrollLeft = targetLeft;
+      positionGridOnbPop(step);
+    }, 500);
   }
-  const gridRect = (grid || target).getBoundingClientRect();
+  // 桌機維持整張表格停在操作列下方；手機卡片式版面則逐步對準目前正在說明的區塊，
+  // 才能在第 2 步從上方快速鈕平滑移動到下方細部時段。
+  const scrollRect = (isNarrowLayout() ? target : (grid || target)).getBoundingClientRect();
   const targetTop = gridOnbTargetTop();
   const maxTop = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
-  const top = Math.max(0, Math.min(window.scrollY + gridRect.top - targetTop, maxTop));
-  window.scrollTo({ top, behavior: 'auto' });
+  const top = Math.max(0, Math.min(window.scrollY + scrollRect.top - targetTop, maxTop));
+  window.scrollTo({ top, behavior: 'smooth' });
 }
 
 function gridOnbTargetTop() {
@@ -2009,7 +2020,7 @@ function suggestCalScrollToSel() {
   const sc = $('suggestCalScroll');
   const el = document.querySelector('#suggestCalDays [data-d="' + (suggestCalStart || todayYmd()) + '"]');
   if (!sc || !el) return;
-  sc.scrollTop = Math.max(0, el.offsetTop - sc.offsetTop - 4);
+  sc.scrollTo({ top: Math.max(0, el.offsetTop - sc.offsetTop - 4), behavior: 'smooth' });
 }
 
 function renderSuggestCalendar() {
@@ -2294,7 +2305,7 @@ function showDone(name, extra) {
   $('main').style.display = 'none';
   $('bar').style.display = 'none';
   $('done').style.display = '';
-  window.scrollTo({ top: 0 });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 /* 回到表單繼續修改（重新進入網址也同樣可重新填寫） */

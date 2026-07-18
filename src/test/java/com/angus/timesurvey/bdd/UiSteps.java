@@ -447,6 +447,8 @@ public class UiSteps {
     public void gridOnboardingLeftFullyVisible() {
         assertThat(page.locator("#onbPopGrid")).isVisible();
         assertThat(page.locator("#onbColLeft")).isVisible();
+        waitUntilInsideViewport("#gridCard th.datecell");
+        waitUntilInsideViewport("#onbPopGrid");
         assertInsideViewport(page.locator("#onbPopGrid"), "左半段引導泡泡");
         assertInsideViewport(page.locator("#gridCard th.datecell").first(), "左半段快速操作區");
         Boolean arrowPointsLeft = (Boolean) page.locator("#onbPopGrid").evaluate(
@@ -460,6 +462,8 @@ public class UiSteps {
     public void gridOnboardingRightFullyVisible() {
         assertThat(page.locator("#onbPopGrid")).isVisible();
         assertThat(page.locator("#onbColRight")).isVisible();
+        waitUntilInsideViewport("#gridCard td.hourcell .hbox");
+        waitUntilInsideViewport("#onbPopGrid");
         assertInsideViewport(page.locator("#onbPopGrid"), "右半段引導泡泡");
         assertInsideViewport(page.locator("#gridCard td.hourcell .hbox").first(), "右半段時段操作區");
         Boolean arrowPointsRight = (Boolean) page.locator("#onbPopGrid").evaluate(
@@ -471,6 +475,21 @@ public class UiSteps {
 
     @Then("表格操作引導的表格區應停在操作列下方的理想高度")
     public void gridOnboardingCardAtIdealHeight() {
+        waitForPageScrollToSettle();
+        page.waitForFunction("""
+                () => {
+                  const card = document.getElementById('gridCard');
+                  if (!card) return false;
+                  const cardRect = card.getBoundingClientRect();
+                  const actionBar = document.getElementById('actionBar');
+                  if (actionBar && actionBar.getClientRects().length > 0) {
+                    const actionRect = actionBar.getBoundingClientRect();
+                    const gap = cardRect.top - actionRect.bottom;
+                    return actionRect.top >= -4 && gap >= 8 && gap <= 36;
+                  }
+                  return cardRect.top >= 56 && cardRect.top <= 150;
+                }
+                """);
         var box = page.locator("#gridCard").boundingBox();
         org.junit.jupiter.api.Assertions.assertNotNull(box, "表格區應可取得位置");
         var actionBar = page.locator("#actionBar").boundingBox();
@@ -486,6 +505,47 @@ public class UiSteps {
         }
     }
 
+    @When("切換為手機版面")
+    public void switchToMobileLayout() {
+        page.setViewportSize(390, 844);
+        page.waitForFunction("window.matchMedia('(max-width: 720px)').matches");
+    }
+
+    @Then("手機版表格操作引導應移動到上方快速操作並完整顯示")
+    public void mobileGridOnboardingMovesToQuickActions() {
+        assertThat(page.locator("#onbLeftTitleText")).containsText("上方");
+        waitForMobileGridOnboardingTarget("#gridCard th.datecell");
+        waitUntilInsideViewport("#onbPopGrid");
+        assertInsideViewport(page.locator("#gridCard th.datecell").first(), "手機版上方快速操作區");
+        assertInsideViewport(page.locator("#onbPopGrid"), "手機版上方操作引導泡泡");
+        assertThat(page.locator("#onbPopGrid")).hasClass(java.util.regex.Pattern.compile(".*\\bat-below\\b.*"));
+        page.evaluate("window.__mobileGridOnbFirstScrollY = window.scrollY");
+    }
+
+    @Then("手機版表格操作引導應移動到下方細部時段並完整顯示")
+    public void mobileGridOnboardingMovesToDetailedSlots() {
+        assertThat(page.locator("#onbRightTitleText")).containsText("下方");
+        waitForMobileGridOnboardingTarget("#gridCard td.hourcell .hbox");
+        waitUntilInsideViewport("#onbPopGrid");
+        assertInsideViewport(page.locator("#gridCard td.hourcell .hbox").first(), "手機版下方細部時段區");
+        assertInsideViewport(page.locator("#onbPopGrid"), "手機版下方時段引導泡泡");
+        Number firstScrollY = (Number) page.evaluate("window.__mobileGridOnbFirstScrollY || 0");
+        Number currentScrollY = (Number) page.evaluate("window.scrollY");
+        org.junit.jupiter.api.Assertions.assertTrue(currentScrollY.doubleValue() > firstScrollY.doubleValue() + 10,
+                "手機版第 2 步應從上方快速操作平滑移動到下方細部時段，第一次 scrollY="
+                        + firstScrollY + "，第二次 scrollY=" + currentScrollY);
+    }
+
+    private void waitForMobileGridOnboardingTarget(String selector) {
+        page.waitForFunction("""
+                selector => {
+                  const el = document.querySelector(selector);
+                  if (!el || !window.matchMedia('(max-width: 720px)').matches) return false;
+                  return Math.abs(el.getBoundingClientRect().top - gridOnbTargetTop()) <= 2;
+                }
+                """, selector);
+    }
+
     private void assertInsideViewport(Locator locator, String label) {
         var box = locator.boundingBox();
         org.junit.jupiter.api.Assertions.assertNotNull(box, label + "應可取得位置");
@@ -499,6 +559,94 @@ public class UiSteps {
                 label + "右側不應超出畫面，實際 right=" + (box.x + box.width));
         org.junit.jupiter.api.Assertions.assertTrue(box.y + box.height <= vp.height + tolerance,
                 label + "下方不應超出畫面，實際 bottom=" + (box.y + box.height));
+    }
+
+    /** 平滑捲動是非同步動畫；等目標實際進入畫面後再檢查最終座標，避免讀到移動途中的位置。 */
+    private void waitUntilInsideViewport(String selector) {
+        page.waitForFunction("""
+                selector => {
+                  const el = document.querySelector(selector);
+                  if (!el) return false;
+                  const r = el.getBoundingClientRect();
+                  return r.left >= -1 && r.top >= -1
+                      && r.right <= window.innerWidth + 1
+                      && r.bottom <= window.innerHeight + 1;
+                }
+                """, selector);
+    }
+
+    /** 等頁面連續數幀維持同一捲動位置，再分別讀取元素座標，避免兩次量測落在動畫的不同影格。 */
+    private void waitForPageScrollToSettle() {
+        page.waitForFunction("""
+                () => new Promise(resolve => {
+                  let lastX = window.scrollX;
+                  let lastY = window.scrollY;
+                  let stableFrames = 0;
+                  const check = () => {
+                    const stable = Math.abs(window.scrollX - lastX) < 0.25
+                        && Math.abs(window.scrollY - lastY) < 0.25;
+                    stableFrames = stable ? stableFrames + 1 : 0;
+                    lastX = window.scrollX;
+                    lastY = window.scrollY;
+                    if (stableFrames >= 4) resolve(true);
+                    else requestAnimationFrame(check);
+                  };
+                  requestAnimationFrame(check);
+                })
+                """);
+    }
+
+    @When("開始記錄頁面定位捲動方式")
+    public void startRecordingPositioningScrollBehavior() {
+        page.evaluate("""
+                () => {
+                  window.__positioningScrollCalls = [];
+                  if (window.__positioningScrollRecorderInstalled) return;
+                  window.__positioningScrollRecorderInstalled = true;
+
+                  const behaviorOf = args => {
+                    const options = args.length === 1 && args[0] && typeof args[0] === 'object'
+                        ? args[0] : null;
+                    return options && options.behavior ? options.behavior : null;
+                  };
+                  const record = (method, args) => window.__positioningScrollCalls.push({
+                    method,
+                    behavior: behaviorOf(args)
+                  });
+
+                  const windowScrollTo = window.scrollTo;
+                  window.scrollTo = function(...args) {
+                    record('window.scrollTo', args);
+                    return windowScrollTo.apply(window, args);
+                  };
+
+                  const elementScrollTo = Element.prototype.scrollTo;
+                  if (elementScrollTo) {
+                    Element.prototype.scrollTo = function(...args) {
+                      record('element.scrollTo', args);
+                      return elementScrollTo.apply(this, args);
+                    };
+                  }
+
+                  const scrollIntoView = Element.prototype.scrollIntoView;
+                  Element.prototype.scrollIntoView = function(...args) {
+                    record('element.scrollIntoView', args);
+                    return scrollIntoView.apply(this, args);
+                  };
+                }
+                """);
+    }
+
+    @Then("頁面定位捲動應使用平滑效果")
+    public void positioningScrollUsesSmoothBehavior() {
+        Number count = (Number) page.evaluate("window.__positioningScrollCalls?.length || 0");
+        String calls = (String) page.evaluate("JSON.stringify(window.__positioningScrollCalls || [])");
+        org.junit.jupiter.api.Assertions.assertTrue(count.intValue() > 0,
+                "應至少發生一次頁面定位捲動，實際紀錄=" + calls);
+        Boolean allSmooth = (Boolean) page.evaluate(
+                "(window.__positioningScrollCalls || []).every(call => call.behavior === 'smooth')");
+        org.junit.jupiter.api.Assertions.assertTrue(allSmooth,
+                "所有頁面定位捲動都應使用 smooth，實際紀錄=" + calls);
     }
 
     @When("按下表格操作引導的按鈕")

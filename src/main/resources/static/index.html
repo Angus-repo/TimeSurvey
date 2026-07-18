@@ -890,7 +890,7 @@ function calScrollToSel() {
   const sc = $('calScroll');
   const el = document.querySelector('#calDays [data-d="' + (calStart || todayYmd()) + '"]');
   if (!sc || !el) return;
-  sc.scrollTop = Math.max(0, el.offsetTop - sc.offsetTop - 4);
+  sc.scrollTo({ top: Math.max(0, el.offsetTop - sc.offsetTop - 4), behavior: 'smooth' });
 }
 
 /* 日曆固定連續顯示「本月一號～下個月月底」（最多兩個月），跨月日期（如 7/26~8/2）
@@ -1477,7 +1477,7 @@ function spotCalPop(scrollIntoPlace) {
   // 泡泡以完整高度貼齊視窗底部、箭頭朝上指向日曆；被提示的日曆盡量捲到畫面上緣，
   // 至少保證露出上半部（標題＋星期列＋起訖日示範的第一列）
   if (scrollIntoPlace) {
-    window.scrollTo({ top: Math.max(0, window.scrollY + r.top - 8), behavior: 'auto' });
+    window.scrollTo({ top: Math.max(0, window.scrollY + r.top - 8), behavior: 'smooth' });
     r = cal.getBoundingClientRect();
   }
   const calPeek = 150;   // 日曆至少露出的高度
