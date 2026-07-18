@@ -16,7 +16,7 @@
              border-radius: 20px; padding: 7px 16px; font-size: 13px; font-family: inherit; cursor: pointer;
              transition: background .15s, border-color .15s; }
   .hdr-btn:hover { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.6); }
-  .hdr-actions { display: flex; align-items: center; gap: 10px; }
+  .hdr-actions { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
   .container { max-width: 1100px; margin: 24px auto; padding: 0 16px 70px; }
   .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); padding: 16px 20px; margin-bottom: 16px; }
   label { font-size: 14px; color: #555; }
@@ -344,6 +344,7 @@
   @media (max-width: 720px) {
     header { padding: 14px 16px; }
     header h1 { font-size: 18px; }
+    .hdr-actions { width: 100%; justify-content: flex-end; }
     .container { margin: 16px auto; padding: 0 12px 100px; }
     .card { padding: 14px; }
     /* 姓名選擇：直排、整寬，方便單手操作 */

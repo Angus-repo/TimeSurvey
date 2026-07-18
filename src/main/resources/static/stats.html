@@ -7,10 +7,17 @@
 <style>
   * { box-sizing: border-box; }
   body { font-family: "Microsoft JhengHei", "PingFang TC", sans-serif; margin: 0; background: #f0f2f5; color: #333; }
-  header { background: #34495e; color: #fff; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header { background: #34495e; color: #fff; padding: 16px 24px; display: flex; align-items: center;
+           justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   header h1 { margin: 0; font-size: 20px; }
   header a { color: #cfd8e3; font-size: 13px; text-decoration: none; }
   header a:hover { color: #fff; text-decoration: underline; }
+  .hdr-actions { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+  @media (max-width: 720px) {
+    header { padding: 14px 16px; }
+    header h1 { font-size: 18px; }
+    .hdr-actions { width: 100%; justify-content: flex-end; }
+  }
   .container { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
   .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.1); padding: 20px; margin-bottom: 24px; }
   .card h2 { margin-top: 0; font-size: 17px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
@@ -80,7 +87,7 @@
 <body>
 <header>
   <h1 data-i18n="st.header">📊 時間調查 - 全站使用統計</h1>
-  <div class="hdr-actions" style="display:flex; align-items:center; gap:14px">
+  <div class="hdr-actions">
     <a href="/" data-i18n="st.backAdmin">← 回後台維護</a>
   </div>
 </header>

@@ -457,9 +457,9 @@ public class UiSteps {
         int total = Math.max(1, (int) Math.ceil(height / (double) chunkPx));
         float drawW = pageW;
         // Chromium 的 full-page 截圖偶爾會比整頁倍數多出 1～2px；若直接切頁會產生幾乎全白的尾頁。
-        // 尾段小於單頁 3% 時，將整張圖片等比縮小極少量，合併回前面的頁數。
+        // 尾段小於單頁 8% 時，將整張圖片等比縮小極少量，避免產生只有白底的尾頁。
         int tailPx = height - (total - 1) * chunkPx;
-        if (total > 1 && tailPx <= Math.max(8, Math.round(chunkPx * 0.03f))) {
+        if (total > 1 && tailPx <= Math.max(8, Math.round(chunkPx * 0.08f))) {
             total--;
             drawW = Math.min(pageW, total * imgAreaH * width / height);
             chunkPx = Math.max(1, (int) Math.ceil(height / (double) total));
@@ -1441,6 +1441,31 @@ public class UiSteps {
     @Then("登入姓名視窗應完整顯示在手機畫面內")
     public void accountPanelFitsMobileViewport() {
         assertInsideViewport(page.locator(".entra-panel"), "登入姓名視窗");
+    }
+
+    @Then("手機版頁首的多國語系與姓名按鈕應靠右對齊")
+    public void mobileHeaderLanguageAndNameAlignRight() {
+        var actions = page.locator("header .hdr-actions");
+        var language = actions.locator(".i18n-control");
+        var name = actions.locator(".entra-chip");
+        assertThat(language).isVisible();
+        assertThat(name).isVisible();
+
+        String justifyContent = (String) actions.evaluate("el => getComputedStyle(el).justifyContent");
+        org.junit.jupiter.api.Assertions.assertEquals("flex-end", justifyContent,
+                "手機版頁首工具列應使用靠右對齊");
+
+        var actionsBox = actions.boundingBox();
+        var languageBox = language.boundingBox();
+        var nameBox = name.boundingBox();
+        org.junit.jupiter.api.Assertions.assertNotNull(actionsBox, "應可取得手機版頁首工具列位置");
+        org.junit.jupiter.api.Assertions.assertNotNull(languageBox, "應可取得多國語系按鈕位置");
+        org.junit.jupiter.api.Assertions.assertNotNull(nameBox, "應可取得姓名按鈕位置");
+
+        double actionsRight = actionsBox.x + actionsBox.width;
+        double controlsRight = Math.max(languageBox.x + languageBox.width, nameBox.x + nameBox.width);
+        org.junit.jupiter.api.Assertions.assertEquals(actionsRight, controlsRight, 2.0,
+                "多國語系與姓名按鈕群組應貼齊頁首工具列右側");
     }
 
     @When("切換語言為英文")
