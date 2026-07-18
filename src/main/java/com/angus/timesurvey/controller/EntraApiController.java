@@ -33,7 +33,7 @@ import java.util.UUID;
  * Microsoft Entra ID 登入與 Microsoft Graph 代呼叫 API。
  *
  * 登入採後端授權碼流程：{@code /api/entra/login} 導向微軟登入頁 →
- * {@code /api/entra/callback} 以 client secret 換取 token、refresh token 存入資料庫、
+ * {@code /api/entra/callback} 以應用程式身分（憑證或 client secret）換取 token、refresh token 存入資料庫、
  * 登入者記在 HTTP session → 之後前端呼叫 {@code /users}、{@code /calendar} 等代理端點，
  * 由 {@link EntraGraphService} 用 refresh token 換 access token 呼叫 Graph。
  * 未登入（或 refresh token 失效）一律回 401，前端據此重新走登入流程。

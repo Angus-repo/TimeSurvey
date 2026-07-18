@@ -97,6 +97,28 @@ class EntraEnvironmentPostProcessorTest {
     }
 
     @Test
+    void 填了憑證設定時一併注入(@TempDir Path dir) throws Exception {
+        Path f = dir.resolve("entra.properties");
+        Files.writeString(f, "entra.client-id=my-client\n"
+                + "entra.certificate=./data/entra-cert.pem\n"
+                + "entra.certificate-key=./data/entra-key.pem\n");
+        StandardEnvironment env = envWithFile(f.toString());
+        run(env);
+        assertEquals("./data/entra-cert.pem", env.getProperty("entra.certificate"));
+        assertEquals("./data/entra-key.pem", env.getProperty("entra.certificate-key"));
+    }
+
+    @Test
+    void 未填憑證設定時不注入該屬性(@TempDir Path dir) throws Exception {
+        Path f = dir.resolve("entra.properties");
+        Files.writeString(f, "entra.client-id=my-client\nentra.certificate=   \n");
+        StandardEnvironment env = envWithFile(f.toString());
+        run(env);
+        assertNull(env.getProperty("entra.certificate"));
+        assertNull(env.getProperty("entra.certificate-key"));
+    }
+
+    @Test
     void 預設路徑為資料目錄下的entra檔案() {
         assertEquals("./data/entra.properties", EntraEnvironmentPostProcessor.DEFAULT_FILE);
     }

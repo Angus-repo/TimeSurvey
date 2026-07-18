@@ -47,8 +47,13 @@ feedback.subject=[TimeSurvey] 意見回饋
 ```properties
 # 必填：Azure 應用程式註冊的 Application (client) ID，未填此項則不啟用登入
 entra.client-id=11111111-2222-3333-4444-555555555555
-# 必填：用戶端密碼（憑證及祕密 > 用戶端密碼的「值」），後端以此向微軟換取 token
+# 應用程式身分驗證，密碼與憑證二擇一（皆填時以憑證優先）——
+# 方式 a：用戶端密碼（憑證及祕密 > 用戶端密碼的「值」），後端以此向微軟換取 token
 entra.client-secret=你的用戶端密碼
+# 方式 b：憑證（PEM 憑證 + PKCS#8 私鑰；私鑰與憑證同檔時 certificate-key 可省略），
+# 後端每次呼叫 token 端點時用私鑰現簽短命 JWT，私鑰不出主機，較密碼安全
+entra.certificate=./data/entra-cert.pem
+entra.certificate-key=./data/entra-key.pem
 # 選填：Directory (tenant) ID，未填則採用預設值 common（公司帳號與個人 Microsoft 帳戶皆可）；
 # 公司正式使用建議填自家租戶 ID。注意 organizations 會擋掉個人帳戶（選了帳號會被退回
 # 帳戶選擇頁、形成無限循環），個人帳戶測試時請留空（common）
@@ -68,11 +73,49 @@ entra.tenant-id=
   同一時段有多個會議會在右上角註明數量，滑鼠移過可看每個會議的完整名稱與邀請人。
 
 Azure 應用程式註冊需求：**Web** 平台重新導向 URI 填本站的回呼端點
-（如 `http://localhost:8080/api/entra/callback`），並建立一個用戶端密碼；
+（如 `http://localhost:8080/api/entra/callback`），並於「憑證及祕密」建立
+用戶端密碼**或**上傳憑證公鑰（產生步驟見下）；
 Microsoft Graph 委派權限：`User.Read`（登入）、`User.ReadBasic.All`（組織目錄檢查）、
 `Calendars.Read`（帶入行事曆）、`offline_access`（取得 refresh token）。
-未建立 `entra.properties`（或 CLIENT_ID / CLIENT_SECRET 留空）時，
+未建立 `entra.properties`（或 CLIENT_ID 留空、密碼與憑證皆未設）時，
 以上功能全部不啟用，網站維持原本的免登入行為。
+
+### 以憑證取代用戶端密碼
+
+後端每次呼叫微軟 token 端點時，改用憑證私鑰現簽短命 JWT（client assertion）
+證明應用程式身分：私鑰不出主機、線上只傳簽章，較 client secret 安全，
+效期也可自訂（密碼在 Azure 上限約 2 年）。設定步驟：
+
+1. 產生自簽憑證（私鑰為 PKCS#8、效期 2 年，檔案落在已 `.gitignore` 的 `data/`）：
+
+   ```bash
+   openssl req -x509 -newkey rsa:2048 -keyout ./data/entra-key.pem \
+       -out ./data/entra-cert.pem -days 730 -nodes -subj "/CN=timesurvey"
+   ```
+
+2. 到 Azure Portal > 應用程式註冊 > 憑證及祕密 > **憑證** > 上傳憑證，
+   上傳 `entra-cert.pem`（公鑰）；私鑰 `entra-key.pem` 留在主機上，切勿外流。
+
+3. 在 `entra.properties` 加入憑證路徑（有設憑證就優先於 client-secret）：
+
+   ```properties
+   entra.certificate=./data/entra-cert.pem
+   entra.certificate-key=./data/entra-key.pem
+   ```
+
+4. 重新啟動應用程式即生效。確認登入正常後，可刪除 `entra.client-secret`
+   設定並到 Azure Portal 撤銷舊的用戶端密碼。
+
+注意：私鑰需為 PKCS#8 格式（檔頭 `-----BEGIN PRIVATE KEY-----`）。
+若手上的私鑰是 openssl 舊格式（`BEGIN RSA PRIVATE KEY`，PKCS#1），請先轉換：
+
+```bash
+openssl pkcs8 -topk8 -nocrypt -in 舊私鑰.pem -out 新私鑰.pem
+```
+
+若憑證與私鑰放在同一個 PEM 檔，`entra.certificate-key` 可省略。
+憑證設定有誤（找不到檔案、格式不對）時應用程式會**啟動失敗**並顯示中文錯誤訊息，
+避免上線後才發現登入不了。憑證到期前記得重新產生並上傳新公鑰。
 
 ## 執行方式
 

@@ -80,7 +80,7 @@ class EntraGraphServiceTest {
         });
         server.start();
         base = "http://127.0.0.1:" + server.getAddress().getPort();
-        service = new EntraGraphService("my-client", "my-secret", "my-tenant",
+        service = new EntraGraphService("my-client", "my-secret", "", "", "my-tenant",
                 base, base + "/graph", repo);
     }
 
@@ -98,9 +98,39 @@ class EntraGraphServiceTest {
 
     @Test
     void 未設定CLIENT_SECRET時視為未啟用() {
-        EntraGraphService none = new EntraGraphService("my-client", "", "my-tenant", base, base, repo);
+        EntraGraphService none = new EntraGraphService("my-client", "", "", "", "my-tenant", base, base, repo);
         assertFalse(none.enabled());
         assertTrue(service.enabled());
+    }
+
+    /** 憑證測試素材（自簽憑證，僅供測試）：test-cert.pem 憑證、test-key.pem PKCS#8 私鑰 */
+    private static final String CERT = "src/test/resources/entra/test-cert.pem";
+    private static final String KEY = "src/test/resources/entra/test-key.pem";
+
+    @Test
+    void 只設憑證未設CLIENT_SECRET時仍視為啟用() {
+        EntraGraphService certOnly = new EntraGraphService("my-client", "", CERT, KEY,
+                "my-tenant", base, base, repo);
+        assertTrue(certOnly.enabled());
+    }
+
+    @Test
+    void 設定憑證時以client_assertion驗證身分且不送client_secret() {
+        // 同時設定 secret 與憑證：憑證優先
+        EntraGraphService certService = new EntraGraphService("my-client", "my-secret", CERT, KEY,
+                "my-tenant", base, base + "/graph", repo);
+        tokenResponse = "{\"access_token\":\"at-1\",\"refresh_token\":\"rt-1\",\"expires_in\":3600," +
+                "\"id_token\":\"" + fakeIdToken("{\"oid\":\"oid-1\",\"name\":\"王小明\"}") + "\"}";
+        when(repo.findById("oid-1")).thenReturn(Optional.empty());
+
+        certService.redeemCode("auth-code", "http://localhost/api/entra/callback");
+
+        String form = tokenRequests.get(0);
+        assertFalse(form.contains("client_secret="), "設定憑證時不應送出 client secret");
+        assertTrue(form.contains("client_assertion_type=" +
+                java.net.URLEncoder.encode("urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                        StandardCharsets.UTF_8)));
+        assertTrue(form.contains("client_assertion=ey"), "應帶私鑰簽章的 JWT");
     }
 
     @Test

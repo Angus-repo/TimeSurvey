@@ -9,15 +9,18 @@
 #      - 平台設定：新增「Web」平台，重新導向 URI 填入本站的回呼端點，例如
 #          http://localhost:8080/api/entra/callback
 #        （正式環境請改填正式網址，路徑固定為 /api/entra/callback）
-#      - 憑證及祕密：新增一個「用戶端密碼（client secret）」，把「值」填到下方
-#        entra.client-secret（注意離開頁面後就看不到值，請當場複製）
+#      - 憑證及祕密（二擇一，兩者都設時以憑證優先）：
+#        a. 用戶端密碼：新增一個「用戶端密碼（client secret）」，把「值」填到下方
+#           entra.client-secret（注意離開頁面後就看不到值，請當場複製）
+#        b. 憑證：上傳憑證的公鑰（.cer/.pem），私鑰留在主機上，
+#           路徑填到下方 entra.certificate / entra.certificate-key
 #      - API 權限（Microsoft Graph，委派權限）：
 #          User.Read            登入者基本資料（登入必要）
 #          User.ReadBasic.All   查詢公司組織中的使用者（受調查人員姓名檢查）
 #          Calendars.Read       讀取登入者行事曆（調查填寫頁帶入行事曆）
 #          offline_access       取得 refresh token（後端保存、換發 access token 必要）
 #   2. 複製本檔為同目錄下的 entra.properties（去掉 .example 副檔名）。
-#   3. 填入下方的 CLIENT_ID 與 CLIENT_SECRET（皆必填），租戶識別碼可選填。
+#   3. 填入下方的 CLIENT_ID，再擇一填入 CLIENT_SECRET 或憑證路徑，租戶識別碼可選填。
 #   4. 重新啟動應用程式，各網頁（後台維護頁、調查填寫頁、統計頁）即會啟用 Entra ID 登入。
 #
 # entra.properties 本身位於 .gitignore 的 data/ 目錄內，不會進版控；
@@ -27,9 +30,21 @@
 # 必填：應用程式（用戶端）識別碼，即 Azure 應用程式註冊頁的「Application (client) ID」
 entra.client-id=
 
-# 必填：用戶端密碼（憑證及祕密 > 用戶端密碼的「值」）。
+# 應用程式身分驗證，client-secret 與 certificate 二擇一（皆填時以憑證優先）：
+#
+# 方式 a：用戶端密碼（憑證及祕密 > 用戶端密碼的「值」）。
 # 後端以此密碼向微軟換取 token；密碼有效期限到期前記得到 Azure Portal 換新
 entra.client-secret=
+
+# 方式 b：憑證。後端每次呼叫 token 端點時用私鑰現簽短命 JWT（client assertion），
+# 私鑰不出主機、線上只傳簽章，較 client secret 安全。
+# 產生自簽憑證（私鑰 PKCS#8、效期 2 年）：
+#   openssl req -x509 -newkey rsa:2048 -keyout ./data/entra-key.pem \
+#       -out ./data/entra-cert.pem -days 730 -nodes -subj "/CN=timesurvey"
+# 再把 entra-cert.pem 上傳到 Azure Portal > 應用程式註冊 > 憑證及祕密 > 憑證。
+# entra.certificate 填 PEM 憑證路徑；私鑰與憑證同一檔時 entra.certificate-key 可省略
+entra.certificate=
+entra.certificate-key=
 
 # 選填：目錄（租戶）識別碼「Directory (tenant) ID」。
 # 未填則採用預設值 common（公司／學校帳號與個人 Microsoft 帳戶皆可登入，

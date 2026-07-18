@@ -32,8 +32,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Microsoft Entra ID 授權碼流程與 Microsoft Graph 代呼叫（皆在後端進行）：
  *
  * <ol>
- *   <li>首次登入：導向微軟登入頁 → 回呼帶回授權碼 → 以 client secret 換取
- *       access token + refresh token，refresh token 存入資料庫（{@link EntraToken}）。</li>
+ *   <li>首次登入：導向微軟登入頁 → 回呼帶回授權碼 → 以應用程式身分（憑證優先，
+ *       否則 client secret）換取 access token + refresh token，
+ *       refresh token 存入資料庫（{@link EntraToken}）。</li>
  *   <li>之後每次呼叫 Graph：先用記憶體快取的 access token；過期時以資料庫的
  *       refresh token 換新的 access token（微軟輪替 refresh token 時同步回存）。</li>
  *   <li>refresh token 失效（撤銷、過期）→ 刪除該筆紀錄並拋出
@@ -67,6 +68,8 @@ public class EntraGraphService {
 
     private final String clientId;
     private final String clientSecret;
+    /** 憑證方式的應用程式身分驗證；未設定為 null，有設定時優先於 client secret */
+    private final EntraClientCertificate certificate;
     private final String tenantId;
     private final String loginBase;
     private final String graphBase;
@@ -80,22 +83,25 @@ public class EntraGraphService {
 
     public EntraGraphService(@Value("${entra.client-id:}") String clientId,
                              @Value("${entra.client-secret:}") String clientSecret,
+                             @Value("${entra.certificate:}") String certificatePath,
+                             @Value("${entra.certificate-key:}") String certificateKeyPath,
                              @Value("${entra.tenant-id:common}") String tenantId,
                              @Value("${entra.login-base:https://login.microsoftonline.com}") String loginBase,
                              @Value("${entra.graph-base:https://graph.microsoft.com/v1.0}") String graphBase,
                              EntraTokenRepository repo) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
+        this.certificate = EntraClientCertificate.loadOrNull(certificatePath, certificateKeyPath);
         this.tenantId = (tenantId == null || tenantId.isBlank()) ? "common" : tenantId;
         this.loginBase = loginBase;
         this.graphBase = graphBase;
         this.repo = repo;
     }
 
-    /** 是否啟用 Entra ID 登入：client-id 與 client-secret（後端流程必要）都有值 */
+    /** 是否啟用 Entra ID 登入：client-id 加上「憑證或 client secret 擇一」（後端流程必要） */
     public boolean enabled() {
         return clientId != null && !clientId.isBlank()
-                && clientSecret != null && !clientSecret.isBlank();
+                && (certificate != null || (clientSecret != null && !clientSecret.isBlank()));
     }
 
     /* ---------- 登入（授權碼流程） ---------- */
@@ -241,16 +247,23 @@ public class EntraGraphService {
         return accessToken;
     }
 
-    /** 呼叫 token 端點（共用參數 client_id / client_secret / scope 在此補上） */
+    /** 呼叫 token 端點（共用參數 client_id / scope 與應用程式身分驗證在此補上）：
+     *  有設定憑證時以 client assertion（私鑰簽章）證明身分，否則用 client secret */
     private JsonNode tokenRequest(Map<String, String> params) {
+        String tokenUrl = loginBase + "/" + tenantId + "/oauth2/v2.0/token";
         Map<String, String> form = new LinkedHashMap<>(params);
         form.put("client_id", clientId);
-        form.put("client_secret", clientSecret);
+        if (certificate != null) {
+            form.put("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer");
+            form.put("client_assertion", certificate.assertion(clientId, tokenUrl));
+        } else {
+            form.put("client_secret", clientSecret);
+        }
         form.put("scope", SCOPES);
         StringBuilder body = new StringBuilder();
         form.forEach((k, v) -> body.append(body.isEmpty() ? "" : "&").append(k).append('=').append(enc(v)));
 
-        HttpRequest req = HttpRequest.newBuilder(URI.create(loginBase + "/" + tenantId + "/oauth2/v2.0/token"))
+        HttpRequest req = HttpRequest.newBuilder(URI.create(tokenUrl))
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
                 .build();
