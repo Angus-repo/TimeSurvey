@@ -281,13 +281,23 @@ window.I18N = (function () {
       '.i18n-menu[hidden] { display: none; }' +
       '.i18n-option { width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 9px;' +
       ' border: 0; border-radius: 8px; background: transparent; color: #2f3b48; font-size: 13px;' +
-      ' font-family: inherit; line-height: 1.35; text-align: left; white-space: nowrap; cursor: pointer; }' +
-      '.i18n-option:hover, .i18n-option:focus { background: #f2f5f8; outline: none; }' +
+      ' font-family: inherit; line-height: 1.35; text-align: left; white-space: nowrap; cursor: pointer;' +
+      ' transition: background .15s, color .15s, box-shadow .15s; }' +
+      '.i18n-option:focus { outline: none; }' +
+      '.i18n-option:hover, .i18n-option:focus-visible { background: #eef7f4; color: #245f51;' +
+      ' box-shadow: inset 0 0 0 1px #d3e9e1; }' +
       '.i18n-option-code { min-width: 38px; height: 22px; padding: 0 7px; border-radius: 999px;' +
       ' display: inline-flex; align-items: center; justify-content: center; background: #e7ecf1;' +
       ' border: 1px solid #d8dfe7; color: #324253; box-shadow: inset 0 1px 0 rgba(255,255,255,.8);' +
-      ' font-size: 12px; font-weight: 800; letter-spacing: .04em; line-height: 1; }' +
+      ' font-size: 12px; font-weight: 800; letter-spacing: .04em; line-height: 1;' +
+      ' transition: background .15s, border-color .15s, color .15s; }' +
+      '.i18n-option[aria-selected="true"] { background: #e7f0ff; color: #1f4f8c;' +
+      ' box-shadow: inset 0 0 0 1px #c6daf5; }' +
       '.i18n-option[aria-selected="true"] .i18n-option-name { font-weight: 700; }' +
+      '.i18n-option[aria-selected="true"] .i18n-option-code { background: #3d78bf; border-color: #3d78bf;' +
+      ' color: #fff; box-shadow: none; }' +
+      '.i18n-option[aria-selected="true"]:hover, .i18n-option[aria-selected="true"]:focus-visible {' +
+      ' background: #d6e6fb; box-shadow: inset 0 0 0 1px #b8d0ef; }' +
       '.i18n-control.fixed { position: fixed; top: 14px; right: 14px; z-index: 900;' +
       ' background: #fff; color: #333; border-color: #ccc; }';
     document.head.appendChild(st);

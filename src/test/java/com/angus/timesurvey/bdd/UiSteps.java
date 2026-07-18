@@ -1477,6 +1477,32 @@ public class UiSteps {
         page.locator("#surveyList").waitFor();
     }
 
+    @When("展開語系選單")
+    public void openLanguageMenu() {
+        page.locator(".i18n-switch").waitFor();
+        page.locator(".i18n-switch").click();
+        assertThat(page.locator(".i18n-menu")).isVisible();
+    }
+
+    @Then("已選取的語系與滑鼠移入的未選取語系應顯示不同底色")
+    public void selectedAndHoveredLanguagesHaveDifferentBackgrounds() {
+        Locator selected = page.locator(".i18n-option[aria-selected='true']");
+        Locator unselected = page.locator(".i18n-option[aria-selected='false']");
+        String selectedBackground = (String) selected.evaluate("el => getComputedStyle(el).backgroundColor");
+        String defaultBackground = (String) unselected.evaluate("el => getComputedStyle(el).backgroundColor");
+
+        org.junit.jupiter.api.Assertions.assertNotEquals(defaultBackground, selectedBackground,
+                "已選取語系應具有不同於一般選項的底色");
+
+        unselected.hover();
+        page.waitForTimeout(200);
+        String hoverBackground = (String) unselected.evaluate("el => getComputedStyle(el).backgroundColor");
+        org.junit.jupiter.api.Assertions.assertNotEquals(defaultBackground, hoverBackground,
+                "滑鼠移入未選取語系時應更換底色");
+        org.junit.jupiter.api.Assertions.assertNotEquals(selectedBackground, hoverBackground,
+                "滑鼠移入與已選取狀態應使用不同底色");
+    }
+
     @Then("後台維護頁應顯示英文介面")
     public void adminPageShowsEnglishUi() {
         assertThat(page.locator("header h1")).hasText("⏰ Time Survey - Admin");
