@@ -230,6 +230,14 @@
   #calOnbPop { position: fixed; top: auto; left: auto; }
   #calOnbPop::before { bottom: auto; top: var(--arrow-top, 50%); left: 100%; transform: translateY(-50%);
                        border-bottom-color: transparent; border-left-color: #fff; }
+  /* 窄螢幕左側放不下時，泡泡改放日曆下方／上方，箭頭改為指向日曆中心 */
+  #calOnbPop.below::before { top: auto; bottom: 100%; left: var(--arrow-left, 50%); transform: translateX(-50%);
+                             border-left-color: transparent; border-bottom-color: #fff; }
+  #calOnbPop.above::before { top: 100%; bottom: auto; left: var(--arrow-left, 50%); transform: translateX(-50%);
+                             border-left-color: transparent; border-top-color: #fff; }
+  /* 內容比可用空間高時才退回內部捲動（overflow 會把 ::before 箭頭裁掉，只好不畫） */
+  #calOnbPop.scrolly { overflow-y: auto; overscroll-behavior: contain; }
+  #calOnbPop.scrolly::before { display: none; }
   /* 拖曳引導泡泡內的動畫示意：綠色膠囊在灰色軌道內左右來回滑動
      （上方預留空間給時間氣泡，故不裁切超出部分） */
   .drag-demo { position: relative; display: flex; height: 30px; width: 180px; margin: 44px 0 4px;
@@ -342,6 +350,53 @@
   .cday.multi .dlabel { display: block; margin-bottom: 6px; }
   .cday.multi .tbar, .cday.multi .chip { display: flex; margin-left: 12px; width: fit-content; }
   .cday.multi .chip { display: inline-flex; }
+
+  /* ===== RWD：手機（≤720px）版面 ===== */
+  @media (max-width: 720px) {
+    header h1 { font-size: 18px; }
+    .container { margin: 16px auto; padding: 0 12px; }
+    .card { padding: 18px 16px; margin-bottom: 16px; }
+    .card h2 { font-size: 17px; margin-bottom: 14px; padding-bottom: 10px; }
+    /* 表單欄位改單欄直排（!important 覆蓋欄位上的行內固定寬度） */
+    .row { gap: 14px; margin-bottom: 16px; }
+    .row > div { flex: 1 1 100% !important; min-width: 0 !important; }
+    /* 輸入框字級 16px 以上，避免 iOS Safari 聚焦時自動放大頁面 */
+    input, textarea, select { font-size: 16px; }
+    .ptags input { font-size: 16px; min-width: 120px; }
+    [data-i18n="idx.dateRangeHint"] { text-align: left !important; margin: -6px 0 14px !important; }
+    /* 名單下方的工具列：開關與按鈕改為整寬直排，按鈕加大方便點按 */
+    .pbar { flex-wrap: wrap; gap: 10px 14px; }
+    .pbar-side { margin-left: 0 !important; width: 100%; }
+    .pbar-btns { width: 100%; }
+    .pbar-btns button { flex: 1 1 auto; padding: 12px 16px; }
+    /* 通知提示改列在標題下方，不再浮動靠右 */
+    .card h2 #notifUi { float: none !important; display: block; margin-top: 6px; }
+    /* 調查清單：手機沒有足夠寬度顯示五欄，表格改為卡片式排版 */
+    .slist, .slist tbody { display: block; }
+    .slist thead { display: none; }
+    .slist tbody tr { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px;
+                      padding: 12px 2px; border-bottom: 1px solid #eef1f5; }
+    .slist td { display: block; border-bottom: none; padding: 0; }
+    .slist td[colspan] { grid-column: 1 / -1; }
+    .slist td:nth-child(1) { grid-column: 1 / -1; font-weight: 700; font-size: 15.5px; }
+    .slist td:nth-child(2) { color: #6b7682; font-size: 13px; align-self: center; }
+    .slist td:nth-child(3) { justify-self: end; }
+    .slist td:nth-child(4) { grid-column: 1 / -1; }
+    .slist td:nth-child(4) .muted { display: inline; margin-left: 8px; }
+    .slist td:nth-child(5) { grid-column: 1 / -1; margin-top: 4px; }
+    /* 操作圖示鈕加大為適合手指的觸控目標 */
+    .ops { gap: 10px; }
+    .btn-ic { width: 42px; height: 42px; }
+    .btn-ic svg { width: 19px; height: 19px; }
+    .splitbtn .btn-ic.caret { width: 22px; }
+    .splitbtn .btn-ic.caret svg { width: 11px; height: 11px; }
+    /* 調查結果：日期標籤獨立一行；時間軸太寬時可在原地橫向捲動 */
+    .concl .dlabel { display: block; min-width: 0; margin-bottom: 4px; }
+    .cday .tbar, .cday.multi .tbar { max-width: 100%; overflow-x: auto; padding-bottom: 6px; margin-left: 0; }
+    .cday.multi .chip { margin-left: 0; }
+    .meetbox { font-size: 13.5px; }
+    .onb-pop { max-width: calc(100vw - 32px); }
+  }
 </style>
 </head>
 <body>
@@ -396,7 +451,7 @@
         <div class="pbar">
           <span class="muted" id="pCount">共 0 人</span>
           <a href="javascript:void(0)" onclick="copyParticipants()" data-i18n="idx.copyAllNames">📋 複製全部人名</a>
-          <div style="margin-left:auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap">
+          <div class="pbar-side" style="margin-left:auto; display:flex; align-items:center; gap:14px; flex-wrap:wrap">
             <label class="toggle" data-i18n-title="idx.allowAddTitle"
                    title="開啟後，參與者在填寫頁可自行邀請其它需要參與會議的人加入這份調查">
               <input type="checkbox" id="fAllowAdd" checked>
@@ -409,7 +464,7 @@
               <span class="track"><span class="thumb"></span></span>
               <span class="tgl-text" data-i18n="idx.allowSwap">允許成員更換</span>
             </label>
-            <div style="display:flex; gap:10px; flex-wrap:wrap">
+            <div class="pbar-btns" style="display:flex; gap:10px; flex-wrap:wrap">
               <button class="btn-cancel" onclick="resetForm()" id="cancelBtn" style="display:none" data-i18n="idx.cancelEdit">取消修改</button>
               <button class="btn-primary" onclick="saveSurvey()" id="saveBtn" data-i18n="idx.createBtn">建立調查</button>
             </div>
@@ -421,7 +476,7 @@
 
   <div class="card">
     <h2><span data-i18n="idx.surveyList">調查清單</span> <span id="notifUi" style="float:right;font-weight:400;font-size:13px"></span></h2>
-    <table>
+    <table class="slist">
       <thead>
         <tr><th style="width:25%" data-i18n="idx.thName">調查名稱</th><th style="width:110px" data-i18n="idx.thRange">日期範圍</th><th style="width:100px" data-i18n="idx.thProgress">填寫狀況(人)</th><th style="width:150px" data-i18n="idx.thStatus">目前狀態</th><th style="width:210px" data-i18n="idx.thOps">操作</th></tr>
       </thead>
@@ -795,10 +850,13 @@ function toggleCal(e) {
   if (pop.style.display === 'none') {
     renderCalendar();
     pop.style.display = '';
-    pop.scrollIntoView({ behavior: 'smooth', block: 'center' });   // 捲動頁面，讓大日曆維持在原本的位置（日期欄位左側）但置中顯示
+    // 首次開啟會接著顯示新手引導：頁面捲動交給 spotCalPop 決定（讓泡泡與日曆同時入鏡），
+    // 這裡的平滑置中捲動會蓋過引導的定位捲動，故引導時不執行
+    const willOnb = !localStorage.getItem('dateRangeOnboarded');
+    if (!willOnb) pop.scrollIntoView({ behavior: 'smooth', block: 'center' });   // 捲動頁面，讓大日曆維持在原本的位置（日期欄位左側）但置中顯示
     calScrollToSel();   // 捲到起日（或今天）所在的那一列
     // 首次開啟大日曆時，說明起迄日與挖空日的操作（看過一次就不再出現）
-    if (!localStorage.getItem('dateRangeOnboarded')) setTimeout(startCalOnb, 60);
+    if (willOnb) setTimeout(startCalOnb, 60);
   }
   else pop.style.display = 'none';
 }
@@ -1389,26 +1447,55 @@ function endDragOnb() {
 /* ---------- 「調查日期範圍」的新手引導：首次開啟大日曆時說明起迄日與挖空日 ---------- */
 let calOnbOn = false;   // 引導進行中（捲動／縮放時重新定位泡泡用）
 
-/* 把大日曆抬到遮罩之上，並將說明泡泡定位在日曆的左邊、箭頭對準日曆垂直中心 */
-function spotCalPop() {
+/* 把大日曆抬到遮罩之上，並將說明泡泡定位在日曆的左邊、箭頭對準日曆垂直中心；
+   窄螢幕左側放不下時，改放日曆下方（下方太擠改上方），箭頭指向日曆中心。
+   scrollIntoPlace 為 true（引導開始時）會先把頁面捲到讓日曆貼近畫面上緣，
+   讓泡泡完整顯示的同時、被提示的日曆也能一起入鏡 */
+function spotCalPop(scrollIntoPlace) {
   const cal = document.querySelector('#calPop .cal');
   if (!cal) return false;
   $('calPop').classList.add('onb-cal-spot');
-  const r = cal.getBoundingClientRect();
+  let r = cal.getBoundingClientRect();
   const pop = $('calOnbPop');
   pop.style.display = '';   // 先顯示才量得到泡泡實際寬高
+  pop.classList.remove('below', 'above', 'scrolly');
+  pop.style.maxHeight = '';
   const pw = pop.offsetWidth, ph = pop.offsetHeight;
-  const left = Math.max(12, r.left - pw - 14);
-  const top = Math.max(8, Math.min(r.top + r.height / 2 - ph / 2, window.innerHeight - ph - 8));
+  if (r.left - pw - 14 >= 12) {
+    // 左側放得下：泡泡在日曆左邊、箭頭指右
+    const top = Math.max(8, Math.min(r.top + r.height / 2 - ph / 2, window.innerHeight - ph - 8));
+    pop.style.left = (r.left - pw - 14) + 'px';
+    pop.style.top = top + 'px';
+    pop.style.setProperty('--arrow-top', (r.top + r.height / 2 - top) + 'px');
+    return true;
+  }
+  // 左側放不下（手機或窄視窗）：以泡泡為主的「貼底」策略——
+  // 泡泡以完整高度貼齊視窗底部、箭頭朝上指向日曆；被提示的日曆盡量捲到畫面上緣，
+  // 至少保證露出上半部（標題＋星期列＋起訖日示範的第一列）
+  if (scrollIntoPlace) {
+    window.scrollTo({ top: Math.max(0, window.scrollY + r.top - 8), behavior: 'auto' });
+    r = cal.getBoundingClientRect();
+  }
+  const calPeek = 150;   // 日曆至少露出的高度
+  pop.classList.add('below');
+  let popTop = window.innerHeight - 8 - ph;
+  if (popTop < r.top + calPeek + 12) {
+    // 泡泡完整顯示會蓋到日曆第一列：往下讓出日曆上半部，泡泡改內部捲動
+    popTop = r.top + calPeek + 12;
+    pop.classList.add('scrolly');
+    pop.style.maxHeight = Math.max(120, window.innerHeight - 8 - popTop) + 'px';
+  }
+  pop.style.top = popTop + 'px';
+  const left = Math.max(12, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 12));
   pop.style.left = left + 'px';
-  pop.style.top = top + 'px';
-  pop.style.setProperty('--arrow-top', (r.top + r.height / 2 - top) + 'px');
+  pop.style.setProperty('--arrow-left',
+      Math.max(18, Math.min(r.left + r.width / 2 - left, pw - 18)) + 'px');
   return true;
 }
 
 function startCalOnb() {
   if ($('calPop').style.display === 'none') return;   // 日曆已被關掉就不引導
-  if (!spotCalPop()) return;
+  if (!spotCalPop(true)) return;
   calOnbOn = true;
   $('calOnbMask').style.display = '';
 }

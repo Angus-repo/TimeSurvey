@@ -306,6 +306,14 @@
   #calOnbPop { position: fixed; top: auto; left: auto; z-index: 1243; }
   #calOnbPop::before { bottom: auto; top: var(--arrow-top, 50%); left: 100%; transform: translateY(-50%);
                        border-bottom-color: transparent; border-left-color: #fff; }
+  /* 窄螢幕左側放不下時，泡泡改放日曆下方／上方，箭頭改為指向日曆中心 */
+  #calOnbPop.below::before { top: auto; bottom: 100%; left: var(--arrow-left, 50%); transform: translateX(-50%);
+                             border-left-color: transparent; border-bottom-color: #fff; }
+  #calOnbPop.above::before { top: 100%; bottom: auto; left: var(--arrow-left, 50%); transform: translateX(-50%);
+                             border-left-color: transparent; border-top-color: #fff; }
+  /* 內容比可用空間高時才退回內部捲動（overflow 會把 ::before 箭頭裁掉，只好不畫） */
+  #calOnbPop.scrolly { overflow-y: auto; overscroll-behavior: contain; }
+  #calOnbPop.scrolly::before { display: none; }
 
   /* 送出後的完成畫面 */
   #done .card { padding: 24px 28px; }
@@ -324,6 +332,69 @@
   .ownlink { text-align: center; margin-top: 4px; }
   .ownlink a { color: #2c7be5; font-size: 13px; text-decoration: none; }
   .ownlink a:hover { text-decoration: underline; }
+
+  /* ===== RWD：平板（≤1024px）稍微縮小欄寬，讓直向平板不需橫向捲動 ===== */
+  @media (max-width: 1024px) {
+    .datecell { min-width: 112px; padding: 8px; }
+    .hbox { min-width: 52px; }
+    th.col-sep, td.col-sep { width: 16px; min-width: 16px; }
+  }
+
+  /* ===== RWD：手機（≤720px）時段表改為「一天一張卡片」直向排列 ===== */
+  @media (max-width: 720px) {
+    header { padding: 14px 16px; }
+    header h1 { font-size: 18px; }
+    .container { margin: 16px auto; padding: 0 12px 100px; }
+    .card { padding: 14px; }
+    /* 姓名選擇：直排、整寬，方便單手操作 */
+    .who-main { flex-direction: column; align-items: stretch; gap: 8px; }
+    .who-combo { display: block; }
+    .who-trigger { width: 100%; font-size: 16px; }
+    .who-menu { width: 100%; min-width: 0; }
+    .who-item { padding: 11px 12px; white-space: normal; }
+    /* 頂部功能鈕整寬 */
+    .topbar { gap: 8px; }
+    .splitbtn { width: 100%; }
+    .splitbtn .topbtn.main { flex: 1; padding: 11px 12px; }
+    #btnCal { width: 100%; padding: 11px 12px; }
+    /* 時段表：改為每個日期一張卡片，快速鈕在上、各小時格三欄換行排列 */
+    .gridwrap { overflow-x: visible; }
+    table.grid, table.grid tbody { display: block; }
+    table.grid thead { display: none; }
+    table.grid tbody tr { display: flex; flex-wrap: wrap; column-gap: 8px;
+                          border: 1.5px solid #e2e8e5; border-radius: 10px; background: #fbfcfc;
+                          padding: 10px 12px 12px; margin-bottom: 14px; }
+    table.grid tr.week-sep { display: block; border: none; background: none;
+                             padding: 0; margin: 2px 0 14px; }
+    tr.week-sep td { display: block; padding: 8px 0 0; }
+    th.col-sep, td.col-sep, td.na { display: none; }
+    th.datecell { display: block; width: 100%; min-width: 0; background: transparent;
+                  border: none; padding: 0 0 2px; }
+    .datecell .dname { font-size: 16px; }
+    /* 快速鈕與複製鈕加大為適合手指的觸控目標 */
+    .quick { gap: 6px; }
+    .quick label { font-size: 13px; padding: 5px 12px; }
+    .copybtn { padding: 5px 12px; }
+    td.hourcell { display: block; flex: 1 1 30%; max-width: calc((100% - 16px) / 3); min-width: 0; }
+    .hbox { min-width: 0; margin-top: 14px; }
+    .slot { height: 38px; font-size: 14px; }
+    .chk { width: 26px; height: 26px; font-size: 15px; top: -10px; right: -8px; }
+    /* 底部送出列：已勾選數獨立一行、按鈕整寬，並預留 iPhone 底部手勢區 */
+    .submit-bar { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+    .submit-bar .count { display: block; margin: 0 0 8px; }
+    .submit-actions { display: flex; width: 100%; }
+    .submit-bar .submit-main { flex: 1; padding: 12px 10px; }
+    .toast { bottom: 110px; max-width: calc(100vw - 32px); }
+    /* 完成畫面：日期標籤獨立一行 */
+    .dday .dlabel { display: block; min-width: 0; margin-bottom: 2px; }
+    /* 彈窗輸入框字級 16px 以上，避免 iOS Safari 聚焦時自動放大頁面 */
+    .modal-card textarea, .ptags input { font-size: 16px; }
+    /* 引導泡泡：夾在畫面內；卡片式版面沒有左右半段之分，
+       泡泡置中顯示在說明目標下方，箭頭改為朝上指向目標 */
+    .onb-pop { max-width: calc(100vw - 32px); }
+    .onb-pop-grid.at-below::before { top: auto; bottom: 100%; left: var(--grid-arrow-left, 50%); right: auto;
+                                     transform: translateX(-50%); border-bottom-color: #fff; }
+  }
 </style>
 </head>
 <body>
@@ -398,11 +469,11 @@
     <div class="onb-pop onb-pop-grid" id="onbPopGrid" style="display:none">
       <div class="onb-grid-cols">
         <div class="onb-col" id="onbColLeft">
-          <div class="onb-col-title"><span data-i18n="sv.onbLeftTitle">⬅️ 左半邊：快速鈕</span><span class="onb-step-dot">1 / 2</span></div>
+          <div class="onb-col-title"><span id="onbLeftTitleText" data-i18n="sv.onbLeftTitle">⬅️ 左半邊：快速鈕</span><span class="onb-step-dot">1 / 2</span></div>
           <div class="onb-col-desc" data-i18n="sv.onbLeftDescHtml">點選「<b>全天／上午／下午</b>」可一次勾選整段時間；<br>📋 <b>複製</b>鈕可把這天已勾選的時段，複製貼到其他天。</div>
         </div>
         <div class="onb-col" id="onbColRight" style="display:none">
-          <div class="onb-col-title"><span data-i18n="sv.onbRightTitle">➡️ 右半邊：細部時段</span><span class="onb-step-dot">2 / 2</span></div>
+          <div class="onb-col-title"><span id="onbRightTitleText" data-i18n="sv.onbRightTitle">➡️ 右半邊：細部時段</span><span class="onb-step-dot">2 / 2</span></div>
           <div class="onb-col-desc" data-i18n="sv.onbRightDescHtml">點擊小時外框右上角的 <b>✓</b> 可整時勾選；<br>也可個別點選 <b>30 分鐘</b>方格做更精細的調整。</div>
         </div>
       </div>
@@ -740,11 +811,20 @@ function maybeShowGridOnboarding() {
   setGridOnbStep(1);
 }
 
+/* 手機的卡片式版面（≤720px）：快速鈕在上、細部時段在下，沒有左右半段之分 */
+function isNarrowLayout() {
+  return window.matchMedia('(max-width: 720px)').matches;
+}
+
 function setGridOnbStep(step) {
   gridOnbStep = step;
   $('onbColLeft').style.display = step === 1 ? '' : 'none';
   $('onbColRight').style.display = step === 2 ? '' : 'none';
   $('onbGridBtn').textContent = step === 1 ? I18N.t('sv.onbNext') : I18N.t('common.gotIt');
+  // 手機卡片式版面的說明改講「上方／下方」，桌機維持「左半邊／右半邊」
+  const narrow = isNarrowLayout();
+  $('onbLeftTitleText').textContent = I18N.t(narrow ? 'sv.onbLeftTitleMobile' : 'sv.onbLeftTitle');
+  $('onbRightTitleText').textContent = I18N.t(narrow ? 'sv.onbRightTitleMobile' : 'sv.onbRightTitle');
   // 泡泡停在正在說明的半段旁邊：講左半邊時在右側且箭頭指左；講右半邊時在左側且箭頭指右
   $('onbPopGrid').classList.toggle('at-right', step === 1);
   $('onbPopGrid').classList.toggle('at-left', step === 2);
@@ -803,6 +883,27 @@ function positionGridOnbPop(step) {
   if (!datecell) return;
   const outerEl = $('gridOuter');
   const outer = outerEl.getBoundingClientRect();
+  // 手機卡片式版面：沒有左右半段之分，泡泡水平置中、跟在說明目標下方，
+  // 箭頭朝上指向目標中心，不做半段壓暗
+  if (isNarrowLayout()) {
+    pop.classList.add('at-below');
+    pop.classList.remove('at-left', 'at-right');
+    $('onbHalfDim').style.display = 'none';
+    const fr = (gridOnbFocusEl(step) || datecell).getBoundingClientRect();
+    const viewportPad = 12;
+    const left = Math.max(viewportPad - outer.left,
+        (window.innerWidth - pop.offsetWidth) / 2 - outer.left);
+    pop.style.left = left + 'px';
+    pop.style.right = 'auto';
+    let top = fr.bottom + 12 - outer.top;
+    const maxTop = window.innerHeight - outer.top - pop.offsetHeight - viewportPad;
+    pop.style.top = Math.max(viewportPad - outer.top, Math.min(top, maxTop)) + 'px';
+    // 箭頭對準正在說明的目標中心（頁面座標換算成泡泡內的相對位置）
+    pop.style.setProperty('--grid-arrow-left',
+        Math.max(18, Math.min(fr.left + fr.width / 2 - (outer.left + left), pop.offsetWidth - 18)) + 'px');
+    return;
+  }
+  pop.classList.remove('at-below');
   const focus = gridOnbFocusEl(step) || datecell;
   const dateRect = datecell.getBoundingClientRect();
   const focusRect = focus.getBoundingClientRect();
@@ -1991,6 +2092,9 @@ function onSuggestCalDayClick(ds) {
   renderSuggestCalendar();
 }
 
+/* 泡泡放在建議日期日曆的左邊、箭頭對準日曆垂直中心；
+   窄螢幕左側放不下時，改放日曆下方（下方太擠改上方），箭頭指向日曆中心；
+   內容比可用空間高時才退回內部捲動（日曆在固定位置的彈窗內，無法靠捲頁面騰出空間） */
 function spotSuggestCalPop() {
   const cal = document.querySelector('#suggestCalPop .cal');
   if (!cal) return false;
@@ -1999,12 +2103,31 @@ function spotSuggestCalPop() {
   const r = cal.getBoundingClientRect();
   const pop = $('calOnbPop');
   pop.style.display = '';
+  pop.classList.remove('below', 'above', 'scrolly');
+  pop.style.maxHeight = '';
   const pw = pop.offsetWidth, ph = pop.offsetHeight;
-  const left = Math.max(12, r.left - pw - 14);
-  const top = Math.max(8, Math.min(r.top + r.height / 2 - ph / 2, window.innerHeight - ph - 8));
+  if (r.left - pw - 14 >= 12) {
+    // 左側放得下：泡泡在日曆左邊、箭頭指右
+    const top = Math.max(8, Math.min(r.top + r.height / 2 - ph / 2, window.innerHeight - ph - 8));
+    pop.style.left = (r.left - pw - 14) + 'px';
+    pop.style.top = top + 'px';
+    pop.style.setProperty('--arrow-top', (r.top + r.height / 2 - top) + 'px');
+    return true;
+  }
+  const spaceBelow = window.innerHeight - r.bottom - 14 - 8;
+  const spaceAbove = r.top - 14 - 8;
+  const below = spaceBelow >= ph || spaceBelow >= spaceAbove;
+  const space = Math.max(120, below ? spaceBelow : spaceAbove);
+  pop.classList.add(below ? 'below' : 'above');
+  if (ph > space) {
+    pop.classList.add('scrolly');
+    pop.style.maxHeight = space + 'px';
+  }
+  pop.style.top = (below ? r.bottom + 14 : Math.max(8, r.top - 14 - Math.min(ph, space))) + 'px';
+  const left = Math.max(12, Math.min(r.left + r.width / 2 - pw / 2, window.innerWidth - pw - 12));
   pop.style.left = left + 'px';
-  pop.style.top = top + 'px';
-  pop.style.setProperty('--arrow-top', (r.top + r.height / 2 - top) + 'px');
+  pop.style.setProperty('--arrow-left',
+      Math.max(18, Math.min(r.left + r.width / 2 - left, pw - 18)) + 'px');
   return true;
 }
 
