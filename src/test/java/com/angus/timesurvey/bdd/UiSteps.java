@@ -453,15 +453,18 @@ public class UiSteps {
      * 回傳實際新增的頁數。
      */
     private static PdfImageLayout pdfImageLayout(int width, int height, float pageW, float imgAreaH) {
-        int chunkPx = Math.max(1, (int) Math.floor(width * (imgAreaH / pageW)));
+        // 繪製寬度以「1 像素最多畫 1pt」為上限：手機截圖（390px）不放大、以原尺寸置中，
+        // 避免拉伸到整頁寬導致比例過大又失真；電腦版截圖（寬於頁寬）仍縮至整頁寬。
+        float baseW = Math.min(pageW, width);
+        int chunkPx = Math.max(1, (int) Math.floor(width * (imgAreaH / baseW)));
         int total = Math.max(1, (int) Math.ceil(height / (double) chunkPx));
-        float drawW = pageW;
+        float drawW = baseW;
         // Chromium 的 full-page 截圖偶爾會比整頁倍數多出 1～2px；若直接切頁會產生幾乎全白的尾頁。
         // 尾段小於單頁 8% 時，將整張圖片等比縮小極少量，避免產生只有白底的尾頁。
         int tailPx = height - (total - 1) * chunkPx;
         if (total > 1 && tailPx <= Math.max(8, Math.round(chunkPx * 0.08f))) {
             total--;
-            drawW = Math.min(pageW, total * imgAreaH * width / height);
+            drawW = Math.min(baseW, total * imgAreaH * width / height);
             chunkPx = Math.max(1, (int) Math.ceil(height / (double) total));
         }
         return new PdfImageLayout(total, chunkPx, drawW);
