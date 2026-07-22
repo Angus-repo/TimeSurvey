@@ -120,6 +120,8 @@
   .splitbtn .topbtn:hover { background: #22b8cf; }
   .splitbtn .topbtn.main { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
                             border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  /* 沒有其他成員操作、右側箭頭鈕隱藏時：主按鈕恢復完整圓角，避免右緣呈現平角的「半顆按鈕」 */
+  .splitbtn .topbtn.main.solo { border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
   .splitbtn .topbtn.caret { padding: 8px 10px; font-size: 11px; border-top-left-radius: 0;
                             border-bottom-left-radius: 0; border-left: 1px solid rgba(255,255,255,.4); }
   .member-menu { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 1100;
@@ -756,6 +758,8 @@ async function init() {
     $('miDecline').style.display = (showDecline && (showInvite || showSwap)) ? '' : 'none';
     const hasMenu = (showSwap && showInvite) || (showDecline && (showInvite || showSwap));
     $('btnMemberCaret').style.display = hasMenu ? '' : 'none';
+    // 沒有選單時箭頭鈕隱藏，主按鈕須恢復完整圓角，否則右緣是平角、看起來像半顆按鈕
+    $('btnMemberMain').classList.toggle('solo', !hasMenu);
   }
   // 已啟用 Entra ID 登入時：顯示「同意讀取我的行事曆」按鈕（調查已結束僅供查看，不需帶入），
   // 並以登入者身分決定填寫者（不開放下拉自選姓名）；「先選姓名」的新手引導只在免登入模式才需要
