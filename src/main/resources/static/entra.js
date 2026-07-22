@@ -320,7 +320,7 @@ window.Entra = (function () {
     const caret = document.createElement('span');
     caret.className = 'entra-lang-caret';
     caret.setAttribute('aria-hidden', 'true');
-    caret.textContent = current.shortName + ' ⌄';
+    caret.textContent = current.shortName;
     row.appendChild(caret);
 
     const list = document.createElement('div');
