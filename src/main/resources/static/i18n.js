@@ -265,11 +265,10 @@ window.I18N = (function () {
       ' transition: background .15s, border-color .15s, box-shadow .15s; }' +
       '.i18n-control:hover, .i18n-control.open { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.6); }' +
       '.i18n-control:focus-within { box-shadow: 0 0 0 3px rgba(255,255,255,.28); border-color: rgba(255,255,255,.75); }' +
-      '.i18n-switch { width: 100%; height: 100%; padding: 0 7px 0 8px; border: 0; border-radius: inherit;' +
-      ' display: inline-flex; align-items: center; justify-content: space-between; gap: 3px;' +
+      '.i18n-switch { width: 100%; height: 100%; padding: 0 8px; border: 0; border-radius: inherit;' +
+      ' display: inline-flex; align-items: center; justify-content: center; gap: 5px;' +
       ' background: transparent; color: inherit; font-size: 13px; font-family: inherit; font-weight: 700; cursor: pointer; line-height: 1;' +
       ' appearance: none; -webkit-appearance: none; outline: none; }' +
-      '.i18n-switch::after { content: "⌄"; font-size: 14px; font-weight: 700; line-height: 1; opacity: .9; }' +
       '.i18n-icon { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px;' +
       ' font-size: 14px; line-height: 1; pointer-events: none; }' +
       '.i18n-control.open .i18n-icon { display: none; }' +
