@@ -83,9 +83,23 @@ window.Entra = (function () {
       .entra-chip-abs { position: absolute; right: 20px; top: 50%; transform: translateY(-50%); }
       .entra-chip-abs:hover { transform: translateY(-50%) scale(1.06); }
       .entra-chip-fixed { position: fixed; right: 14px; top: 14px; z-index: 900; }
-      /* 已登入時把頁首的常用工具收進姓名資訊卡；未啟用 Entra 時仍維持原本頁首操作。 */
+      /* 已登入時把頁首的常用工具（含多國語系）收進姓名資訊卡；未啟用 Entra 時仍維持原本頁首操作。 */
       .entra-signed-in header #resetOnbBtn,
-      .entra-signed-in header #feedbackBtn { display: none !important; }
+      .entra-signed-in header #feedbackBtn,
+      .entra-signed-in header .i18n-control { display: none !important; }
+      /* 帳號卡內的語言切換：主列右側顯示目前語系，點開後列出可選語系 */
+      .entra-lang-caret { margin-left: auto; font-size: 12px; font-weight: 700; color: #8a94a0; }
+      .entra-lang-list { display: flex; flex-direction: column; gap: 2px; padding: 2px 0 4px 30px; }
+      .entra-lang-list[hidden] { display: none; }
+      .entra-lang-opt { display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 9px;
+                        border: none; border-radius: 7px; background: transparent; color: #334155;
+                        font-size: 13px; font-family: inherit; text-align: left; cursor: pointer; }
+      .entra-lang-opt:hover, .entra-lang-opt:focus { background: #f0f5fa; outline: none; }
+      .entra-lang-code { min-width: 34px; height: 20px; padding: 0 6px; border-radius: 999px; flex: none;
+                         display: inline-flex; align-items: center; justify-content: center; background: #e7ecf1;
+                         border: 1px solid #d8dfe7; color: #324253; font-size: 11.5px; font-weight: 800; letter-spacing: .04em; }
+      .entra-lang-opt[aria-selected="true"] { color: #1f4f8c; font-weight: 700; }
+      .entra-lang-opt[aria-selected="true"] .entra-lang-code { background: #3d78bf; border-color: #3d78bf; color: #fff; }
       .entra-panel { position: fixed; z-index: 5300; width: 300px; background: #fff; border-radius: 12px;
                      box-shadow: 0 10px 34px rgba(0,0,0,.3); padding: 18px 20px; color: #1f2733;
                      max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto;
@@ -293,8 +307,56 @@ window.Entra = (function () {
     return feedbackConfigPromise;
   }
 
-  /* 姓名資訊卡內只收合重新顯示引導與意見回饋；多國語系維持在頁首。 */
+  /* 帳號卡內的語言切換：點主列展開可選語系清單，選定後寫入偏好並重載套用。
+     未載入 I18N 或只支援單一語系時不顯示。 */
+  function mountLanguageAction(actions) {
+    if (!window.I18N || !Array.isArray(I18N.supported) || I18N.supported.length < 2) return;
+    const langs = I18N.supported;
+    const current = langs.find(l => l.code === I18N.lang) || langs[0];
+
+    const row = accountAction('language', '🌐', accountActionLabel('lang.label'), () => toggle());
+    row.setAttribute('aria-haspopup', 'true');
+    row.setAttribute('aria-expanded', 'false');
+    const caret = document.createElement('span');
+    caret.className = 'entra-lang-caret';
+    caret.setAttribute('aria-hidden', 'true');
+    caret.textContent = current.shortName + ' ⌄';
+    row.appendChild(caret);
+
+    const list = document.createElement('div');
+    list.className = 'entra-lang-list';
+    list.hidden = true;
+    for (const l of langs) {
+      const opt = document.createElement('button');
+      opt.type = 'button';
+      opt.className = 'entra-lang-opt';
+      opt.setAttribute('aria-selected', String(l.code === I18N.lang));
+      opt.innerHTML = '<span class="entra-lang-code"></span><span class="entra-lang-name"></span>';
+      opt.querySelector('.entra-lang-code').textContent = l.shortName;
+      opt.querySelector('.entra-lang-name').textContent = l.name;
+      opt.addEventListener('click', () => {
+        if (l.code === I18N.lang) { toggle(false); return; }
+        localStorage.setItem('lang', l.code);
+        location.reload();
+      });
+      list.appendChild(opt);
+    }
+
+    function toggle(force) {
+      const open = force === undefined ? list.hidden : force;
+      list.hidden = !open;
+      row.setAttribute('aria-expanded', String(open));
+      positionPanel();
+    }
+
+    actions.appendChild(row);
+    actions.appendChild(list);
+  }
+
+  /* 姓名資訊卡內收合多國語系、重新顯示引導與意見回饋。 */
   async function mountAccountActions(actions) {
+    mountLanguageAction(actions);
+
     const resetSource = document.getElementById('resetOnbBtn');
     if (resetSource) {
       actions.appendChild(accountAction('onboarding', '🧭', accountActionLabel('idx.resetOnb'), () => {
